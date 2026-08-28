@@ -14,11 +14,37 @@ const log = (m) => {
   process.stdout.write(`[boot] ${m}\n`);
 };
 
-function pgConfig() {
-  const url = process.env.DATABASE_URL;
-  if (!url) return null;
-  const ssl = process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined;
-  return { connectionString: url, ssl };
+function pgConfigs() {
+  const configs = [];
+  const push = (url, label, sslDefault) => {
+    if (!url) return;
+    const ssl =
+      process.env.DATABASE_SSL === 'true' || sslDefault
+        ? { rejectUnauthorized: false }
+        : undefined;
+    configs.push({ label, connectionString: url, ssl, connectionTimeoutMillis: 8000 });
+  };
+  push(process.env.DATABASE_URL, 'DATABASE_URL', false);
+  push(process.env.DATABASE_PUBLIC_URL, 'DATABASE_PUBLIC_URL', true);
+  return configs;
+}
+
+async function connectFirst(configs) {
+  let lastErr;
+  for (const cfg of configs) {
+    log(`trying ${cfg.label}`);
+    try {
+      const { Client } = pg;
+      const client = new Client(cfg);
+      await client.connect();
+      log(`connected via ${cfg.label}`);
+      return client;
+    } catch (err) {
+      log(`failed to connect via ${cfg.label}: ${err.message ?? err}`);
+      lastErr = err;
+    }
+  }
+  throw lastErr ?? new Error('no database URL available');
 }
 
 async function runMigrations() {
@@ -31,16 +57,13 @@ async function runMigrations() {
     log('migrations directory is empty; skipping');
     return;
   }
-  const cfg = pgConfig();
-  if (!cfg) {
-    log('DATABASE_URL not set; skipping migrations');
+  const configs = pgConfigs();
+  if (configs.length === 0) {
+    log('no DATABASE_URL / DATABASE_PUBLIC_URL; skipping migrations');
     return;
   }
   log(`connecting to Postgres for ${files.length} migration file(s)`);
-  const { Client } = pg;
-  const client = new Client(cfg);
-  await client.connect();
-  log('connected');
+  const client = await connectFirst(configs);
   try {
     const { readFile } = await import('node:fs/promises');
     for (const file of files) {
@@ -79,7 +102,8 @@ async function main() {
     await runSeedIfRequested();
   } catch (err) {
     log(`pre-start step failed: ${err?.stack ?? err}`);
-    process.exit(1);
+    // Do NOT crash — let the app boot and serve /health/live so we can diagnose.
+    log('continuing to app boot despite migration failure');
   }
   log('launching dist/main.js');
   const child = spawn(process.execPath, ['dist/main.js'], {
