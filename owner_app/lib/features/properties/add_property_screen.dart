@@ -1,0 +1,307 @@
+import 'dart:io' show File;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+
+import '../../core/api/api_exception.dart';
+import '../../core/data/location_repository.dart';
+import '../../core/data/owner_repository.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/ui.dart';
+
+class AddPropertyScreen extends ConsumerStatefulWidget {
+  const AddPropertyScreen({super.key});
+  @override
+  ConsumerState<AddPropertyScreen> createState() => _AddPropertyScreenState();
+}
+
+class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
+  final _form = GlobalKey<FormState>();
+  final _name = TextEditingController();
+  final _line1 = TextEditingController();
+  final _city = TextEditingController();
+  final _pin = TextEditingController();
+  int _stars = 3;
+  String? _state;
+  String? _district;
+  final List<XFile> _photos = [];
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _line1.dispose();
+    _city.dispose();
+    _pin.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickPhotos() async {
+    final picker = ImagePicker();
+    final imgs = await picker.pickMultiImage(imageQuality: 80);
+    if (imgs.isNotEmpty) setState(() => _photos.addAll(imgs));
+  }
+
+  Future<void> _submit() async {
+    setState(() => _error = null);
+    if (!_form.currentState!.validate()) return;
+    if (_state == null || _district == null) {
+      setState(() => _error = 'Select a state and district.');
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await ref.read(ownerRepositoryProvider).createProperty({
+        'name': _name.text.trim(),
+        'starRating': _stars,
+        'address': {
+          'line1': _line1.text.trim(),
+          'city': _city.text.trim(),
+          'district': _district,
+          'state': _state,
+          'pinCode': _pin.text.trim(),
+          'country': 'India',
+        },
+        'city': _city.text.trim(),
+        'state': _state,
+        'photoCount': _photos.length, // upload of binaries handled by media endpoint (phase: media)
+      });
+      ref.invalidate(propertiesProvider);
+      ref.invalidate(portfolioProvider);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Property added.')));
+      context.pop();
+    } on ApiException catch (e) {
+      setState(() => _error = e.code == 'PROPERTY_LIMIT_REACHED'
+          ? 'You have reached the number of properties included in your plan. Contact Travelo to increase your limit.'
+          : e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final locations = ref.watch(locationsProvider);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Add property')),
+      body: Form(
+        key: _form,
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            if (_error != null) ...[
+              Banner2(text: _error!, tone: BannerTone.danger, icon: Icons.error_outline),
+              const SizedBox(height: 16),
+            ],
+            const SectionTitle('Hotel details'),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _name,
+              decoration: const InputDecoration(labelText: 'Hotel name'),
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter a hotel name' : null,
+            ),
+            const SizedBox(height: 14),
+            _StarPicker(value: _stars, onChanged: (v) => setState(() => _stars = v)),
+            const SizedBox(height: 24),
+            const SectionTitle('Photos'),
+            const SizedBox(height: 12),
+            _PhotoStrip(
+              photos: _photos,
+              onAdd: _pickPhotos,
+              onRemove: (i) => setState(() => _photos.removeAt(i)),
+            ),
+            const SizedBox(height: 24),
+            const SectionTitle('Address'),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _line1,
+              decoration: const InputDecoration(labelText: 'Address line'),
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter the address' : null,
+            ),
+            const SizedBox(height: 14),
+            locations.when(
+              loading: () => const LinearProgressIndicator(minHeight: 2),
+              error: (_, __) => const Text('Could not load locations',
+                  style: TextStyle(color: AppColors.danger)),
+              data: (map) {
+                final states = map.keys.toList()..sort();
+                final districts = _state == null ? <String>[] : (map[_state] ?? []);
+                return Column(
+                  children: [
+                    DropdownButtonFormField<String>(
+                      initialValue: _state,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'State'),
+                      items: states
+                          .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                          .toList(),
+                      onChanged: (v) => setState(() {
+                        _state = v;
+                        _district = null;
+                      }),
+                    ),
+                    const SizedBox(height: 14),
+                    DropdownButtonFormField<String>(
+                      initialValue: _district,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'District'),
+                      items: districts
+                          .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+                          .toList(),
+                      onChanged: _state == null
+                          ? null
+                          : (v) => setState(() => _district = v),
+                    ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _city,
+                    decoration: const InputDecoration(labelText: 'City / Town'),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter a city' : null,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _pin,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(6),
+                    ],
+                    decoration: const InputDecoration(labelText: 'PIN code'),
+                    validator: (v) =>
+                        (v == null || v.trim().length != 6) ? '6-digit PIN' : null,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 28),
+            FilledButton(
+              onPressed: _busy ? null : _submit,
+              child: _busy
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+                    )
+                  : const Text('Save property'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StarPicker extends StatelessWidget {
+  const _StarPicker({required this.value, required this.onChanged});
+  final int value;
+  final ValueChanged<int> onChanged;
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Text('Star rating', style: TextStyle(color: AppColors.inkMuted)),
+        const Spacer(),
+        ...List.generate(5, (i) {
+          final n = i + 1;
+          return IconButton(
+            onPressed: () => onChanged(n),
+            icon: Icon(
+              n <= value ? Icons.star_rounded : Icons.star_border_rounded,
+              color: n <= value ? AppColors.warning : AppColors.inkFaint,
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+class _PhotoStrip extends StatelessWidget {
+  const _PhotoStrip({required this.photos, required this.onAdd, required this.onRemove});
+  final List<XFile> photos;
+  final VoidCallback onAdd;
+  final ValueChanged<int> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 96,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          GestureDetector(
+            onTap: onAdd,
+            child: Container(
+              width: 96,
+              height: 96,
+              margin: const EdgeInsets.only(right: 10),
+              decoration: BoxDecoration(
+                color: AppColors.field,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                border: Border.all(color: AppColors.line),
+              ),
+              child: const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add_a_photo_outlined, color: AppColors.inkMuted),
+                  SizedBox(height: 6),
+                  Text('Add', style: TextStyle(fontSize: 12, color: AppColors.inkMuted)),
+                ],
+              ),
+            ),
+          ),
+          ...photos.asMap().entries.map((e) {
+            final i = e.key;
+            final x = e.value;
+            return Stack(
+              children: [
+                Container(
+                  width: 96,
+                  height: 96,
+                  margin: const EdgeInsets.only(right: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    image: DecorationImage(
+                      fit: BoxFit.cover,
+                      image: kIsWeb
+                          ? NetworkImage(x.path)
+                          : FileImage(File(x.path)) as ImageProvider,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: 14,
+                  top: 4,
+                  child: GestureDetector(
+                    onTap: () => onRemove(i),
+                    child: const CircleAvatar(
+                      radius: 11,
+                      backgroundColor: Colors.black54,
+                      child: Icon(Icons.close, size: 14, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}

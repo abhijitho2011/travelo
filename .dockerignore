@@ -1,6 +1,8 @@
 node_modules
 dist
 coverage
+owner_app
+web
 .git
 .env
 .env.local
