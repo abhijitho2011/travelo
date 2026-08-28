@@ -1,6 +1,14 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
-  Bell, ChevronsLeft, ChevronsRight, LogOut, Menu, Search, ShieldCheck, UserCircle2, X,
+  Bell,
+  ChevronsLeft,
+  ChevronsRight,
+  LogOut,
+  Menu,
+  Search,
+  ShieldCheck,
+  UserCircle2,
+  X,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
@@ -9,24 +17,39 @@ import { navSections } from "@/components/admin/nav-config";
 import { StatusBadge } from "@/components/admin/primitives";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
-  DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { notifications } from "@/lib/travelo-data";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useSystemHealth } from "@/hooks/api/use-analytics";
+import {
+  useMarkAllNotificationsRead,
+  useMarkNotificationRead,
+  useNotifications,
+} from "@/hooks/api/use-operations";
+import { initials, useCurrentAdmin, useSignOut } from "@/lib/auth";
+import { relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 function Wordmark({ compact }: { compact?: boolean }) {
   return (
-    <Link to="/" className="flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring">
+    <Link
+      to="/"
+      className="flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring"
+    >
       <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-[13px] font-black text-sidebar-primary-foreground">
         T
       </span>
       {!compact && (
         <span className="flex flex-col leading-none">
           <span className="text-sm font-extrabold tracking-tight text-sidebar-accent-foreground">
-            TRAVELO
+            TAVELO
           </span>
           <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/70">
             Super Admin
@@ -52,8 +75,7 @@ function SidebarNav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?
             )}
             <ul className="space-y-0.5">
               {section.items.map((item) => {
-                const active =
-                  item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
+                const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
                 return (
                   <li key={item.to}>
                     <Link
@@ -70,17 +92,11 @@ function SidebarNav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?
                         collapsed && "justify-center px-0",
                       )}
                     >
-                      <item.icon aria-hidden className={cn("size-4 shrink-0", active && "text-sidebar-primary")} />
-                      {!collapsed && (
-                        <>
-                          <span className="truncate">{item.label}</span>
-                          {item.badge && (
-                            <span className="tnum ml-auto rounded bg-sidebar-primary/20 px-1.5 py-0.5 text-[10px] font-bold text-sidebar-primary">
-                              {item.badge}
-                            </span>
-                          )}
-                        </>
-                      )}
+                      <item.icon
+                        aria-hidden
+                        className={cn("size-4 shrink-0", active && "text-sidebar-primary")}
+                      />
+                      {!collapsed && <span className="truncate">{item.label}</span>}
                     </Link>
                   </li>
                 );
@@ -94,17 +110,26 @@ function SidebarNav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?
 }
 
 function NotificationCenter() {
-  const [items, setItems] = useState(notifications.map((n) => ({ ...n, read: false })));
-  const unread = items.filter((n) => !n.read).length;
+  const { data, isLoading, isError } = useNotifications({ limit: 10 });
+  const markRead = useMarkNotificationRead();
+  const markAllRead = useMarkAllNotificationsRead();
+
+  const items = data?.items ?? [];
+  const unread = data?.unread ?? 0;
 
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative size-8" aria-label={`Notifications, ${unread} unread`}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative size-8"
+          aria-label={`Notifications, ${unread} unread`}
+        >
           <Bell aria-hidden className="size-4" />
           {unread > 0 && (
             <span className="tnum absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">
-              {unread}
+              {unread > 9 ? "9+" : unread}
             </span>
           )}
         </Button>
@@ -116,44 +141,69 @@ function NotificationCenter() {
             variant="ghost"
             size="sm"
             className="h-7 text-xs"
-            onClick={() => setItems((prev) => prev.map((n) => ({ ...n, read: true })))}
+            disabled={unread === 0 || markAllRead.isPending}
+            onClick={() => markAllRead.mutate()}
           >
             Mark all read
           </Button>
         </div>
-        <ul className="max-h-[340px] divide-y divide-border overflow-auto">
-          {items.map((n) => (
-            <li key={n.id}>
-              <Link
-                to={n.to}
-                className="flex gap-2.5 px-3 py-2.5 hover:bg-surface-muted"
-                onClick={() =>
-                  setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)))
-                }
-              >
-                <span
-                  aria-hidden
-                  className={cn(
-                    "mt-1.5 size-2 shrink-0 rounded-full",
-                    n.tone === "danger" && "bg-destructive",
-                    n.tone === "warning" && "bg-warning",
-                    n.tone === "info" && "bg-info",
-                    n.tone === "success" && "bg-success",
-                  )}
-                />
-                <span className="min-w-0">
-                  <span className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {n.category}
-                  </span>
-                  <span className={cn("block text-sm", n.read ? "text-muted-foreground" : "font-medium text-foreground")}>
-                    {n.title}
-                  </span>
-                  <span className="block text-xs text-muted-foreground">{n.time}</span>
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <div className="max-h-[340px] overflow-auto">
+          {isLoading ? (
+            <div className="space-y-2 p-3">
+              <Skeleton className="h-9 w-full" />
+              <Skeleton className="h-9 w-full" />
+              <Skeleton className="h-9 w-full" />
+            </div>
+          ) : isError ? (
+            <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+              Notifications are unavailable right now.
+            </p>
+          ) : items.length === 0 ? (
+            <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+              You&apos;re all caught up.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {items.map((n) => (
+                <li key={n.id}>
+                  <button
+                    type="button"
+                    className="flex w-full gap-2.5 px-3 py-2.5 text-left hover:bg-surface-muted"
+                    onClick={() => {
+                      if (!n.readAt) markRead.mutate(n.id);
+                    }}
+                  >
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "mt-1.5 size-2 shrink-0 rounded-full",
+                        n.readAt ? "bg-border-strong" : "bg-primary",
+                      )}
+                    />
+                    <span className="min-w-0">
+                      {n.category && (
+                        <span className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          {n.category}
+                        </span>
+                      )}
+                      <span
+                        className={cn(
+                          "block text-sm",
+                          n.readAt ? "text-muted-foreground" : "font-medium text-foreground",
+                        )}
+                      >
+                        {n.title}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {relativeTime(n.createdAt)}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         <div className="border-t border-border p-2">
           <Button asChild variant="outline" size="sm" className="w-full">
             <Link to="/notifications">Open alert center</Link>
@@ -164,33 +214,57 @@ function NotificationCenter() {
   );
 }
 
-export function ImpersonationBanner({
-  owner,
-  role,
-  onExit,
-}: {
-  owner: string;
-  role: string;
-  onExit: () => void;
-}) {
+function HealthPill() {
+  const { data, isLoading, isError } = useSystemHealth();
+  if (isLoading) return <Skeleton className="h-5 w-20" />;
+  const status = isError ? "Down" : (data?.status ?? "Unknown");
+  return <StatusBadge status={status === "ok" ? "Healthy" : status} />;
+}
+
+function AccountMenu() {
+  const { data: admin, isLoading } = useCurrentAdmin();
+  const signOut = useSignOut();
+
   return (
-    <div
-      role="status"
-      className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-warning px-4 py-2 text-sm font-semibold text-warning-foreground"
-    >
-      <span>⚠ SUPPORT IMPERSONATION MODE</span>
-      <span className="font-normal">
-        Acting as: <strong>{owner}</strong> ({role}) · Admin: John Mathew · all actions recorded
-      </span>
-      <Button
-        size="sm"
-        variant="secondary"
-        className="ml-auto h-7"
-        onClick={onExit}
-      >
-        <X aria-hidden className="mr-1 size-3.5" /> Exit
-      </Button>
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="h-8 gap-2 px-1.5">
+          <span className="flex size-6 items-center justify-center rounded-full bg-primary-soft text-[11px] font-bold text-accent-foreground">
+            {initials(admin?.name)}
+          </span>
+          <span className="hidden text-left leading-tight sm:block">
+            {isLoading ? (
+              <Skeleton className="h-4 w-24" />
+            ) : (
+              <>
+                <span className="block text-xs font-semibold">{admin?.name ?? "Administrator"}</span>
+                <span className="block text-[10px] text-muted-foreground">
+                  {admin?.roles?.[0] ?? "Admin"}
+                </span>
+              </>
+            )}
+          </span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="truncate">{admin?.email ?? "Signed in"}</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link to="/admin-users">
+            <UserCircle2 aria-hidden className="mr-2 size-4" /> Admin users &amp; sessions
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/roles">
+            <ShieldCheck aria-hidden className="mr-2 size-4" /> Roles &amp; permissions
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => void signOut()}>
+          <LogOut aria-hidden className="mr-2 size-4" /> Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -198,9 +272,6 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { open, setOpen } = useCommandPalette();
-  const impersonating = useRouterState({
-    select: (s) => s.location.search as { impersonate?: string },
-  });
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -213,7 +284,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
           collapsed ? "w-[68px]" : "w-[248px]",
         )}
       >
-        <div className={cn("flex h-14 items-center border-b border-sidebar-border px-3", collapsed && "justify-center px-0")}>
+        <div
+          className={cn(
+            "flex h-14 items-center border-b border-sidebar-border px-3",
+            collapsed && "justify-center px-0",
+          )}
+        >
           <Wordmark compact={collapsed} />
         </div>
         <div className="min-h-0 flex-1">
@@ -227,7 +303,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             className="w-full justify-center text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           >
-            {collapsed ? <ChevronsRight aria-hidden className="size-4" /> : (
+            {collapsed ? (
+              <ChevronsRight aria-hidden className="size-4" />
+            ) : (
               <>
                 <ChevronsLeft aria-hidden className="mr-1.5 size-4" /> Collapse
               </>
@@ -247,7 +325,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
           <div className="absolute inset-y-0 left-0 flex w-[264px] flex-col bg-sidebar">
             <div className="flex h-14 items-center justify-between border-b border-sidebar-border px-3">
               <Wordmark />
-              <Button variant="ghost" size="icon" className="size-8 text-sidebar-foreground" aria-label="Close navigation" onClick={() => setMobileOpen(false)}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 text-sidebar-foreground"
+                aria-label="Close navigation"
+                onClick={() => setMobileOpen(false)}
+              >
                 <X aria-hidden className="size-4" />
               </Button>
             </div>
@@ -261,7 +345,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-40 border-b border-border bg-surface/95 backdrop-blur">
           <div className="flex h-14 items-center gap-2 px-3 lg:px-5">
-            <Button variant="ghost" size="icon" className="size-8 lg:hidden" aria-label="Open navigation" onClick={() => setMobileOpen(true)}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8 lg:hidden"
+              aria-label="Open navigation"
+              onClick={() => setMobileOpen(true)}
+            >
               <Menu aria-hidden className="size-4" />
             </Button>
             <button
@@ -277,51 +367,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
             </button>
             <div className="ml-auto flex items-center gap-1.5">
               <span className="hidden lg:block">
-                <StatusBadge status="Healthy" />
+                <HealthPill />
               </span>
               <NotificationCenter />
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="h-8 gap-2 px-1.5">
-                    <span className="flex size-6 items-center justify-center rounded-full bg-primary-soft text-[11px] font-bold text-accent-foreground">
-                      JM
-                    </span>
-                    <span className="hidden text-left leading-tight sm:block">
-                      <span className="block text-xs font-semibold">John Mathew</span>
-                      <span className="block text-[10px] text-muted-foreground">Super Admin</span>
-                    </span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>john@travelo.io</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link to="/admin-users">
-                      <UserCircle2 aria-hidden className="mr-2 size-4" /> Profile &amp; sessions
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to="/roles">
-                      <ShieldCheck aria-hidden className="mr-2 size-4" /> Roles &amp; permissions
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link to="/login">
-                      <LogOut aria-hidden className="mr-2 size-4" /> Sign out
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <AccountMenu />
             </div>
           </div>
-          {impersonating?.impersonate && (
-            <ImpersonationBanner
-              owner={impersonating.impersonate}
-              role="Owner"
-              onExit={() => window.history.back()}
-            />
-          )}
         </header>
         <main className="min-w-0 flex-1">{children}</main>
       </div>

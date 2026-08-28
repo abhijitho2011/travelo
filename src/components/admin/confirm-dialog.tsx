@@ -1,14 +1,24 @@
+import { Loader2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { toast } from "sonner";
 
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
+/**
+ * Confirmation for destructive/audited actions. `onConfirm` performs the real
+ * API call; the dialog stays open until it settles so failures surface inline.
+ */
 export function ConfirmDialog({
   trigger,
   title,
@@ -22,17 +32,30 @@ export function ConfirmDialog({
   trigger: ReactNode;
   title: string;
   description: string;
-  impact?: string[];
-  confirmLabel?: string;
-  destructive?: boolean;
-  requireReason?: boolean;
-  onConfirm?: (reason: string) => void;
+  impact?: string[] | undefined;
+  confirmLabel?: string | undefined;
+  destructive?: boolean | undefined;
+  requireReason?: boolean | undefined;
+  onConfirm: (reason: string) => Promise<unknown> | unknown;
 }) {
+  const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
-  const blocked = requireReason && reason.trim().length < 4;
+  const [busy, setBusy] = useState(false);
+  const blocked = (requireReason && reason.trim().length < 4) || busy;
+
+  const run = async () => {
+    setBusy(true);
+    try {
+      await onConfirm(reason.trim());
+      setOpen(false);
+      setReason("");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
-    <AlertDialog>
+    <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
@@ -62,18 +85,18 @@ export function ConfirmDialog({
           </div>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             disabled={blocked}
-            className={destructive ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : undefined}
-            onClick={() => {
-              onConfirm?.(reason);
-              toast.success(`${confirmLabel} completed`, {
-                description: "An audit entry was created automatically.",
-              });
-              setReason("");
+            className={
+              destructive ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : undefined
+            }
+            onClick={(e) => {
+              e.preventDefault();
+              void run();
             }}
           >
+            {busy && <Loader2 aria-hidden className="mr-2 size-4 animate-spin" />}
             {confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>

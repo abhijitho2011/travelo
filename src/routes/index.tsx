@@ -1,263 +1,307 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowUpRight, CalendarDays, Download, Plus } from "lucide-react";
-import { useState } from "react";
+import { Plus } from "lucide-react";
 import {
-  Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, Line, LineChart,
-  ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from "recharts";
 
-import { KpiCard, PageHeader, Section, StatusBadge, Timeline } from "@/components/admin/primitives";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  activityFeed, alerts, growthSeries, kpis, platformUsage, revenueSeries, subscriptionHealth,
-} from "@/lib/travelo-data";
-import { cn } from "@/lib/utils";
+  AsyncSection,
+  ChartSkeleton,
+  ErrorState,
+  KpiCard,
+  PageHeader,
+  Section,
+  StatusBadge,
+} from "@/components/admin/primitives";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useDashboard } from "@/hooks/api/use-analytics";
+import { useFailedPayments } from "@/hooks/api/use-billing";
+import { useTickets } from "@/hooks/api/use-support";
+import { compactInr, formatDate, humanise, inr, num, relativeTime } from "@/lib/format";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Platform Dashboard · Travelo Super Admin" },
-      {
-        name: "description",
-        content:
-          "Executive view of Travelo platform health: owners, properties, rooms, MRR, ARR, subscription health and live usage.",
-      },
-      { property: "og:title", content: "Platform Dashboard · Travelo Super Admin" },
-      {
-        property: "og:description",
-        content: "Owners, properties, MRR/ARR, subscription health and platform usage in one control plane.",
-      },
+      { title: "Dashboard · Tavelo Super Admin" },
+      { name: "description", content: "Platform-wide KPIs, revenue trend and operational alerts." },
     ],
   }),
-  component: Dashboard,
+  component: DashboardPage,
 });
 
-const chartTooltip = {
-  contentStyle: {
-    background: "var(--color-surface)",
-    border: "1px solid var(--color-border)",
-    borderRadius: "8px",
-    fontSize: "12px",
-  },
-};
+const TONE_COLORS = [
+  "var(--color-primary)",
+  "var(--color-info)",
+  "var(--color-success)",
+  "var(--color-warning)",
+  "var(--color-destructive)",
+];
 
-function Dashboard() {
-  const [range, setRange] = useState("30d");
-  const healthTotal = subscriptionHealth.reduce((a, b) => a + b.value, 0);
+function DashboardPage() {
+  const dashboard = useDashboard();
+  const failed = useFailedPayments(5);
+  const openTickets = useTickets({ limit: 5, status: "OPEN" });
+
+  const overview = dashboard.data?.overview;
+  const series = dashboard.data?.revenueSeries ?? [];
+  const health = dashboard.data?.subscriptionHealth ?? [];
+  const owners = dashboard.data?.ownerBreakdown ?? [];
 
   return (
     <>
       <PageHeader
         eyebrow="Overview"
-        title="Platform Dashboard"
-        description="Live state of the Travelo platform — customers, revenue, subscriptions and system load."
+        title="Platform dashboard"
+        description="Live owners, subscriptions, revenue and operational signals."
         actions={
-          <>
-            <Select value={range} onValueChange={setRange}>
-              <SelectTrigger className="h-8 w-[168px] text-sm" aria-label="Date range">
-                <CalendarDays aria-hidden className="mr-1.5 size-3.5" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="yesterday">Yesterday</SelectItem>
-                <SelectItem value="7d">Last 7 days</SelectItem>
-                <SelectItem value="30d">Last 30 days</SelectItem>
-                <SelectItem value="month">This month</SelectItem>
-                <SelectItem value="lastmonth">Last month</SelectItem>
-                <SelectItem value="quarter">This quarter</SelectItem>
-                <SelectItem value="year">This year</SelectItem>
-                <SelectItem value="custom">Custom range…</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="sm" className="h-8">
-              <Download aria-hidden className="mr-1.5 size-3.5" /> Export
-            </Button>
-            <Button asChild size="sm" className="h-8">
-              <Link to="/owners/new">
-                <Plus aria-hidden className="mr-1.5 size-3.5" /> Add owner
-              </Link>
-            </Button>
-          </>
+          <Button asChild size="sm" className="h-8">
+            <Link to="/owners/new">
+              <Plus aria-hidden className="mr-1.5 size-3.5" /> New owner
+            </Link>
+          </Button>
         }
       />
 
-      <div className="space-y-4 p-4 lg:p-6">
-        {/* Alert center */}
-        <Section title="Platform alert center" description="Clicking an alert opens the filtered screen.">
-          <ul className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-5">
-            {alerts.map((a) => (
-              <li key={a.text} className="bg-surface">
-                <Link
-                  to={a.to}
-                  className="flex h-full items-start gap-2 px-3.5 py-3 text-sm hover:bg-surface-muted"
-                >
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "mt-1 size-2.5 shrink-0 rounded-full",
-                      a.tone === "danger" && "bg-destructive",
-                      a.tone === "warning" && "bg-warning",
-                      a.tone === "success" && "bg-success",
-                    )}
-                  />
-                  <span className="text-foreground">{a.text}</span>
-                  <ArrowUpRight aria-hidden className="ml-auto size-3.5 shrink-0 text-muted-foreground" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Section>
+      <div className="space-y-4 p-5 lg:p-6">
+        {dashboard.isError ? (
+          <div className="panel">
+            <ErrorState
+              description={
+                dashboard.error instanceof Error
+                  ? dashboard.error.message
+                  : "The dashboard could not be loaded."
+              }
+              onRetry={() => dashboard.refetch()}
+            />
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {dashboard.isLoading
+              ? Array.from({ length: 8 }).map((_, i) => (
+                  <Skeleton key={i} className="h-[86px] w-full rounded-lg" />
+                ))
+              : [
+                  { label: "Total owners", value: num(overview?.ownersTotal) },
+                  { label: "Active owners", value: num(overview?.ownersActive) },
+                  { label: "Properties", value: num(overview?.propertiesTotal) },
+                  { label: "Rooms managed", value: num(overview?.rooms) },
+                  { label: "Active subscriptions", value: num(overview?.subsActive) },
+                  { label: "MRR", value: compactInr(overview?.mrr) },
+                  { label: "ARR", value: compactInr(overview?.arr) },
+                  {
+                    label: "Expiring soon",
+                    value: num(overview?.expiringSoon),
+                    hint: "next 7 days",
+                  },
+                ].map((kpi) => (
+                  <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} hint={kpi.hint} />
+                ))}
+          </div>
+        )}
 
-        {/* KPI row */}
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
-          {kpis.map((k) => (
-            <KpiCard key={k.label} {...k} />
-          ))}
-        </div>
-
-        {/* Revenue + subscription health */}
-        <div className="grid gap-4 xl:grid-cols-3">
-          <Section
-            className="xl:col-span-2"
-            title="Revenue"
-            description="MRR, ARR and collected revenue"
-            actions={
-              <Tabs defaultValue="mrr">
-                <TabsList className="h-8">
-                  <TabsTrigger value="mrr" className="text-xs">MRR</TabsTrigger>
-                  <TabsTrigger value="arr" className="text-xs">ARR</TabsTrigger>
-                  <TabsTrigger value="collected" className="text-xs">Collected</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            }
-          >
-            <div className="h-[264px] p-3">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={revenueSeries}>
-                  <defs>
-                    <linearGradient id="mrrFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity={0.28} />
-                      <stop offset="100%" stopColor="var(--color-chart-1)" stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid stroke="var(--color-border)" vertical={false} />
-                  <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={11} stroke="var(--color-muted-foreground)" />
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    fontSize={11}
-                    stroke="var(--color-muted-foreground)"
-                    tickFormatter={(v: number) => `₹${(v / 100000).toFixed(0)}L`}
-                  />
-                  <Tooltip {...chartTooltip} formatter={(v: number) => `₹${(v / 100000).toFixed(2)}L`} />
-                  <Area type="monotone" dataKey="mrr" stroke="var(--color-chart-1)" strokeWidth={2} fill="url(#mrrFill)" name="MRR" />
-                  <Line type="monotone" dataKey="collected" stroke="var(--color-chart-3)" strokeWidth={2} dot={false} name="Collected" />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </Section>
-
-          <Section title="Subscription health" description={`${healthTotal} total subscriptions`}>
+        <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
+          <Section title="Revenue trend" description="Daily MRR recorded by the platform">
             <div className="p-4">
-              <div className="mb-4 flex h-2 overflow-hidden rounded-full">
-                {subscriptionHealth.map((s) => (
-                  <span
-                    key={s.label}
-                    title={`${s.label}: ${s.value}`}
-                    style={{ width: `${(s.value / healthTotal) * 100}%` }}
-                    className={cn(
-                      s.tone === "success" && "bg-success",
-                      s.tone === "info" && "bg-info",
-                      s.tone === "warning" && "bg-warning",
-                      s.tone === "danger" && "bg-destructive",
-                      s.tone === "neutral" && "bg-border-strong",
-                    )}
-                  />
-                ))}
-              </div>
-              <ul className="space-y-1.5">
-                {subscriptionHealth.map((s) => (
-                  <li key={s.label}>
-                    <Link
-                      to="/subscriptions"
-                      className="flex items-center justify-between rounded px-1 py-1 text-sm hover:bg-surface-muted"
+              <AsyncSection
+                loading={dashboard.isLoading}
+                error={dashboard.error}
+                onRetry={() => dashboard.refetch()}
+                isEmpty={series.length === 0}
+                emptyTitle="No revenue history yet"
+                emptyDescription="Daily platform metrics are recorded once subscriptions start billing."
+                skeleton={<ChartSkeleton height={260} />}
+              >
+                <ResponsiveContainer width="100%" height={260}>
+                  <AreaChart data={series} margin={{ left: 4, right: 8, top: 8, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="mrrFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.35} />
+                        <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                    <XAxis
+                      dataKey="day"
+                      tickFormatter={(v: string) => formatDate(v).slice(0, 6)}
+                      tick={{ fontSize: 11 }}
+                      stroke="var(--color-muted-foreground)"
+                      minTickGap={24}
+                    />
+                    <YAxis
+                      tickFormatter={(v: number) => compactInr(v)}
+                      tick={{ fontSize: 11 }}
+                      stroke="var(--color-muted-foreground)"
+                      width={70}
+                    />
+                    <Tooltip
+                      formatter={(value: number) => inr(value)}
+                      labelFormatter={(label: string) => formatDate(label)}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="mrr"
+                      name="MRR"
+                      stroke="var(--color-primary)"
+                      fill="url(#mrrFill)"
+                      strokeWidth={2}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </AsyncSection>
+            </div>
+          </Section>
+
+          <Section title="Subscription health" description="Live status distribution">
+            <div className="p-4">
+              <AsyncSection
+                loading={dashboard.isLoading}
+                error={dashboard.error}
+                onRetry={() => dashboard.refetch()}
+                isEmpty={health.length === 0}
+                emptyTitle="No subscriptions yet"
+                emptyDescription="Status distribution appears once owners are subscribed."
+                skeleton={<ChartSkeleton height={200} />}
+              >
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={health}
+                      dataKey="count"
+                      nameKey="status"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={2}
                     >
-                      <StatusBadge status={s.label} tone={s.tone} />
-                      <span className="tnum font-semibold">{s.value}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+                      {health.map((entry, i) => (
+                        <Cell key={entry.status} fill={TONE_COLORS[i % TONE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v: number, n: string) => [num(v), humanise(n)]} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <ul className="mt-3 space-y-1.5">
+                  {health.map((h, i) => (
+                    <li key={h.status} className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        <span
+                          aria-hidden
+                          className="size-2 rounded-full"
+                          style={{ background: TONE_COLORS[i % TONE_COLORS.length] }}
+                        />
+                        {humanise(h.status)}
+                      </span>
+                      <span className="tnum font-semibold">{num(h.count)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </AsyncSection>
             </div>
           </Section>
         </div>
 
-        {/* Growth + usage */}
         <div className="grid gap-4 xl:grid-cols-3">
-          <Section className="xl:col-span-2" title="Customer growth" description="New owners, new properties and churn">
-            <div className="h-[240px] p-3">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={growthSeries}>
-                  <CartesianGrid stroke="var(--color-border)" vertical={false} />
-                  <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={11} stroke="var(--color-muted-foreground)" />
-                  <YAxis tickLine={false} axisLine={false} fontSize={11} stroke="var(--color-muted-foreground)" />
-                  <Tooltip {...chartTooltip} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="owners" name="New owners" fill="var(--color-chart-1)" radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="properties" name="New properties" fill="var(--color-chart-2)" radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="churned" name="Churned owners" fill="var(--color-chart-5)" radius={[3, 3, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+          <Section title="Owner status" description="Accounts by lifecycle state">
+            <div className="px-4 py-3">
+              <AsyncSection
+                loading={dashboard.isLoading}
+                error={dashboard.error}
+                onRetry={() => dashboard.refetch()}
+                isEmpty={owners.length === 0}
+                emptyTitle="No owners yet"
+                emptyDescription="Create the first owner to populate this breakdown."
+              >
+                <ul className="divide-y divide-border">
+                  {owners.map((o) => (
+                    <li key={o.status} className="flex items-center justify-between py-2">
+                      <StatusBadge status={o.status} />
+                      <span className="tnum text-sm font-semibold">{num(o.count)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </AsyncSection>
             </div>
           </Section>
 
-          <Section title="Platform usage" description="Last 24 hours">
-            <ul className="grid grid-cols-2 gap-px bg-border">
-              {platformUsage.map((u) => (
-                <li key={u.label} className="bg-surface px-3 py-2.5">
-                  <p className="eyebrow truncate">{u.label}</p>
-                  <p className="tnum text-base font-bold">{u.value}</p>
-                  <p className="truncate text-[11px] text-muted-foreground">{u.sub}</p>
-                </li>
-              ))}
-            </ul>
-          </Section>
-        </div>
-
-        {/* Activity + expiring */}
-        <div className="grid gap-4 xl:grid-cols-3">
           <Section
-            className="xl:col-span-2"
-            title="Owner activity"
+            title="Failed payments"
+            description="Needs collections follow-up"
             actions={
-              <Button asChild variant="ghost" size="sm" className="h-7 text-xs">
-                <Link to="/activity">View all</Link>
+              <Button asChild variant="outline" size="sm" className="h-7">
+                <Link to="/payments">View all</Link>
               </Button>
             }
           >
-            <div className="px-4 py-2">
-              <Timeline items={activityFeed.slice(0, 6)} />
+            <div className="px-4 py-3">
+              <AsyncSection
+                loading={failed.isLoading}
+                error={failed.error}
+                onRetry={() => failed.refetch()}
+                isEmpty={(failed.data?.items?.length ?? 0) === 0}
+                emptyTitle="No failed payments"
+                emptyDescription="Every recent charge has settled successfully."
+              >
+                <ul className="divide-y divide-border">
+                  {failed.data?.items?.map((p) => (
+                    <li key={p.id} className="flex items-center justify-between gap-3 py-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{p.owner ?? "Unknown owner"}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {p.failureReason ?? humanise(p.status)} · {relativeTime(p.createdAt)}
+                        </p>
+                      </div>
+                      <span className="tnum shrink-0 text-sm font-semibold">{inr(p.amount)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </AsyncSection>
             </div>
           </Section>
 
           <Section
-            title="Trend — MRR vs churn"
-            description="Rolling 9 months"
+            title="Open tickets"
+            description="Awaiting a first response"
+            actions={
+              <Button asChild variant="outline" size="sm" className="h-7">
+                <Link to="/support">View all</Link>
+              </Button>
+            }
           >
-            <div className="h-[240px] p-3">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={revenueSeries}>
-                  <CartesianGrid stroke="var(--color-border)" vertical={false} />
-                  <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={11} stroke="var(--color-muted-foreground)" />
-                  <YAxis tickLine={false} axisLine={false} fontSize={11} stroke="var(--color-muted-foreground)" tickFormatter={(v: number) => `₹${(v / 10000000).toFixed(1)}Cr`} />
-                  <Tooltip {...chartTooltip} formatter={(v: number) => `₹${(v / 100000).toFixed(1)}L`} />
-                  <Line type="monotone" dataKey="arr" name="ARR" stroke="var(--color-chart-2)" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+            <div className="px-4 py-3">
+              <AsyncSection
+                loading={openTickets.isLoading}
+                error={openTickets.error}
+                onRetry={() => openTickets.refetch()}
+                isEmpty={(openTickets.data?.items?.length ?? 0) === 0}
+                emptyTitle="Inbox zero"
+                emptyDescription="There are no open support tickets right now."
+              >
+                <ul className="divide-y divide-border">
+                  {openTickets.data?.items?.map((t) => (
+                    <li key={t.id} className="py-2">
+                      <Link
+                        to="/support/$ticketId"
+                        params={{ ticketId: t.id }}
+                        className="block hover:underline"
+                      >
+                        <p className="truncate text-sm font-medium">{t.subject}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {t.owner ?? "Unassigned owner"} · {relativeTime(t.createdAt)}
+                        </p>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </AsyncSection>
             </div>
           </Section>
         </div>

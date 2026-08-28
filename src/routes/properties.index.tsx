@@ -1,170 +1,129 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { MoreHorizontal } from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 
 import { DataTable, type Column } from "@/components/admin/data-table";
-import { KpiCard, MetricRow, PageHeader, ScoreBar, StatusBadge } from "@/components/admin/primitives";
+import { SearchBox, StatusFilter, ToolbarActions } from "@/components/admin/list-toolbar";
+import { PageHeader, StatusBadge } from "@/components/admin/primitives";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { inr, properties, type Property } from "@/lib/travelo-data";
+import type { Property } from "@/hooks/api/types";
+import { useProperties } from "@/hooks/api/use-properties";
+import { useListParams } from "@/hooks/use-list-params";
+import { formatDate, num } from "@/lib/format";
 
 export const Route = createFileRoute("/properties/")({
   head: () => ({
     meta: [
-      { title: "Properties · Travelo Super Admin" },
-      { name: "description", content: "Monitor every hotel and resort on the platform: rooms, occupancy, revenue and listing state." },
-      { property: "og:title", content: "Properties · Travelo Super Admin" },
-      { property: "og:description", content: "Platform-wide hotel and resort monitoring." },
+      { title: "Properties · Tavelo Super Admin" },
+      { name: "description", content: "Every hotel managed on the Tavelo platform." },
     ],
   }),
   component: PropertiesPage,
 });
 
+const PROPERTY_STATUSES = ["ACTIVE", "DRAFT", "PENDING", "SUSPENDED", "ARCHIVED"];
+
 function PropertiesPage() {
-  const [status, setStatus] = useState("all");
-  const [drawer, setDrawer] = useState<Property | null>(null);
-  const rows = properties.filter((p) => status === "all" || p.status === status);
+  const navigate = useNavigate();
+  const list = useListParams();
+  const query = useProperties({
+    limit: list.limit,
+    offset: list.offset,
+    q: list.q,
+    status: list.statusParam,
+  });
 
   const columns: Column<Property>[] = [
     {
-      key: "hotel", header: "Hotel", sortValue: (p) => p.name,
+      key: "name",
+      header: "Property",
       cell: (p) => (
         <div className="min-w-0">
-          <Link
-            to="/properties/$propertyId"
-            params={{ propertyId: p.id }}
-            onClick={(e) => e.stopPropagation()}
-            className="block truncate font-semibold hover:text-primary hover:underline"
-          >
-            {p.name}
-          </Link>
-          <span className="block truncate text-xs text-muted-foreground">
-            {p.stars}★ {p.category} · {p.location}
-          </span>
+          <p className="truncate font-medium text-foreground">{p.name}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {[p.city, p.state, p.country].filter(Boolean).join(", ") || "—"}
+          </p>
         </div>
       ),
     },
     {
-      key: "owner", header: "Owner", sortValue: (p) => p.owner,
-      cell: (p) => (
-        <Link to="/owners/$ownerId" params={{ ownerId: p.ownerId }} onClick={(e) => e.stopPropagation()} className="text-muted-foreground hover:text-primary hover:underline">
-          {p.owner}
-        </Link>
-      ),
+      key: "owner",
+      header: "Owner",
+      cell: (p) =>
+        p.owner ? (
+          <Link
+            to="/owners/$ownerId"
+            params={{ ownerId: p.ownerId }}
+            className="text-primary hover:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {p.owner}
+          </Link>
+        ) : (
+          "—"
+        ),
     },
-    { key: "rooms", header: "Rooms", align: "right", sortValue: (p) => p.rooms, cell: (p) => <span className="tnum">{p.rooms}</span> },
-    { key: "occ", header: "Occupancy", align: "right", sortValue: (p) => p.occupancy, cell: (p) => <span className="tnum">{p.occupancy}%</span> },
-    { key: "rev", header: "Revenue (MTD)", align: "right", sortValue: (p) => p.revenue, cell: (p) => <span className="tnum">{inr(p.revenue)}</span> },
-    { key: "gm", header: "GM", optional: true, cell: (p) => p.gm },
+    { key: "category", header: "Category", cell: (p) => p.category ?? "—" },
+    {
+      key: "stars",
+      header: "Rating",
+      cell: (p) => (p.starRating ? `${p.starRating}★` : "—"),
+    },
+    { key: "rooms", header: "Rooms", align: "right", cell: (p) => num(p.roomCount) },
     { key: "status", header: "Status", cell: (p) => <StatusBadge status={p.status} /> },
-    { key: "listing", header: "Listing", cell: (p) => <StatusBadge status={p.listing} /> },
+    { key: "created", header: "Onboarded", cell: (p) => formatDate(p.createdAt) },
   ];
-
-  const totalRooms = properties.reduce((a, p) => a + p.rooms, 0);
-  const active = properties.filter((p) => p.status === "Active").length;
 
   return (
     <>
       <PageHeader
         eyebrow="Customers"
         title="Properties"
-        description="All hotels and resorts across every owner account."
-        breadcrumbs={[{ label: "Super Admin", to: "/" }, { label: "Properties" }]}
+        description="Hotels onboarded across every owner account."
       />
-      <div className="space-y-4 p-4 lg:p-6">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <KpiCard label="Properties" value={String(properties.length)} hint="in this view" />
-          <KpiCard label="Active" value={String(active)} hint={`${properties.length - active} suspended`} />
-          <KpiCard label="Rooms" value={totalRooms.toLocaleString("en-IN")} hint="managed inventory" />
-          <KpiCard label="Avg occupancy" value={`${Math.round(properties.reduce((a, p) => a + p.occupancy, 0) / properties.length)}%`} delta="+3.1%" />
-        </div>
-
+      <div className="p-5 lg:p-6">
         <DataTable
-          rows={rows}
+          rows={query.data?.items ?? []}
           columns={columns}
           rowKey={(p) => p.id}
-          searchKeys={(p) => `${p.name} ${p.owner} ${p.location} ${p.gm}`}
-          searchPlaceholder="Search hotel, owner, city…"
-          exportName="Properties"
-          onRowClick={(p) => setDrawer(p)}
-          filters={
-            <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger className="h-8 w-[150px] text-sm" aria-label="Filter by status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="Active">Active</SelectItem>
-                <SelectItem value="Suspended">Suspended</SelectItem>
-              </SelectContent>
-            </Select>
+          loading={query.isLoading}
+          error={query.error}
+          onRetry={() => query.refetch()}
+          onRowClick={(p) =>
+            navigate({ to: "/properties/$propertyId", params: { propertyId: p.id } })
           }
-          rowActions={(p) => (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="size-7" aria-label={`Actions for ${p.name}`}>
-                  <MoreHorizontal aria-hidden className="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                  <Link to="/properties/$propertyId" params={{ propertyId: p.id }}>Open property 360</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to="/listings">Review listing</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link to="/integrations">Integration health</Link></DropdownMenuItem>
-                <DropdownMenuItem onClick={() => toast.info(`Monitoring ${p.name}`, { description: "Live operations stream opened." })}>
-                  Monitor operations
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          emptyTitle="No properties match"
-          emptyDescription="Adjust the filters, or onboard an owner so they can create hotels."
+          emptyTitle="No properties match this view"
+          emptyDescription="Adjust the search or status filter to widen the results."
+          emptyAction={
+            <Button asChild size="sm" variant="outline">
+              <Link to="/owners">Browse owners</Link>
+            </Button>
+          }
+          pagination={{
+            total: query.data?.total ?? 0,
+            limit: list.limit,
+            offset: list.offset,
+            onOffsetChange: list.setOffset,
+          }}
+          toolbar={
+            <>
+              <SearchBox
+                value={list.search}
+                onChange={list.setSearch}
+                placeholder="Search by hotel name or city…"
+              />
+              <StatusFilter
+                value={list.status}
+                onChange={list.setStatus}
+                options={PROPERTY_STATUSES}
+              />
+              <ToolbarActions>
+                <span className="tnum text-xs text-muted-foreground">
+                  {query.data?.total ?? 0} total
+                </span>
+              </ToolbarActions>
+            </>
+          }
         />
       </div>
-
-      <Sheet open={!!drawer} onOpenChange={(o) => !o && setDrawer(null)}>
-        <SheetContent className="w-full sm:max-w-md">
-          {drawer && (
-            <>
-              <SheetHeader>
-                <SheetTitle>{drawer.name}</SheetTitle>
-                <SheetDescription>{drawer.owner} · {drawer.id}</SheetDescription>
-              </SheetHeader>
-              <div className="mt-4 space-y-4">
-                <div className="flex gap-2">
-                  <StatusBadge status={drawer.status} />
-                  <StatusBadge status={drawer.listing} />
-                </div>
-                <dl>
-                  <MetricRow label="Category" value={`${drawer.stars}★ ${drawer.category}`} />
-                  <MetricRow label="Location" value={drawer.location} />
-                  <MetricRow label="Rooms" value={drawer.rooms} />
-                  <MetricRow label="Occupancy" value={`${drawer.occupancy}%`} />
-                  <MetricRow label="Revenue (MTD)" value={inr(drawer.revenue)} />
-                  <MetricRow label="GM" value={drawer.gm} />
-                  <MetricRow label="AGM" value={drawer.agm} />
-                  <MetricRow label="Updated" value={drawer.updated} />
-                </dl>
-                <ScoreBar value={drawer.completeness} label="Listing completeness" />
-                <div className="flex flex-wrap gap-2">
-                  <Button asChild size="sm">
-                    <Link to="/properties/$propertyId" params={{ propertyId: drawer.id }}>Open property 360</Link>
-                  </Button>
-                  <Button asChild variant="outline" size="sm">
-                    <Link to="/owners/$ownerId" params={{ ownerId: drawer.ownerId }}>Owner 360</Link>
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
     </>
   );
 }

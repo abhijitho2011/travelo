@@ -3,6 +3,7 @@ import {
   Outlet,
   Link,
   createRootRouteWithContext,
+  redirect,
   useRouter,
   useRouterState,
   HeadContent,
@@ -12,8 +13,12 @@ import { useEffect, type ReactNode } from "react";
 
 import { AdminShell } from "@/components/admin/admin-shell";
 import { Toaster } from "@/components/ui/sonner";
+import { isAuthenticated } from "@/lib/auth";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+
+/** Routes that render without the admin chrome and without a session. */
+const PUBLIC_PATHS = ["/login"];
 
 function NotFoundComponent() {
   return (
@@ -22,7 +27,7 @@ function NotFoundComponent() {
         <h1 className="text-7xl font-bold text-foreground">404</h1>
         <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          This admin screen doesn't exist or has been moved.
+          This admin screen doesn&apos;t exist or has been moved.
         </p>
         <div className="mt-6">
           <Link
@@ -48,10 +53,11 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This screen didn't load
+          This screen didn&apos;t load
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          The platform API returned an error. Retry, or head back to the dashboard.
+          {error?.message || "The platform API returned an error."} Retry, or head back to the
+          dashboard.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
@@ -76,14 +82,27 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  /**
+   * Session guard. Tokens live in localStorage, so this only runs meaningfully
+   * in the browser; on the server we let the shell render and the client
+   * redirects immediately after hydration.
+   */
+  beforeLoad: ({ location }) => {
+    if (typeof window === "undefined") return;
+    if (PUBLIC_PATHS.includes(location.pathname)) return;
+    if (!isAuthenticated()) {
+      throw redirect({ to: "/login", search: { next: location.href } });
+    }
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Travelo Super Admin" },
+      { title: "Tavelo Super Admin" },
       {
         name: "description",
-        content: "Travelo platform control plane for owners, properties, subscriptions and billing.",
+        content:
+          "Tavelo platform control plane for owners, properties, subscriptions and billing.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -123,7 +142,7 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const chromeless = pathname === "/login" || pathname.startsWith("/impersonate");
+  const chromeless = PUBLIC_PATHS.includes(pathname);
 
   return (
     <QueryClientProvider client={queryClient}>

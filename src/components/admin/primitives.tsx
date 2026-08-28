@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { statusTone, type StatusTone } from "@/lib/travelo-data";
+import { humanise, toneForStatus, type StatusTone } from "@/lib/format";
 
 /* ---------------------------------------------------------------- status */
 
@@ -34,7 +34,7 @@ export function StatusBadge({
   tone,
   className,
 }: { status: string; tone?: StatusTone } & { className?: string }) {
-  const resolved = tone ?? statusTone[status] ?? "neutral";
+  const resolved = tone ?? toneForStatus(status);
   return (
     <span className={cn(statusBadge({ tone: resolved }), className)}>
       <span
@@ -48,7 +48,7 @@ export function StatusBadge({
           resolved === "neutral" && "bg-muted-foreground",
         )}
       />
-      {status}
+      {humanise(status)}
     </span>
   );
 }
@@ -64,11 +64,11 @@ export function PageHeader({
   actions,
   breadcrumbs,
 }: {
-  eyebrow?: string;
+  eyebrow?: string | undefined;
   title: string;
-  description?: string;
-  actions?: ReactNode;
-  breadcrumbs?: { label: string; to?: string }[];
+  description?: string | undefined;
+  actions?: ReactNode | undefined;
+  breadcrumbs?: { label: string; to?: string }[] | undefined;
 }) {
   return (
     <header className="border-b border-border bg-surface px-5 py-4 lg:px-8 lg:py-5">
@@ -109,11 +109,11 @@ export function Section({
   children,
   className,
 }: {
-  title?: string;
-  description?: string;
-  actions?: ReactNode;
+  title?: string | undefined;
+  description?: string | undefined;
+  actions?: ReactNode | undefined;
   children: ReactNode;
-  className?: string;
+  className?: string | undefined;
 }) {
   return (
     <section className={cn("panel overflow-hidden", className)}>
@@ -142,9 +142,9 @@ export function KpiCard({
 }: {
   label: string;
   value: string;
-  delta?: string;
-  trend?: string;
-  hint?: string;
+  delta?: string | undefined;
+  trend?: string | undefined;
+  hint?: string | undefined;
 }) {
   const Icon = trend === "down" ? ArrowDownRight : ArrowUpRight;
   return (
@@ -209,8 +209,8 @@ export function EmptyState({
 }: {
   title: string;
   description: string;
-  action?: ReactNode;
-  icon?: typeof Inbox;
+  action?: ReactNode | undefined;
+  icon?: typeof Inbox | undefined;
 }) {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
@@ -229,9 +229,9 @@ export function ErrorState({
   description = "The request to the platform API failed. This is usually temporary.",
   onRetry,
 }: {
-  title?: string;
-  description?: string;
-  onRetry?: () => void;
+  title?: string | undefined;
+  description?: string | undefined;
+  onRetry?: (() => void) | undefined;
 }) {
   return (
     <div
@@ -331,5 +331,63 @@ export function ScoreBar({ value, label }: { value: number; label?: string }) {
         <div className={cn("h-full rounded-full", tone)} style={{ width: `${value}%` }} />
       </div>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------ async section */
+
+/**
+ * Renders loading / error / empty / content for a non-tabular panel.
+ * Keeps every screen consistent without each route re-implementing states.
+ */
+export function AsyncSection({
+  loading,
+  error,
+  onRetry,
+  isEmpty,
+  emptyTitle = "No records yet",
+  emptyDescription = "Data will appear here once the platform has records.",
+  skeleton,
+  children,
+}: {
+  loading?: boolean | undefined;
+  error?: unknown | undefined;
+  onRetry?: (() => void) | undefined;
+  isEmpty?: boolean | undefined;
+  emptyTitle?: string | undefined;
+  emptyDescription?: string | undefined;
+  skeleton?: ReactNode | undefined;
+  children: ReactNode;
+}) {
+  if (error) {
+    return (
+      <ErrorState
+        onRetry={onRetry}
+        description={
+          error instanceof Error && error.message
+            ? error.message
+            : "The request to the platform API failed. This is usually temporary."
+        }
+      />
+    );
+  }
+  if (loading) return <>{skeleton ?? <TableSkeleton rows={4} cols={3} />}</>;
+  if (isEmpty) return <EmptyState title={emptyTitle} description={emptyDescription} />;
+  return <>{children}</>;
+}
+
+/** Read-only key/value grid used on detail screens. */
+export function DetailGrid({ items }: { items: { label: string; value: ReactNode }[] }) {
+  return (
+    <dl className="grid gap-x-6 gap-y-3 px-4 py-4 sm:grid-cols-2 lg:grid-cols-3">
+      {items.map((item) => (
+        <div key={item.label}>
+          <dt className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            {item.label}
+          </dt>
+          <dd className="mt-0.5 text-sm text-foreground">{item.value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }

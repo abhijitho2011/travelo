@@ -1,51 +1,78 @@
-import { CalendarPlus } from "lucide-react";
+import { CalendarPlus, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { MetricRow } from "@/components/admin/primitives";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
-import { MetricRow } from "@/components/admin/primitives";
+import { useExtendSubscription } from "@/hooks/api/use-subscriptions";
+import type { Subscription } from "@/hooks/api/types";
+import { errorMessage } from "@/lib/api";
+import { formatDate } from "@/lib/format";
 
-const options = [
+const PRESETS = [
   { value: "30", label: "30 days" },
   { value: "90", label: "90 days" },
   { value: "182", label: "6 months" },
   { value: "365", label: "12 months" },
-  { value: "custom", label: "Custom date" },
+  { value: "custom", label: "Custom" },
 ];
 
-function addDays(dateLabel: string, days: number) {
-  const parsed = new Date(dateLabel);
+function addDays(from: string | null | undefined, days: number) {
+  if (!from) return "—";
+  const parsed = new Date(from);
   if (Number.isNaN(parsed.getTime())) return "—";
   parsed.setDate(parsed.getDate() + days);
-  return parsed.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  return formatDate(parsed);
 }
 
 export function ExtendSubscriptionDialog({
-  owner,
+  subscription,
   variant = "default",
 }: {
-  owner: { company: string; plan: string; expiry: string };
-  variant?: "default" | "outline";
+  subscription: Pick<Subscription, "id" | "owner" | "plan" | "currentPeriodEnd">;
+  variant?: "default" | "outline" | undefined;
 }) {
   const [open, setOpen] = useState(false);
   const [choice, setChoice] = useState("90");
-  const [custom, setCustom] = useState("");
+  const [customDays, setCustomDays] = useState("30");
   const [reason, setReason] = useState("");
+  const extend = useExtendSubscription();
 
-  const newExpiry = choice === "custom" ? (custom || "—") : addDays(owner.expiry, Number(choice));
+  const days = choice === "custom" ? Number(customDays) || 0 : Number(choice);
+  const newExpiry = addDays(subscription.currentPeriodEnd, days);
+  const invalid = days < 1 || days > 3650 || reason.trim().length < 4;
+
+  const submit = async () => {
+    try {
+      await extend.mutateAsync({ id: subscription.id, days, reason: reason.trim() });
+      toast.success("Subscription extended", {
+        description: `${subscription.owner ?? "Owner"} now runs to ${newExpiry}.`,
+      });
+      setOpen(false);
+      setReason("");
+    } catch (error) {
+      toast.error("Could not extend subscription", { description: errorMessage(error) });
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm" variant={variant} className="h-8">
-          <CalendarPlus aria-hidden className="mr-1.5 size-3.5" /> Extend subscription
+          <CalendarPlus aria-hidden className="mr-1.5 size-3.5" /> Extend
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
@@ -57,23 +84,36 @@ export function ExtendSubscriptionDialog({
         </DialogHeader>
 
         <dl className="rounded-md border border-border bg-surface-muted px-3 py-1">
-          <MetricRow label="Owner" value={owner.company} />
-          <MetricRow label="Current plan" value={owner.plan} />
-          <MetricRow label="Current expiry" value={owner.expiry} />
+          <MetricRow label="Owner" value={subscription.owner ?? "—"} />
+          <MetricRow label="Current plan" value={subscription.plan} />
+          <MetricRow label="Current expiry" value={formatDate(subscription.currentPeriodEnd)} />
         </dl>
 
         <fieldset className="space-y-2">
           <legend className="text-sm font-semibold">Extension period</legend>
           <RadioGroup value={choice} onValueChange={setChoice} className="grid grid-cols-2 gap-2">
-            {options.map((o) => (
-              <div key={o.value} className="flex items-center gap-2 rounded-md border border-border px-3 py-2">
+            {PRESETS.map((o) => (
+              <div
+                key={o.value}
+                className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
+              >
                 <RadioGroupItem id={`ext-${o.value}`} value={o.value} />
-                <Label htmlFor={`ext-${o.value}`} className="text-sm font-normal">{o.label}</Label>
+                <Label htmlFor={`ext-${o.value}`} className="text-sm font-normal">
+                  {o.label}
+                </Label>
               </div>
             ))}
           </RadioGroup>
           {choice === "custom" && (
-            <Input type="date" value={custom} onChange={(e) => setCustom(e.target.value)} aria-label="Custom expiry date" />
+            <Input
+              type="number"
+              min={1}
+              max={3650}
+              value={customDays}
+              onChange={(e) => setCustomDays(e.target.value)}
+              aria-label="Custom number of days"
+              placeholder="Days"
+            />
           )}
         </fieldset>
 
@@ -92,90 +132,14 @@ export function ExtendSubscriptionDialog({
             placeholder="Goodwill after integration outage…"
           />
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="extend-note">Internal note</Label>
-          <Input id="extend-note" placeholder="Visible to admins only" />
-        </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button
-            disabled={reason.trim().length < 4}
-            onClick={() => {
-              setOpen(false);
-              toast.success("Subscription extended", {
-                description: `${owner.company} now expires ${newExpiry}. Audit entry created.`,
-              });
-              setReason("");
-            }}
-          >
-            Confirm extension
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={extend.isPending}>
+            Cancel
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-export function PropertyLimitDialog({
-  owner,
-}: {
-  owner: { company: string; properties: number };
-}) {
-  const [open, setOpen] = useState(false);
-  const [limit, setLimit] = useState(String(owner.properties + 3));
-  const [mode, setMode] = useState("permanent");
-  const delta = Math.max(0, Number(limit) - owner.properties);
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline" className="h-8">Change property limit</Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Property allowance</DialogTitle>
-          <DialogDescription>{owner.company}</DialogDescription>
-        </DialogHeader>
-        <dl className="rounded-md border border-border bg-surface-muted px-3 py-1">
-          <MetricRow label="Current allowance" value={`${owner.properties} properties`} />
-          <MetricRow label="New allowance" value={`${limit} properties`} />
-          <MetricRow label="Pricing impact" value={`+₹${(delta * 20000).toLocaleString("en-IN")}/mo`} />
-        </dl>
-        <div className="space-y-1.5">
-          <Label htmlFor="new-limit">New limit</Label>
-          <Input id="new-limit" type="number" min={1} value={limit} onChange={(e) => setLimit(e.target.value)} />
-        </div>
-        <fieldset className="space-y-2">
-          <legend className="text-sm font-semibold">Type</legend>
-          <RadioGroup value={mode} onValueChange={setMode} className="grid gap-2">
-            <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2">
-              <RadioGroupItem id="limit-perm" value="permanent" />
-              <Label htmlFor="limit-perm" className="text-sm font-normal">Permanent increase</Label>
-            </div>
-            <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2">
-              <RadioGroupItem id="limit-temp" value="temporary" />
-              <Label htmlFor="limit-temp" className="text-sm font-normal">Temporary (reverts at renewal)</Label>
-            </div>
-          </RadioGroup>
-        </fieldset>
-        <div className="space-y-1.5">
-          <Label htmlFor="limit-effective">Effective date</Label>
-          <Input id="limit-effective" type="date" defaultValue="2026-09-01" />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="limit-reason">Reason</Label>
-          <Textarea id="limit-reason" rows={2} placeholder="Upgrade requested via ticket…" />
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button
-            onClick={() => {
-              setOpen(false);
-              toast.success("Property limit updated", { description: `${owner.company}: ${limit} properties (${mode}).` });
-            }}
-          >
-            Apply change
+          <Button disabled={invalid || extend.isPending} onClick={() => void submit()}>
+            {extend.isPending && <Loader2 aria-hidden className="mr-2 size-4 animate-spin" />}
+            Confirm extension
           </Button>
         </DialogFooter>
       </DialogContent>
