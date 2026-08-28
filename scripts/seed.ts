@@ -5,6 +5,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
 import * as argon2 from 'argon2';
 import * as schema from '../src/database/schema';
+import { normalizeMobile } from '../src/modules/shared-auth/mobile.util';
 
 // ---------- Permission catalog ----------
 const PERMISSIONS: { key: string; group: string; description: string }[] = [
@@ -90,12 +91,33 @@ const ROLES = [
   },
 ];
 
-const SEED_ADMINS = [
+/**
+ * The super-admin identity is driven entirely by env. SUPER_ADMIN_EMAIL /
+ * SUPER_ADMIN_MOBILE are the allowlist used by Google and OTP sign-in, so the
+ * seeded row is kept in sync with them on every run (idempotent).
+ */
+const SUPER_ADMIN_EMAIL = (
+  process.env.SUPER_ADMIN_EMAIL ??
+  process.env.SEED_SUPER_ADMIN_EMAIL ??
+  'admin@tavelo.local'
+)
+  .trim()
+  .toLowerCase();
+const SUPER_ADMIN_MOBILE = normalizeMobile(process.env.SUPER_ADMIN_MOBILE);
+
+const SEED_ADMINS: {
+  email: string;
+  name: string;
+  roleKey: string;
+  envPassword?: string;
+  mobile?: string | null;
+}[] = [
   {
-    email: process.env.SEED_SUPER_ADMIN_EMAIL ?? 'admin@tavelo.local',
+    email: SUPER_ADMIN_EMAIL,
     name: 'Super Admin',
     roleKey: 'super_admin',
     envPassword: process.env.SEED_SUPER_ADMIN_PASSWORD ?? 'ChangeMe!12345',
+    mobile: SUPER_ADMIN_MOBILE,
   },
   { email: 'finance@tavelo.local', name: 'Finance Admin', roleKey: 'finance_admin' },
   { email: 'support@tavelo.local', name: 'Support Admin', roleKey: 'support_admin' },
@@ -177,20 +199,62 @@ async function main() {
 
   console.log('Seeding admins...');
   for (const a of SEED_ADMINS) {
-    const [existing] = await db
+    const isSuperAdmin = a.roleKey === 'super_admin';
+    let [existing] = await db
       .select()
       .from(schema.admins)
       .where(eq(schema.admins.email, a.email.toLowerCase()))
       .limit(1);
+
+    // The super admin may already exist under a previous email — find it by
+    // role so the row is updated rather than duplicated.
+    if (!existing && isSuperAdmin) {
+      const [superRole] = await db
+        .select()
+        .from(schema.roles)
+        .where(eq(schema.roles.key, 'super_admin'))
+        .limit(1);
+      if (superRole) {
+        const [link] = await db
+          .select()
+          .from(schema.adminRoles)
+          .where(eq(schema.adminRoles.roleId, superRole.id))
+          .limit(1);
+        if (link) {
+          const [row] = await db
+            .select()
+            .from(schema.admins)
+            .where(eq(schema.admins.id, link.adminId))
+            .limit(1);
+          existing = row;
+        }
+      }
+    }
+
     let adminId: string;
     if (existing) {
       adminId = existing.id;
+      // Keep email/mobile aligned with the environment (idempotent).
+      const patch: Record<string, unknown> = {};
+      if (existing.email !== a.email.toLowerCase()) patch.email = a.email.toLowerCase();
+      if (a.mobile !== undefined && existing.mobile !== a.mobile) patch.mobile = a.mobile;
+      if (Object.keys(patch).length) {
+        patch.updatedAt = new Date();
+        await db.update(schema.admins).set(patch).where(eq(schema.admins.id, adminId));
+        console.log(`  updated ${a.email} (${Object.keys(patch).join(', ')})`);
+      }
     } else {
       const password = a.envPassword ?? cryptoRandom(20);
       const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
       const [inserted] = await db
         .insert(schema.admins)
-        .values({ email: a.email.toLowerCase(), name: a.name, passwordHash, status: 'Active' })
+        .values({
+          email: a.email.toLowerCase(),
+          name: a.name,
+          passwordHash,
+          status: 'Active',
+          mobile: a.mobile ?? null,
+        })
         .returning();
       adminId = inserted.id;
       console.log(`  created ${a.email} (password: ${a.envPassword ? '<from env>' : password})`);

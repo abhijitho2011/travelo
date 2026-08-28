@@ -15,6 +15,11 @@ import { PermissionsService } from '../permissions/permissions.service';
 import { AuditService } from '../audit/audit.service';
 import { getRequestContext } from '../../common/context/request-context';
 
+export interface AdminLoginResult {
+  admin: { id: string; email: string; name: string; roles: string[]; permissions: string[] };
+  tokens: TokenPair;
+}
+
 interface TokenPair {
   accessToken: string;
   refreshToken: string;
@@ -46,13 +51,7 @@ export class AuthService {
     }
   }
 
-  async login(
-    email: string,
-    password: string,
-  ): Promise<{
-    admin: { id: string; email: string; name: string; roles: string[]; permissions: string[] };
-    tokens: TokenPair;
-  }> {
+  async login(email: string, password: string): Promise<AdminLoginResult> {
     const [admin] = await this.db
       .select()
       .from(admins)
@@ -75,6 +74,34 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    return this.establishSession(admin.id, 'password', 'auth.login.success');
+  }
+
+  /**
+   * Issues a real admin session + token pair for an already-authenticated
+   * admin id. Used by the Google and mobile-OTP sign-in paths so there is
+   * exactly ONE admin token type and one session table — never a second
+   * bespoke token. The caller is responsible for having authenticated the
+   * identity (and for the allowlist check).
+   */
+  async issueLoginForAdmin(adminId: string, method: 'google' | 'otp'): Promise<AdminLoginResult> {
+    return this.establishSession(adminId, method, `admin.login.${method}`);
+  }
+
+  private async establishSession(
+    adminId: string,
+    method: 'password' | 'google' | 'otp',
+    action: string,
+  ): Promise<AdminLoginResult> {
+    const [admin] = await this.db
+      .select()
+      .from(admins)
+      .where(and(eq(admins.id, adminId), isNull(admins.deletedAt)))
+      .limit(1);
+    if (!admin) throw new UnauthorizedException('Invalid credentials');
+    if (admin.status !== 'Active')
+      throw new UnauthorizedException(`Account ${admin.status.toLowerCase()}`);
+
     const effective = await this.perms.getEffectivePermissions(admin.id);
 
     const session = await this.createSession(admin.id);
@@ -85,22 +112,24 @@ export class AuthService {
       session.refreshTokenPlain,
     );
 
+    const ip = getRequestContext()?.ip ?? null;
     await this.db
       .update(admins)
       .set({
         lastLoginAt: new Date(),
-        lastLoginIp: getRequestContext()?.ip ?? null,
+        lastLoginIp: ip,
         updatedAt: new Date(),
       })
       .where(eq(admins.id, admin.id));
 
     await this.audit.record({
-      action: 'auth.login.success',
+      action,
       entity: 'admin',
       entityId: admin.id,
       actorId: admin.id,
       actorEmail: admin.email,
       actorRole: effective.roles[0],
+      after: { method, ip },
     });
 
     return {

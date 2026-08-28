@@ -26,6 +26,12 @@ const envSchema = z.object({
   SEED_SUPER_ADMIN_EMAIL: z.string().email().default('admin@tavelo.local'),
   SEED_SUPER_ADMIN_PASSWORD: z.string().min(8).default('ChangeMe!12345'),
 
+  // ---------- Super-admin allowlist (Google / mobile-OTP sign-in) ----------
+  // Only these exact identities may sign in via Google or OTP. Leaving one
+  // unset cleanly disables that method; email+password always keeps working.
+  SUPER_ADMIN_EMAIL: z.string().optional(),
+  SUPER_ADMIN_MOBILE: z.string().optional(),
+
   PAYMENT_WEBHOOK_SECRET_RAZORPAY: z.string().optional(),
   PAYMENT_WEBHOOK_SECRET_CASHFREE: z.string().optional(),
 

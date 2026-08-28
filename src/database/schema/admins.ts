@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { pgTable, uuid, varchar, timestamp, boolean, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, timestamp, boolean, integer, index } from 'drizzle-orm/pg-core';
 
 export const adminStatusValues = ['Active', 'Inactive', 'Blocked'] as const;
 export type AdminStatus = (typeof adminStatusValues)[number];
@@ -11,6 +11,8 @@ export const admins = pgTable(
       .primaryKey()
       .default(sql`gen_random_uuid()`),
     email: varchar('email', { length: 255 }).notNull().unique(),
+    /** Normalised (digits-only) mobile used for OTP sign-in. */
+    mobile: varchar('mobile', { length: 32 }),
     name: varchar('name', { length: 255 }).notNull(),
     passwordHash: varchar('password_hash', { length: 512 }).notNull(),
     status: varchar('status', { length: 32 }).notNull().default('Active').$type<AdminStatus>(),
@@ -24,9 +26,34 @@ export const admins = pgTable(
   },
   (t) => ({
     emailIdx: index('admins_email_idx').on(t.email),
+    mobileIdx: index('admins_mobile_idx').on(t.mobile),
     statusIdx: index('admins_status_idx').on(t.status),
+  }),
+);
+
+/**
+ * One-time passcodes for super-admin mobile sign-in. Only ever populated for
+ * the mobile currently allowlisted through SUPER_ADMIN_MOBILE; the OTP itself
+ * is stored argon2-hashed and never logged or returned.
+ */
+export const adminOtps = pgTable(
+  'admin_otps',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    mobile: varchar('mobile', { length: 32 }).notNull(),
+    otpHash: varchar('otp_hash', { length: 512 }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    consumedAt: timestamp('consumed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    mobileIdx: index('admin_otps_mobile_idx').on(t.mobile),
   }),
 );
 
 export type Admin = typeof admins.$inferSelect;
 export type NewAdmin = typeof admins.$inferInsert;
+export type AdminOtp = typeof adminOtps.$inferSelect;

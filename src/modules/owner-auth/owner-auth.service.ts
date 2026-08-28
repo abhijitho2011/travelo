@@ -4,8 +4,8 @@ import { DRIZZLE, Database } from '../../database/database.module';
 import { owners, subscriptions, subscriptionPlans } from '../../database/schema';
 import { OwnerOtpService } from './owner-otp.service';
 import { OwnerTokenService, OwnerTokenPair } from './owner-token.service';
-import { FirebaseService } from './firebase.service';
-import { SMS_PROVIDER, SmsProvider } from './sms/sms-provider.interface';
+import { FirebaseService } from '../shared-auth/firebase.service';
+import { SMS_PROVIDER, SmsProvider } from '../shared-auth/sms/sms-provider.interface';
 import { OwnerErrors } from './owner-errors';
 
 @Injectable()
