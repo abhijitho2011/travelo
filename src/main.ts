@@ -4,7 +4,7 @@ dotenv.config({ path: '.env.local' });
 dotenv.config();
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { Logger } from '@nestjs/common';
+import { Logger, RequestMethod } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { Logger as PinoLogger } from 'nestjs-pino';
@@ -42,7 +42,14 @@ async function bootstrap(): Promise<void> {
     credentials: true,
   });
   app.setGlobalPrefix(env.API_PREFIX, {
-    exclude: ['health', 'health/live', 'health/ready'],
+    exclude: [
+      { path: 'health', method: RequestMethod.ALL },
+      { path: 'health/live', method: RequestMethod.ALL },
+      { path: 'health/ready', method: RequestMethod.ALL },
+      // Owner-app surface is mounted at its literal /api/v1/owner/* paths and
+      // must NOT receive the admin global prefix.
+      { path: 'api/v1/owner/(.*)', method: RequestMethod.ALL },
+    ],
   });
 
   const config = new DocumentBuilder()

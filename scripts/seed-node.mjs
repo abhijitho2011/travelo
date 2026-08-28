@@ -23,6 +23,7 @@ const PERMISSIONS = [
   ['Search', 'search', ['query']],
   ['Audit', 'audit', ['view', 'export']],
   ['Admin', 'admin', ['view', 'create', 'edit']],
+  ['Settings', 'settings', ['locations.manage']],
 ].flatMap(([group, prefix, actions]) =>
   actions.map((a) => ({ key: `${prefix}.${a}`, group, description: `${a} ${group.toLowerCase()}` })),
 );
@@ -31,7 +32,7 @@ const ROLES = [
   { key: 'super_admin', name: 'Super Admin', description: 'Unrestricted access', permissions: ['*'] },
   { key: 'finance_admin', name: 'Finance Admin', description: 'Billing / refunds / invoices', permissions: ['billing.view','billing.refund','billing.export','refund.view','refund.create','invoice.view','invoice.create','invoice.edit','subscription.view','subscription.edit','owner.view','analytics.view','search.query','notification.view'] },
   { key: 'support_admin', name: 'Support Admin', description: 'Support + impersonation', permissions: ['support.view','support.reply','support.assign','support.resolve','owner.view','property.view','subscription.view','impersonation.start','impersonation.stop','impersonation.view','notification.view','search.query'] },
-  { key: 'operations_admin', name: 'Operations Admin', description: 'Operational view + jobs', permissions: ['owner.view','subscription.view','property.view','integration.view','job.view','job.retry','analytics.view','search.query','notification.view'] },
+  { key: 'operations_admin', name: 'Operations Admin', description: 'Operational view + jobs', permissions: ['owner.view','subscription.view','property.view','integration.view','job.view','job.retry','analytics.view','search.query','notification.view','settings.locations.manage'] },
   { key: 'platform_admin', name: 'Platform Admin', description: 'Plans + announcements', permissions: ['owner.view','owner.create','owner.edit','property.view','property.edit','subscription.view','subscription.edit','plan.view','plan.edit','announcement.view','announcement.edit','notification.view','notification.edit','search.query','analytics.view'] },
 ];
 
@@ -51,10 +52,22 @@ const PLANS = [
 ];
 
 const SAMPLE_OWNERS = [
-  { name: 'Rajesh Menon', email: 'rajesh@abchospitality.in', company: 'ABC Hospitality Pvt Ltd', city: 'Kochi', country: 'India', plan: 'PRO', property: 'Kochi Grand Hotel' },
-  { name: 'Anita Deshpande', email: 'anita@sahyadriresorts.com', company: 'Sahyadri Resorts LLP', city: 'Pune', country: 'India', plan: 'BASIC', property: 'Sahyadri Valley Resort' },
-  { name: 'Faisal Rahman', email: 'faisal@marinebay.co', company: 'Marine Bay Hotels', city: 'Dubai', country: 'UAE', plan: 'PRO', property: 'Marine Bay Downtown' },
+  { name: 'Rajesh Menon', email: 'rajesh@abchospitality.in', mobile: '9000000001', company: 'ABC Hospitality Pvt Ltd', city: 'Kochi', country: 'India', plan: 'PRO', property: 'Kochi Grand Hotel' },
+  { name: 'Anita Deshpande', email: 'anita@sahyadriresorts.com', mobile: '9000000002', company: 'Sahyadri Resorts LLP', city: 'Pune', country: 'India', plan: 'BASIC', property: 'Sahyadri Valley Resort' },
+  { name: 'Faisal Rahman', email: 'faisal@marinebay.co', mobile: '9000000003', company: 'Marine Bay Hotels', city: 'Dubai', country: 'UAE', plan: 'PRO', property: 'Marine Bay Downtown' },
 ];
+
+// India states/districts reference (mirrors owner_app/assets/data/in_states_districts.json).
+const LOCATIONS = {
+  'Kerala': ['Thiruvananthapuram', 'Kollam', 'Pathanamthitta', 'Alappuzha', 'Kottayam', 'Idukki', 'Ernakulam', 'Thrissur', 'Palakkad', 'Malappuram', 'Kozhikode', 'Wayanad', 'Kannur', 'Kasaragod'],
+  'Karnataka': ['Bengaluru Urban', 'Bengaluru Rural', 'Mysuru', 'Mangaluru (Dakshina Kannada)', 'Udupi', 'Belagavi', 'Hubballi-Dharwad', 'Kalaburagi', 'Ballari', 'Shivamogga', 'Tumakuru', 'Hassan'],
+  'Goa': ['North Goa', 'South Goa'],
+  'Tamil Nadu': ['Chennai', 'Coimbatore', 'Madurai', 'Tiruchirappalli', 'Salem', 'Tirunelveli', 'Erode', 'Vellore', 'Thoothukudi', 'Kanyakumari'],
+  'Maharashtra': ['Mumbai City', 'Mumbai Suburban', 'Pune', 'Nagpur', 'Nashik', 'Thane', 'Aurangabad', 'Solapur', 'Kolhapur', 'Ratnagiri'],
+  'Telangana': ['Hyderabad', 'Rangareddy', 'Medchal-Malkajgiri', 'Warangal', 'Karimnagar', 'Khammam', 'Nizamabad'],
+  'Delhi': ['New Delhi', 'Central Delhi', 'South Delhi', 'North Delhi', 'East Delhi', 'West Delhi'],
+  'Rajasthan': ['Jaipur', 'Jodhpur', 'Udaipur', 'Ajmer', 'Bikaner', 'Kota', 'Jaisalmer', 'Alwar'],
+};
 
 const rand = (n) => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
@@ -146,9 +159,12 @@ async function main() {
       const email = s.email.toLowerCase();
       const { rows } = await client.query('SELECT id FROM owners WHERE email=$1', [email]);
       let ownerId;
-      if (rows.length) ownerId = rows[0].id;
-      else {
-        const ins = await client.query('INSERT INTO owners (name,email,company,city,country,status) VALUES ($1,$2,$3,$4,$5,\'ACTIVE\') RETURNING id', [s.name, email, s.company, s.city, s.country]);
+      if (rows.length) {
+        ownerId = rows[0].id;
+        // Backfill mobile so OTP login is testable end-to-end.
+        await client.query('UPDATE owners SET mobile=COALESCE(mobile,$1), status=\'ACTIVE\' WHERE id=$2', [s.mobile, ownerId]);
+      } else {
+        const ins = await client.query('INSERT INTO owners (name,email,mobile,company,city,country,status) VALUES ($1,$2,$3,$4,$5,$6,\'ACTIVE\') RETURNING id', [s.name, email, s.mobile, s.company, s.city, s.country]);
         ownerId = ins.rows[0].id;
       }
       const propRow = await client.query('SELECT id FROM properties WHERE owner_id=$1 LIMIT 1', [ownerId]);
@@ -162,6 +178,16 @@ async function main() {
         if (!subRow.rows.length) {
           await client.query('INSERT INTO subscriptions (owner_id, plan_id, status, billing_cycle, starts_at, current_period_start, current_period_end) VALUES ($1,$2,\'ACTIVE\',\'ANNUAL\',now(),now(),now() + interval \'365 days\')', [ownerId, planId]);
         }
+      }
+    }
+
+    console.log('[seed] location states/districts...');
+    for (const [stateName, districts] of Object.entries(LOCATIONS)) {
+      await client.query('INSERT INTO location_states (name) VALUES ($1) ON CONFLICT (name) DO NOTHING', [stateName]);
+      const stateRow = await client.query('SELECT id FROM location_states WHERE name=$1', [stateName]);
+      const stateId = stateRow.rows[0].id;
+      for (const district of districts) {
+        await client.query('INSERT INTO location_districts (state_id, name) VALUES ($1,$2) ON CONFLICT (state_id, name) DO NOTHING', [stateId, district]);
       }
     }
 

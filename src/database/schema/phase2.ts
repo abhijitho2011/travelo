@@ -34,6 +34,8 @@ export const owners = pgTable(
     name: varchar('name', { length: 255 }).notNull(),
     email: varchar('email', { length: 255 }).notNull().unique(),
     phone: varchar('phone', { length: 64 }),
+    mobile: varchar('mobile', { length: 32 }),
+    emailVerified: boolean('email_verified').notNull().default(false),
     company: varchar('company', { length: 255 }),
     gstNumber: varchar('gst_number', { length: 32 }),
     address: jsonb('address'),

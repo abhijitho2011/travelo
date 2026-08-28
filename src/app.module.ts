@@ -12,6 +12,7 @@ import { PermissionsModule } from './modules/permissions/permissions.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { HealthModule } from './modules/health/health.module';
 import { OwnersModule } from './modules/owners/owners.module';
+import { OwnerAuthModule } from './modules/owner-auth/owner-auth.module';
 import { PropertiesModule } from './modules/properties/properties.module';
 import { EntitlementsModule } from './modules/entitlements/entitlements.module';
 import { PlansModule } from './modules/plans/plans.module';
@@ -71,6 +72,7 @@ import { ConfigService } from '@nestjs/config';
     RolesModule,
     HealthModule,
     OwnersModule,
+    OwnerAuthModule,
     EntitlementsModule,
     PropertiesModule,
     PlansModule,
