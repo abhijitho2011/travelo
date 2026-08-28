@@ -109,6 +109,35 @@ export const properties = pgTable(
   }),
 );
 
+/**
+ * Property photos. Only metadata lives here — the bytes are written to the
+ * API's mounted volume (UPLOADS_DIR, /app/uploads in production) and streamed
+ * back through an owner-scoped endpoint, never a naked static directory.
+ */
+export const propertyPhotos = pgTable(
+  'property_photos',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    propertyId: uuid('property_id')
+      .notNull()
+      .references(() => properties.id, { onDelete: 'cascade' }),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => owners.id, { onDelete: 'cascade' }),
+    filename: varchar('filename', { length: 255 }).notNull(),
+    contentType: varchar('content_type', { length: 128 }).notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    propertyIdx: index('property_photos_property_idx').on(t.propertyId),
+    ownerIdx: index('property_photos_owner_idx').on(t.ownerId),
+  }),
+);
+
 // ---------- Features & Plans ----------
 export const features = pgTable('features', {
   id: uuid('id')

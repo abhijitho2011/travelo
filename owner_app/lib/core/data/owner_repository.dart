@@ -1,4 +1,6 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../api/api_client.dart';
 import '../models/owner_models.dart';
@@ -20,8 +22,31 @@ class OwnerRepository {
     return (list as List).map((e) => Property.fromJson(e as Map)).toList();
   }
 
-  Future<void> createProperty(Map<String, dynamic> body) =>
-      _api.post('/properties', body: body);
+  /// Returns the id of the property that was just created, so photos can be
+  /// uploaded against it.
+  Future<String> createProperty(Map<String, dynamic> body) async {
+    final d = await _api.post('/properties', body: body);
+    return (d as Map)['id'] as String;
+  }
+
+  /// Uploads one picked image. On web an [XFile] has no readable path, so the
+  /// bytes are read explicitly; on mobile/desktop the path is used directly.
+  Future<void> uploadPropertyPhoto(String propertyId, XFile file) async {
+    final name = file.name.isNotEmpty ? file.name : 'photo.jpg';
+    final bytes = await file.readAsBytes();
+    final form = FormData.fromMap({
+      'files': MultipartFile.fromBytes(bytes, filename: name),
+    });
+    await _api.postMultipart('/properties/$propertyId/photos', form);
+  }
+
+  Future<List<Map<String, dynamic>>> propertyPhotos(String propertyId) async {
+    final d = await _api.get('/properties/$propertyId/photos');
+    return (d as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  Future<void> deletePropertyPhoto(String propertyId, String photoId) =>
+      _api.delete('/properties/$propertyId/photos/$photoId');
 
   Future<List<StaffMember>> staff(String propertyId) async {
     final d = await _api.get('/properties/$propertyId/staff');

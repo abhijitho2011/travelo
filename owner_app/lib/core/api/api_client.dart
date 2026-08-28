@@ -38,12 +38,18 @@ class ApiClient {
   Future<dynamic> delete(String path, {Object? body}) =>
       _send('DELETE', path, body: body);
 
+  /// Multipart POST (file upload). Dio derives the multipart boundary and
+  /// content-type from [form], so the JSON default must be overridden.
+  Future<dynamic> postMultipart(String path, FormData form) =>
+      _send('POST', path, body: form, multipart: true);
+
   Future<dynamic> _send(
     String method,
     String path, {
     Map<String, dynamic>? query,
     Object? body,
     bool retry = true,
+    bool multipart = false,
   }) async {
     Response res;
     try {
@@ -54,6 +60,7 @@ class ApiClient {
         data: body,
         options: Options(
           method: method,
+          contentType: multipart ? 'multipart/form-data' : null,
           headers: token != null ? {'Authorization': 'Bearer $token'} : null,
         ),
       );
@@ -69,7 +76,14 @@ class ApiClient {
     if (res.statusCode == 401 && retry) {
       final ok = await _refreshOnce();
       if (ok) {
-        return _send(method, path, query: query, body: body, retry: false);
+        return _send(
+          method,
+          path,
+          query: query,
+          body: body,
+          retry: false,
+          multipart: multipart,
+        );
       }
       await _tokens.clear();
       throw const ApiException(

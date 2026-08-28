@@ -25,7 +25,8 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
   final _line1 = TextEditingController();
   final _city = TextEditingController();
   final _pin = TextEditingController();
-  int _stars = 3;
+  final _phone = TextEditingController();
+  final _email = TextEditingController();
   String? _state;
   String? _district;
   final List<XFile> _photos = [];
@@ -38,7 +39,16 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
     _line1.dispose();
     _city.dispose();
     _pin.dispose();
+    _phone.dispose();
+    _email.dispose();
     super.dispose();
+  }
+
+  /// Same normalisation the API applies (strips +91, spaces and trunk zeros).
+  static String _digits(String raw) {
+    var d = raw.replaceAll(RegExp(r'\D+'), '');
+    if (d.length > 10 && d.startsWith('91')) d = d.substring(2);
+    return d.replaceFirst(RegExp(r'^0+'), '');
   }
 
   Future<void> _pickPhotos() async {
@@ -56,9 +66,10 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
     }
     setState(() => _busy = true);
     try {
-      await ref.read(ownerRepositoryProvider).createProperty({
+      final repo = ref.read(ownerRepositoryProvider);
+      final email = _email.text.trim();
+      final propertyId = await repo.createProperty({
         'name': _name.text.trim(),
-        'starRating': _stars,
         'address': {
           'line1': _line1.text.trim(),
           'city': _city.text.trim(),
@@ -69,13 +80,33 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
         },
         'city': _city.text.trim(),
         'state': _state,
-        'photoCount': _photos.length, // upload of binaries handled by media endpoint (phase: media)
+        'phone': _digits(_phone.text),
+        if (email.isNotEmpty) 'email': email,
       });
+
+      // The property is already saved at this point, so a failed photo must
+      // not fail the whole save — report the count instead.
+      var failures = 0;
+      for (final photo in _photos) {
+        try {
+          await repo.uploadPropertyPhoto(propertyId, photo);
+        } catch (_) {
+          failures++;
+        }
+      }
+
       ref.invalidate(propertiesProvider);
       ref.invalidate(portfolioProvider);
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Property added.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            failures == 0
+                ? 'Property added.'
+                : 'Property added, but $failures photo(s) could not be uploaded.',
+          ),
+        ),
+      );
       context.pop();
     } on ApiException catch (e) {
       setState(() => _error = e.code == 'PROPERTY_LIMIT_REACHED'
@@ -100,15 +131,13 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
               Banner2(text: _error!, tone: BannerTone.danger, icon: Icons.error_outline),
               const SizedBox(height: 16),
             ],
-            const SectionTitle('Hotel details'),
+            const SectionTitle('Property details'),
             const SizedBox(height: 12),
             TextFormField(
               controller: _name,
-              decoration: const InputDecoration(labelText: 'Hotel name'),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter a hotel name' : null,
+              decoration: const InputDecoration(labelText: 'Property name'),
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter a property name' : null,
             ),
-            const SizedBox(height: 14),
-            _StarPicker(value: _stars, onChanged: (v) => setState(() => _stars = v)),
             const SizedBox(height: 24),
             const SectionTitle('Photos'),
             const SizedBox(height: 12),
@@ -126,12 +155,19 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
               validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter the address' : null,
             ),
             const SizedBox(height: 14),
+            TextFormField(
+              controller: _city,
+              decoration: const InputDecoration(labelText: 'City / Town'),
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter a city' : null,
+            ),
+            const SizedBox(height: 14),
             locations.when(
               loading: () => const LinearProgressIndicator(minHeight: 2),
               error: (_, __) => const Text('Could not load locations',
                   style: TextStyle(color: AppColors.danger)),
               data: (map) {
                 final states = map.keys.toList()..sort();
+                // Districts are always those of the selected state.
                 final districts = _state == null ? <String>[] : (map[_state] ?? []);
                 return Column(
                   children: [
@@ -144,7 +180,7 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
                           .toList(),
                       onChanged: (v) => setState(() {
                         _state = v;
-                        _district = null;
+                        _district = null; // the old district may not belong here
                       }),
                     ),
                     const SizedBox(height: 14),
@@ -164,30 +200,45 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
               },
             ),
             const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _city,
-                    decoration: const InputDecoration(labelText: 'City / Town'),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter a city' : null,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextFormField(
-                    controller: _pin,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(6),
-                    ],
-                    decoration: const InputDecoration(labelText: 'PIN code'),
-                    validator: (v) =>
-                        (v == null || v.trim().length != 6) ? '6-digit PIN' : null,
-                  ),
-                ),
+            TextFormField(
+              controller: _pin,
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(6),
               ],
+              decoration: const InputDecoration(labelText: 'PIN code'),
+              validator: (v) => (v == null || v.trim().length != 6) ? '6-digit PIN' : null,
+            ),
+            const SizedBox(height: 24),
+            const SectionTitle('Contact'),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _phone,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(labelText: 'Phone number'),
+              validator: (v) {
+                final d = _digits(v ?? '');
+                return RegExp(r'^[6-9]\d{9}$').hasMatch(d)
+                    ? null
+                    : 'Enter a 10-digit mobile number';
+              },
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _email,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                helperText: 'Optional',
+              ),
+              validator: (v) {
+                final t = (v ?? '').trim();
+                if (t.isEmpty) return null; // optional
+                return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(t)
+                    ? null
+                    : 'Enter a valid email';
+              },
             ),
             const SizedBox(height: 28),
             FilledButton(
@@ -203,31 +254,6 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _StarPicker extends StatelessWidget {
-  const _StarPicker({required this.value, required this.onChanged});
-  final int value;
-  final ValueChanged<int> onChanged;
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Text('Star rating', style: TextStyle(color: AppColors.inkMuted)),
-        const Spacer(),
-        ...List.generate(5, (i) {
-          final n = i + 1;
-          return IconButton(
-            onPressed: () => onChanged(n),
-            icon: Icon(
-              n <= value ? Icons.star_rounded : Icons.star_border_rounded,
-              color: n <= value ? AppColors.warning : AppColors.inkFaint,
-            ),
-          );
-        }),
-      ],
     );
   }
 }

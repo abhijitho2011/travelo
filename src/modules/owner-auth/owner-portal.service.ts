@@ -11,13 +11,21 @@ import {
 } from '../../database/schema';
 import { CreatePropertyDto, CreateStaffDto } from './dto';
 import { OwnerErrors } from './owner-errors';
+import { PropertyPhotosService } from './property-photos.service';
 
 // Subscription statuses that grant the plan's property allowance.
 const USABLE_SUB_STATUSES = ['TRIAL', 'ACTIVE', 'EXPIRING', 'GRACE_PERIOD'];
 
 @Injectable()
 export class OwnerPortalService {
-  constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Database,
+    private readonly photos: PropertyPhotosService,
+  ) {}
+
+  private coverPhotoUrls(propertyIds: string[]): Promise<Map<string, string>> {
+    return this.photos.coverUrls(propertyIds);
+  }
 
   /**
    * Effective property limit: a per-subscription override replaces the plan
@@ -70,16 +78,18 @@ export class OwnerPortalService {
       .from(properties)
       .where(and(eq(properties.ownerId, ownerId), isNull(properties.deletedAt)))
       .orderBy(desc(properties.createdAt));
+    // One query for every cover photo rather than one per property.
+    const covers = rows.length ? await this.coverPhotoUrls(rows.map((p) => p.id)) : new Map();
     return rows.map((p) => ({
       id: p.id,
       name: p.name,
-      starRating: p.starRating,
       city: p.city,
       state: p.state,
       status: p.status,
       roomCount: p.roomCount,
       listingCompleteness: p.listingCompleteness,
-      coverPhotoUrl: null as string | null,
+      contact: p.contact,
+      coverPhotoUrl: covers.get(p.id) ?? null,
     }));
   }
 
@@ -106,23 +116,25 @@ export class OwnerPortalService {
         ownerId,
         name: dto.name,
         slug,
-        starRating: dto.starRating,
         city: dto.city,
         state: dto.state,
         country: dto.address.country ?? 'India',
         status: 'DRAFT',
-        address: dto.address as never,
+        address: { ...dto.address, country: dto.address.country ?? 'India' } as never,
+        // Contact details live in the existing jsonb column.
+        contact: { phone: dto.phone, email: dto.email ?? null } as never,
       })
       .returning();
     return {
       id: row.id,
       name: row.name,
-      starRating: row.starRating,
       city: row.city,
       state: row.state,
       status: row.status,
       roomCount: row.roomCount,
       listingCompleteness: row.listingCompleteness,
+      contact: row.contact,
+      // A freshly created property has no photos yet.
       coverPhotoUrl: null as string | null,
     };
   }

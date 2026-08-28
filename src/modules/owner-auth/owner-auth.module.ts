@@ -9,6 +9,7 @@ import { OwnerOtpService } from './owner-otp.service';
 import { OwnerTokenService } from './owner-token.service';
 import { OwnerPortalService } from './owner-portal.service';
 import { LocationsService } from './locations.service';
+import { PropertyPhotosService } from './property-photos.service';
 import { OwnerJwtGuard } from './owner-jwt.guard';
 
 @Module({
@@ -20,6 +21,7 @@ import { OwnerJwtGuard } from './owner-jwt.guard';
     OwnerTokenService,
     OwnerPortalService,
     LocationsService,
+    PropertyPhotosService,
     OwnerJwtGuard,
   ],
 })

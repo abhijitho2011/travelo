@@ -3,16 +3,27 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Param,
   Post,
+  StreamableFile,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
   VERSION_NEUTRAL,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { OwnerJwtGuard } from './owner-jwt.guard';
 import { CurrentOwner, AuthenticatedOwner } from './current-owner.decorator';
 import { OwnerPortalService } from './owner-portal.service';
 import { LocationsService } from './locations.service';
+import {
+  MAX_PHOTO_BYTES,
+  MAX_PHOTOS_PER_PROPERTY,
+  PropertyPhotosService,
+  type UploadedPhoto,
+} from './property-photos.service';
 import { CreatePropertyDto, CreateStaffDto, SetStaffStatusDto } from './dto';
 
 @ApiTags('Owner Portal')
@@ -23,6 +34,7 @@ export class OwnerPortalController {
   constructor(
     private readonly portal: OwnerPortalService,
     private readonly locations: LocationsService,
+    private readonly photos: PropertyPhotosService,
   ) {}
 
   @Get('portfolio/summary')
@@ -38,6 +50,52 @@ export class OwnerPortalController {
   @Post('properties')
   createProperty(@CurrentOwner() owner: AuthenticatedOwner, @Body() dto: CreatePropertyDto) {
     return this.portal.createProperty(owner.id, dto);
+  }
+
+  // ---------- Property photos ----------
+
+  @Get('properties/:id/photos')
+  listPhotos(@CurrentOwner() owner: AuthenticatedOwner, @Param('id') id: string) {
+    return this.photos.list(owner.id, id);
+  }
+
+  @Post('properties/:id/photos')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FilesInterceptor('files', MAX_PHOTOS_PER_PROPERTY, {
+      limits: { fileSize: MAX_PHOTO_BYTES, files: MAX_PHOTOS_PER_PROPERTY },
+    }),
+  )
+  uploadPhotos(
+    @CurrentOwner() owner: AuthenticatedOwner,
+    @Param('id') id: string,
+    @UploadedFiles() files: UploadedPhoto[],
+  ) {
+    return this.photos.upload(owner.id, id, files ?? []);
+  }
+
+  /** Streams the stored bytes. Owner-scoped — there is no public static dir. */
+  @Get('properties/:id/photos/:photoId/raw')
+  @Header('Cache-Control', 'private, max-age=3600')
+  async rawPhoto(
+    @CurrentOwner() owner: AuthenticatedOwner,
+    @Param('id') id: string,
+    @Param('photoId') photoId: string,
+  ): Promise<StreamableFile> {
+    const file = await this.photos.readFile(owner.id, id, photoId);
+    return new StreamableFile(file.stream, {
+      type: file.contentType,
+      length: file.sizeBytes,
+    });
+  }
+
+  @Delete('properties/:id/photos/:photoId')
+  deletePhoto(
+    @CurrentOwner() owner: AuthenticatedOwner,
+    @Param('id') id: string,
+    @Param('photoId') photoId: string,
+  ) {
+    return this.photos.remove(owner.id, id, photoId);
   }
 
   @Get('properties/:id/staff')

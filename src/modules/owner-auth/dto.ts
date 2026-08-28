@@ -35,18 +35,20 @@ export class RefreshDto {
 export class AddressDto {
   @IsString() @Length(1, 255) line1!: string;
   @IsString() @Length(1, 128) city!: string;
-  @IsOptional() @IsString() district?: string;
+  // Required: the app picks it from the admin-managed location catalogue.
+  @IsString() @Length(1, 128) district!: string;
   @IsString() @Length(1, 128) state!: string;
-  @IsString() @Length(3, 12) pinCode!: string;
+  @Matches(/^\d{6}$/, { message: 'pinCode must be exactly 6 digits' }) pinCode!: string;
   @IsOptional() @IsString() country?: string;
 }
 
 export class CreatePropertyDto {
   @IsString() @Length(2, 255) name!: string;
-  @IsOptional() @IsInt() @Min(1) @Max(7) starRating?: number;
   @ValidateNested() @Type(() => AddressDto) address!: AddressDto;
   @IsString() @Length(1, 128) city!: string;
   @IsString() @Length(1, 128) state!: string;
+  @IsString() @Matches(MOBILE_REGEX, { message: 'phone must be 10-15 digits' }) phone!: string;
+  @IsOptional() @IsEmail() email?: string;
 }
 
 export class CreateStaffDto {
