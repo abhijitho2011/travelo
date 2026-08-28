@@ -44,7 +44,7 @@ export class AdminAltAuthService implements OnModuleInit {
    * Boot-time guard: with no password fallback, an unconfigured allowlist means
    * nobody can sign in at all. Say so loudly — but never crash the process.
    */
-  onModuleInit(): void {
+  async onModuleInit(): Promise<void> {
     const email = normalizeEmail(this.config.get<string>('SUPER_ADMIN_EMAIL'));
     const mobile = normalizeMobile(this.config.get<string>('SUPER_ADMIN_MOBILE'));
     if (!email && !mobile) {
@@ -56,6 +56,44 @@ export class AdminAltAuthService implements OnModuleInit {
     }
     if (!email) this.logger.warn('SUPER_ADMIN_EMAIL is not set — Google sign-in is disabled.');
     if (!mobile) this.logger.warn('SUPER_ADMIN_MOBILE is not set — OTP sign-in is disabled.');
+    await this.reconcileSuperAdminMobile(email, mobile);
+  }
+
+  /**
+   * Attaches SUPER_ADMIN_MOBILE to the allowlisted admin row so OTP sign-in can
+   * resolve to it without waiting for a seed run. Without this an operator who
+   * changes SUPER_ADMIN_MOBILE would be locked out until the seed happened to
+   * run — and there is no password fallback. Entirely failure-tolerant.
+   */
+  private async reconcileSuperAdminMobile(
+    email: string | null,
+    mobile: string | null,
+  ): Promise<void> {
+    if (!email || !mobile) return;
+    try {
+      const [admin] = await this.db
+        .select({ id: admins.id, mobile: admins.mobile })
+        .from(admins)
+        .where(and(eq(admins.email, email), isNull(admins.deletedAt)))
+        .limit(1);
+      if (!admin) {
+        this.logger.warn(
+          `SUPER_ADMIN_EMAIL does not match any admin row — sign-in will fail until one exists (run the seed).`,
+        );
+        return;
+      }
+      if (admin.mobile === mobile) return;
+      await this.db
+        .update(admins)
+        .set({ mobile, updatedAt: new Date() })
+        .where(eq(admins.id, admin.id));
+      this.logger.log(
+        `Super-admin mobile synced from SUPER_ADMIN_MOBILE (${maskMobile(mobile)}) — OTP sign-in enabled.`,
+      );
+    } catch (err) {
+      // Never block boot on this; /health must still come up.
+      this.logger.error(`Could not sync the super-admin mobile: ${(err as Error).message}`);
+    }
   }
 
   /**

@@ -54,9 +54,11 @@ railway variables --set SUPER_ADMIN_MOBILE=9895077492   # or SUPER_ADMIN_EMAIL=�
 
 (or edit it in the Railway dashboard → service → Variables). The check reads the
 env on every attempt, so the new identity works as soon as the service restarts.
-The identity must also match an **ACTIVE** admin row: set `RUN_SEED=true` for one
-deploy and the seed updates the existing super admin's email/mobile to match env
-(idempotent, never creates a duplicate).
+The identity must also match an **ACTIVE** admin row. On boot the API attaches
+`SUPER_ADMIN_MOBILE` to the admin whose email is `SUPER_ADMIN_EMAIL`, so changing
+the number is enough — no seed run required. (`RUN_SEED=true` for one deploy does
+the same thing plus creates the row if it is missing; it is idempotent and never
+duplicates the super admin.)
 
 **SMS did not arrive.** Request the code as usual, then open the Railway deploy
 log for the API service and look for:

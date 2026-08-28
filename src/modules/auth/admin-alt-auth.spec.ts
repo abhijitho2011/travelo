@@ -162,6 +162,23 @@ describe('AdminAltAuthService', () => {
     return { svc, auth, sms, otp };
   }
 
+  it('attaches SUPER_ADMIN_MOBILE to the allowlisted admin at boot so OTP can resolve', async () => {
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    try {
+      const { svc } = build({
+        env: { SUPER_ADMIN_EMAIL: SUPER_EMAIL, SUPER_ADMIN_MOBILE: `+91 ${SUPER_MOBILE}` },
+        rows: [{ id: 'admin-1', mobile: null }],
+      });
+      await svc.onModuleInit();
+      const line = log.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(line).toContain('OTP sign-in enabled');
+      expect(line).toContain('******7492');
+      expect(line).not.toContain(SUPER_MOBILE);
+    } finally {
+      jest.restoreAllMocks();
+    }
+  });
+
   it('rejects a Google email that is not the allowlisted one', async () => {
     const { svc, auth } = build({
       env: { SUPER_ADMIN_EMAIL: SUPER_EMAIL },
@@ -267,10 +284,10 @@ describe('AdminAltAuthService', () => {
     }
   });
 
-  it('warns loudly at boot when no sign-in identity is configured', () => {
+  it('warns loudly at boot when no sign-in identity is configured', async () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     try {
-      build({ env: {} }).svc.onModuleInit();
+      await build({ env: {} }).svc.onModuleInit();
       expect(warn.mock.calls.map((c) => String(c[0])).join('\n')).toMatch(
         /ADMIN SIGN-IN IS IMPOSSIBLE/,
       );
