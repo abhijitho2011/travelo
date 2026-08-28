@@ -2,7 +2,7 @@ import { HttpException, Inject, Injectable, Logger, OnModuleInit } from '@nestjs
 import { ConfigService } from '@nestjs/config';
 import { and, eq, isNull } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
-import { adminRoles, admins, roles } from '../../database/schema';
+import { adminRoles, admins, rolePermissions, roles } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { getRequestContext } from '../../common/context/request-context';
 import { FirebaseService } from '../shared-auth/firebase.service';
@@ -99,6 +99,57 @@ export class AdminAltAuthService implements OnModuleInit {
   }
 
   /**
+   * Returns the SUPER_ADMIN role id, creating the role (with the `*` wildcard
+   * permission) when the database has no RBAC scaffolding yet. A production
+   * database that was migrated but never seeded has no roles at all, which
+   * would otherwise leave the platform permanently unreachable.
+   */
+  private async ensureSuperAdminRole(): Promise<string | null> {
+    const existing = await this.db
+      .select({ id: roles.id })
+      .from(roles)
+      .where(eq(roles.key, 'SUPER_ADMIN'))
+      .limit(1);
+    if (existing[0]) return existing[0].id;
+
+    this.logger.warn('SUPER_ADMIN role missing — creating it so the platform is reachable.');
+
+    const [created] = await this.db
+      .insert(roles)
+      .values({
+        key: 'SUPER_ADMIN',
+        name: 'Super Admin',
+        description: 'Full, unrestricted access to every part of the platform.',
+        isSystem: true,
+      })
+      .onConflictDoNothing({ target: roles.key })
+      .returning({ id: roles.id });
+
+    const roleId =
+      created?.id ??
+      (
+        await this.db
+          .select({ id: roles.id })
+          .from(roles)
+          .where(eq(roles.key, 'SUPER_ADMIN'))
+          .limit(1)
+      )[0]?.id;
+
+    if (!roleId) {
+      this.logger.error('Could not create or resolve the SUPER_ADMIN role.');
+      return null;
+    }
+
+    // `*` is the wildcard the permission guard already understands.
+    await this.db
+      .insert(rolePermissions)
+      .values({ roleId, permissionKey: '*' })
+      .onConflictDoNothing();
+
+    return roleId;
+  }
+
+  /**
    * Creates the allowlisted super-admin account and grants it the SUPER_ADMIN
    * role. Idempotent, and deliberately narrower than the seed: it inserts this
    * one account and nothing else, so production never receives demo records.
@@ -109,18 +160,8 @@ export class AdminAltAuthService implements OnModuleInit {
    */
   private async provisionSuperAdmin(email: string, mobile: string | null): Promise<void> {
     try {
-      const [role] = await this.db
-        .select({ id: roles.id })
-        .from(roles)
-        .where(eq(roles.key, 'SUPER_ADMIN'))
-        .limit(1);
-
-      if (!role) {
-        this.logger.error(
-          'Cannot provision the super admin: the SUPER_ADMIN role is missing. Run the migrations/seed for roles first.',
-        );
-        return;
-      }
+      const roleId = await this.ensureSuperAdminRole();
+      if (!roleId) return;
 
       const [created] = await this.db
         .insert(admins)
@@ -149,7 +190,7 @@ export class AdminAltAuthService implements OnModuleInit {
         return;
       }
 
-      await this.db.insert(adminRoles).values({ adminId, roleId: role.id }).onConflictDoNothing();
+      await this.db.insert(adminRoles).values({ adminId, roleId }).onConflictDoNothing();
 
       this.logger.log(
         `Provisioned super admin ${email} (${maskMobile(mobile)}) with the SUPER_ADMIN role — sign-in enabled.`,
