@@ -4,6 +4,7 @@ import '../api/api_client.dart';
 import '../api/token_store.dart';
 import '../models/owner_models.dart';
 import 'auth_state.dart';
+import 'google_auth_service.dart';
 
 /// Owner authentication controller.
 ///
@@ -11,13 +12,18 @@ import 'auth_state.dart';
 /// owner account; only an existing owner account can authenticate. The backend
 /// never reveals whether a number is registered — OTP request always returns OK.
 class AuthController extends StateNotifier<AuthState> {
-  AuthController({required ApiClient api, required TokenStore tokens})
-      : _api = api,
+  AuthController({
+    required ApiClient api,
+    required TokenStore tokens,
+    required GoogleAuthService google,
+  })  : _api = api,
         _tokens = tokens,
+        _google = google,
         super(const AuthState.unknown());
 
   final ApiClient _api;
   final TokenStore _tokens;
+  final GoogleAuthService _google;
 
   /// Restore session on cold start.
   Future<void> bootstrap() async {
@@ -53,6 +59,21 @@ class AuthController extends StateNotifier<AuthState> {
     await _loadMe();
   }
 
+  /// Google sign-in → Firebase ID token → backend exchange for a Travelo
+  /// session. The backend only issues tokens for an existing owner account.
+  Future<void> signInWithGoogle() async {
+    final idToken = await _google.signInAndGetIdToken();
+    final data = await _api.post(
+      '/auth/google',
+      body: {'idToken': idToken},
+    ) as Map;
+    await _tokens.save(
+      access: data['accessToken'] as String,
+      refresh: data['refreshToken'] as String,
+    );
+    await _loadMe();
+  }
+
   Future<void> _loadMe() async {
     final me = await _api.get('/auth/me') as Map;
     final owner = OwnerProfile.fromJson(
@@ -77,6 +98,7 @@ class AuthController extends StateNotifier<AuthState> {
     try {
       await _api.post('/auth/logout');
     } catch (_) {}
+    await _google.signOut();
     await _tokens.clear();
     state = const AuthState.signedOut();
   }

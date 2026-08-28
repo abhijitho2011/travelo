@@ -210,7 +210,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
           const SizedBox(height: 16),
           OutlinedButton.icon(
-            onPressed: _busy ? null : () => _notReady('Google sign-in'),
+            onPressed: _busy ? null : _google,
             icon: const Icon(Icons.g_mobiledata, size: 28),
             label: const Text('Continue with Google'),
           ),
@@ -226,10 +226,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  void _notReady(String what) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$what is coming soon.')),
-    );
+  Future<void> _google() async {
+    setState(() {
+      _busy = true;
+      _banner = null;
+    });
+    try {
+      await ref.read(authControllerProvider.notifier).signInWithGoogle();
+      // Router redirects on auth state change.
+    } on ApiException catch (e) {
+      if (e.code == 'CANCELLED') return;
+      setState(() {
+        switch (e.code) {
+          case 'ACCOUNT_SUSPENDED':
+            _banner = 'Your account is currently suspended. Please contact Travelo Support.';
+            break;
+          case 'ACCOUNT_BLOCKED':
+            _banner = 'Your account has been blocked. Contact Travelo Support for assistance.';
+            break;
+          case 'OWNER_NOT_FOUND':
+          case 'NOT_FOUND':
+            _banner =
+                'This Google account is not registered with Travelo. Ask your Travelo administrator for an invitation.';
+            break;
+          case 'NETWORK':
+            _banner = "We couldn't reach Travelo. Check your connection and try again.";
+            break;
+          default:
+            _banner = 'Google sign-in failed. Please try again.';
+        }
+      });
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Widget _label(String t) => Text(
