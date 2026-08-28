@@ -10,33 +10,51 @@ import pg from 'pg';
 
 const MIGRATIONS_DIR = path.resolve('src/database/migrations');
 
+const log = (m) => {
+  process.stdout.write(`[boot] ${m}\n`);
+};
+
+function pgConfig() {
+  const url = process.env.DATABASE_URL;
+  if (!url) return null;
+  const ssl = process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined;
+  return { connectionString: url, ssl };
+}
+
 async function runMigrations() {
   if (!existsSync(MIGRATIONS_DIR)) {
-    console.log('[boot] no migrations directory; skipping');
+    log('no migrations directory; skipping');
     return;
   }
-  const files = (await readdir(MIGRATIONS_DIR))
-    .filter((f) => f.endsWith('.sql'))
-    .sort();
+  const files = (await readdir(MIGRATIONS_DIR)).filter((f) => f.endsWith('.sql')).sort();
   if (files.length === 0) {
-    console.log('[boot] migrations directory is empty; skipping');
+    log('migrations directory is empty; skipping');
     return;
   }
-  if (!process.env.DATABASE_URL) {
-    console.warn('[boot] DATABASE_URL not set; skipping migrations');
+  const cfg = pgConfig();
+  if (!cfg) {
+    log('DATABASE_URL not set; skipping migrations');
     return;
   }
+  log(`connecting to Postgres for ${files.length} migration file(s)`);
   const { Client } = pg;
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  const client = new Client(cfg);
   await client.connect();
+  log('connected');
   try {
     const { readFile } = await import('node:fs/promises');
     for (const file of files) {
       const sql = await readFile(path.join(MIGRATIONS_DIR, file), 'utf8');
-      console.log(`[boot] applying migration: ${file}`);
-      await client.query(sql);
+      log(`applying migration: ${file} (${sql.length} bytes)`);
+      try {
+        await client.query(sql);
+        log(`migration OK: ${file}`);
+      } catch (err) {
+        log(`migration FAILED (${file}): ${err.message ?? err}`);
+        throw err;
+      }
     }
-    console.log(`[boot] applied ${files.length} migration(s)`);
+    log(`applied ${files.length} migration(s)`);
   } finally {
     await client.end();
   }
@@ -44,7 +62,7 @@ async function runMigrations() {
 
 async function runSeedIfRequested() {
   if (process.env.RUN_SEED !== 'true') return;
-  console.log('[boot] RUN_SEED=true — running seed');
+  log('RUN_SEED=true — running seed');
   const { fileURLToPath } = await import('node:url');
   const here = path.dirname(fileURLToPath(import.meta.url));
   const seedPath = path.join(here, 'seed-node.mjs');
@@ -55,13 +73,15 @@ async function runSeedIfRequested() {
 }
 
 async function main() {
+  log('starting');
   try {
     await runMigrations();
     await runSeedIfRequested();
   } catch (err) {
-    console.error('[boot] pre-start step failed:', err);
+    log(`pre-start step failed: ${err?.stack ?? err}`);
     process.exit(1);
   }
+  log('launching dist/main.js');
   const child = spawn(process.execPath, ['dist/main.js'], {
     stdio: 'inherit',
     env: process.env,
@@ -69,4 +89,7 @@ async function main() {
   child.on('exit', (code) => process.exit(code ?? 0));
 }
 
-main();
+main().catch((err) => {
+  log(`fatal: ${err?.stack ?? err}`);
+  process.exit(1);
+});
