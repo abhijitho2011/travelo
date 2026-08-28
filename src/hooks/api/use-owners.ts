@@ -46,19 +46,40 @@ export function useOwnerProperties(id: string) {
 export type CreateOwnerInput = {
   name: string;
   email: string;
-  phone?: string | undefined;
-  company?: string | undefined;
+  phone: string;
+  company: string;
+  /** Street address line. */
+  address: string;
+  pinCode: string;
+  /** location_states.id */
+  state: string;
+  /** location_districts.id — must belong to `state`. */
+  district: string;
+  /** Required: an owner cannot be created without a subscription plan. */
+  planId: string;
   gstNumber?: string | undefined;
-  city?: string | undefined;
+  startsAt?: string | undefined;
   country?: string | undefined;
-  address?: Record<string, unknown> | undefined;
+};
+
+export type CreatedOwner = Owner & {
+  subscription: {
+    id: string;
+    planId: string;
+    plan: string;
+    status: string;
+    durationMonths: number;
+    periodPrice: number;
+    currentPeriodStart: string;
+    currentPeriodEnd: string;
+  };
 };
 
 export function useCreateOwner() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateOwnerInput) =>
-      apiFetch<Owner>("/owners", { method: "POST", body: input }),
+      apiFetch<CreatedOwner>("/owners", { method: "POST", body: input }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.owners.all });
       qc.invalidateQueries({ queryKey: qk.dashboard });
@@ -73,6 +94,30 @@ export function useUpdateOwner(id: string) {
       apiFetch<Owner>(`/owners/${id}`, { method: "PATCH", body: input }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.owners.all });
+    },
+  });
+}
+
+/**
+ * Soft-deletes an owner: the account leaves the platform, its subscription is
+ * cancelled and its properties are archived. Billing history is preserved.
+ */
+export function useDeleteOwner() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      apiFetch<{
+        deleted: boolean;
+        ownerId: string;
+        subscriptionsCancelled: number;
+        propertiesArchived: number;
+      }>(`/owners/${id}`, { method: "DELETE", body: { reason } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.owners.all });
+      qc.invalidateQueries({ queryKey: qk.properties.all });
+      qc.invalidateQueries({ queryKey: qk.subscriptions.all });
+      qc.invalidateQueries({ queryKey: qk.audit.all });
+      qc.invalidateQueries({ queryKey: qk.dashboard });
     },
   });
 }

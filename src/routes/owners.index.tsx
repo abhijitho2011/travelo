@@ -7,7 +7,12 @@ import { DataTable, type Column } from "@/components/admin/data-table";
 import { SearchBox, StatusFilter, ToolbarActions } from "@/components/admin/list-toolbar";
 import { PageHeader, StatusBadge } from "@/components/admin/primitives";
 import { Button } from "@/components/ui/button";
-import { useOwners, useSetOwnerStatus, type OwnerStatusAction } from "@/hooks/api/use-owners";
+import {
+  useDeleteOwner,
+  useOwners,
+  useSetOwnerStatus,
+  type OwnerStatusAction,
+} from "@/hooks/api/use-owners";
 import type { Owner } from "@/hooks/api/types";
 import { useListParams } from "@/hooks/use-list-params";
 import { errorMessage } from "@/lib/api";
@@ -27,6 +32,18 @@ const OWNER_STATUSES = ["ACTIVE", "PENDING", "SUSPENDED", "BLOCKED"];
 
 function OwnerRowActions({ owner }: { owner: Owner }) {
   const setStatus = useSetOwnerStatus(owner.id);
+  const deleteOwner = useDeleteOwner();
+
+  const remove = async (reason: string) => {
+    try {
+      const result = await deleteOwner.mutateAsync({ id: owner.id, reason });
+      toast.success("Owner deleted", {
+        description: `${owner.company ?? owner.name} removed — ${result.subscriptionsCancelled} subscription(s) cancelled, ${result.propertiesArchived} property(ies) archived.`,
+      });
+    } catch (error) {
+      toast.error("Could not delete owner", { description: errorMessage(error) });
+    }
+  };
 
   const run = async (action: OwnerStatusAction, reason: string) => {
     try {
@@ -96,6 +113,23 @@ function OwnerRowActions({ owner }: { owner: Owner }) {
           }
         />
       )}
+      <ConfirmDialog
+        confirmLabel="Delete owner"
+        title="Delete owner"
+        description={`${label} will be removed from the Tavelo platform.`}
+        impact={[
+          "The owner and their staff lose all access",
+          "Their subscription is cancelled immediately",
+          "All of their properties are archived",
+          "Billing and audit history is kept for the record",
+        ]}
+        onConfirm={(reason) => remove(reason)}
+        trigger={
+          <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive">
+            Delete
+          </Button>
+        }
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Building2, UserSearch } from "lucide-react";
 import { toast } from "sonner";
 
@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import {
   useAddEntitlementOverride,
+  useDeleteOwner,
   useOwnerEntitlements,
   useOwnerOverview,
   useOwnerProperties,
@@ -52,6 +53,20 @@ function StatusActions({
   label: string;
 }) {
   const setStatus = useSetOwnerStatus(ownerId);
+  const deleteOwner = useDeleteOwner();
+  const navigate = useNavigate();
+
+  const remove = async (reason: string) => {
+    try {
+      const result = await deleteOwner.mutateAsync({ id: ownerId, reason });
+      toast.success("Owner deleted", {
+        description: `${label} removed — ${result.subscriptionsCancelled} subscription(s) cancelled, ${result.propertiesArchived} property(ies) archived.`,
+      });
+      await navigate({ to: "/owners" });
+    } catch (error) {
+      toast.error("Could not delete owner", { description: errorMessage(error) });
+    }
+  };
 
   const run = async (action: OwnerStatusAction, reason: string) => {
     try {
@@ -119,6 +134,23 @@ function StatusActions({
           }
         />
       )}
+      <ConfirmDialog
+        confirmLabel="Delete owner"
+        title="Delete owner"
+        description={`${label} will be removed from the Tavelo platform.`}
+        impact={[
+          "The owner and their staff lose all access",
+          "Their subscription is cancelled immediately",
+          "All of their properties are archived",
+          "Billing and audit history is kept for the record",
+        ]}
+        onConfirm={(reason) => remove(reason)}
+        trigger={
+          <Button size="sm" variant="outline" className="h-8 text-destructive">
+            Delete
+          </Button>
+        }
+      />
     </div>
   );
 }

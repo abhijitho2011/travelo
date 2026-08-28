@@ -10,6 +10,11 @@ export type Owner = {
   address: Record<string, unknown> | null;
   city: string | null;
   country: string | null;
+  pinCode: string | null;
+  stateId: string | null;
+  districtId: string | null;
+  state: string | null;
+  district: string | null;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -75,6 +80,10 @@ export type Plan = {
   limit: number;
   monthly: number;
   annual: number;
+  /** Billing period length in months. */
+  durationMonths: number;
+  /** Total charged per period = monthly x durationMonths (paise). */
+  periodPrice: number;
   currency: string;
   status: string;
   features: string[];
@@ -87,6 +96,8 @@ export type PlanDetail = {
   description: string | null;
   monthlyPrice: number;
   annualPrice: number;
+  durationMonths: number;
+  periodPrice: number;
   propertyLimit: number;
   currency: string;
   status: string;

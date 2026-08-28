@@ -32,6 +32,8 @@ export type CreatePlanInput = {
   monthlyPrice: number;
   annualPrice: number;
   propertyLimit: number;
+  /** Billing period length in months (1–120). */
+  durationMonths: number;
   currency?: string | undefined;
   features?: string[] | undefined;
 };
