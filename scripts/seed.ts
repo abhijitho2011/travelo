@@ -92,15 +92,15 @@ const ROLES = [
 
 const SEED_ADMINS = [
   {
-    email: process.env.SEED_SUPER_ADMIN_EMAIL ?? 'admin@travelo.local',
+    email: process.env.SEED_SUPER_ADMIN_EMAIL ?? 'admin@tavelo.local',
     name: 'Super Admin',
     roleKey: 'super_admin',
     envPassword: process.env.SEED_SUPER_ADMIN_PASSWORD ?? 'ChangeMe!12345',
   },
-  { email: 'finance@travelo.local', name: 'Finance Admin', roleKey: 'finance_admin' },
-  { email: 'support@travelo.local', name: 'Support Admin', roleKey: 'support_admin' },
-  { email: 'ops@travelo.local', name: 'Operations Admin', roleKey: 'operations_admin' },
-  { email: 'platform@travelo.local', name: 'Platform Admin', roleKey: 'platform_admin' },
+  { email: 'finance@tavelo.local', name: 'Finance Admin', roleKey: 'finance_admin' },
+  { email: 'support@tavelo.local', name: 'Support Admin', roleKey: 'support_admin' },
+  { email: 'ops@tavelo.local', name: 'Operations Admin', roleKey: 'operations_admin' },
+  { email: 'platform@tavelo.local', name: 'Platform Admin', roleKey: 'platform_admin' },
 ];
 
 const FEATURES = [

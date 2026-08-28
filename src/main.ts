@@ -53,7 +53,7 @@ async function bootstrap(): Promise<void> {
   });
 
   const config = new DocumentBuilder()
-    .setTitle('Travelo Super Admin API')
+    .setTitle('Tavelo Super Admin API')
     .setDescription('Phase 1 — auth, admins, roles, permissions, audit')
     .setVersion('0.1.0')
     .addBearerAuth()
@@ -69,7 +69,7 @@ async function bootstrap(): Promise<void> {
 
   await app.listen(env.PORT, '0.0.0.0');
   const logger = new Logger('Bootstrap');
-  logger.log(`Travelo Super Admin API listening on 0.0.0.0:${env.PORT}${env.API_PREFIX}`);
+  logger.log(`Tavelo Super Admin API listening on 0.0.0.0:${env.PORT}${env.API_PREFIX}`);
   logger.log(`Swagger docs at http://0.0.0.0:${env.PORT}/api/docs`);
 }
 

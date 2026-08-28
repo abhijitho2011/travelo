@@ -1,7 +1,7 @@
 {
-  "name": "travelo-super-admin-api",
+  "name": "tavelo-super-admin-api",
   "version": "0.1.0",
-  "description": "Travelo Super Admin backend (NestJS + Drizzle + PostgreSQL + Redis)",
+  "description": "Tavelo Super Admin backend (NestJS + Drizzle + PostgreSQL + Redis)",
   "private": true,
   "engines": {
     "node": ">=20 <21"

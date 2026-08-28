@@ -23,7 +23,7 @@ const envSchema = z.object({
   THROTTLE_TTL: z.coerce.number().int().positive().default(60),
   THROTTLE_LIMIT: z.coerce.number().int().positive().default(120),
 
-  SEED_SUPER_ADMIN_EMAIL: z.string().email().default('admin@travelo.local'),
+  SEED_SUPER_ADMIN_EMAIL: z.string().email().default('admin@tavelo.local'),
   SEED_SUPER_ADMIN_PASSWORD: z.string().min(8).default('ChangeMe!12345'),
 
   PAYMENT_WEBHOOK_SECRET_RAZORPAY: z.string().optional(),

@@ -13,8 +13,8 @@ import { DRIZZLE, Database } from '../../database/database.module';
 import { owners, ownerSessions } from '../../database/schema';
 import { AuthenticatedOwner } from './current-owner.decorator';
 
-const OWNER_ISSUER = 'travelo-owner';
-const OWNER_AUDIENCE = 'travelo-owner';
+const OWNER_ISSUER = 'tavelo-owner';
+const OWNER_AUDIENCE = 'tavelo-owner';
 
 export interface OwnerAccessPayload {
   sub: string; // owner id
@@ -27,7 +27,7 @@ export interface OwnerAccessPayload {
 
 /**
  * Guard for owner-scoped endpoints. Verifies the owner access token against
- * the SEPARATE owner secret (issuer/audience travelo-owner) so admin tokens
+ * the SEPARATE owner secret (issuer/audience tavelo-owner) so admin tokens
  * are never accepted here, and vice versa.
  */
 @Injectable()

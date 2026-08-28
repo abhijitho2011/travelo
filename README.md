@@ -1,6 +1,6 @@
-# Travelo Super Admin API — Phase 1
+# Tavelo Super Admin API — Phase 1
 
-NestJS 10 + TypeScript backend for the Travelo Super Admin control plane. Phase 1 delivers the foundation: config, database (PostgreSQL + Drizzle), Redis, JWT auth with refresh rotation, admins CRUD, roles & permissions with RBAC, audit logging, health checks, Swagger, and container/Railway deploy assets.
+NestJS 10 + TypeScript backend for the Tavelo Super Admin control plane. Phase 1 delivers the foundation: config, database (PostgreSQL + Drizzle), Redis, JWT auth with refresh rotation, admins CRUD, roles & permissions with RBAC, audit logging, health checks, Swagger, and container/Railway deploy assets.
 
 ## Requirements
 - Node.js 20.x
@@ -20,7 +20,7 @@ npm run dev                # http://0.0.0.0:${PORT}${API_PREFIX}
 
 Swagger UI: `http://0.0.0.0:${PORT}/api/docs` (bind is `0.0.0.0`; connect from your host at the same port).
 
-Default super admin: `admin@travelo.local` / `ChangeMe!12345` (override via `SEED_SUPER_ADMIN_EMAIL` / `SEED_SUPER_ADMIN_PASSWORD`).
+Default super admin: `admin@tavelo.local` / `ChangeMe!12345` (override via `SEED_SUPER_ADMIN_EMAIL` / `SEED_SUPER_ADMIN_PASSWORD`).
 
 ## Quick start (Docker Compose)
 

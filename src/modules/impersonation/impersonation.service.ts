@@ -19,7 +19,7 @@ export interface StartImpersonationInput {
 
 @Injectable()
 export class ImpersonationService {
-  static IMPERSONATION_ISSUER = 'travelo-impersonation';
+  static IMPERSONATION_ISSUER = 'tavelo-impersonation';
   static IMPERSONATION_TTL_SECONDS = 60 * 60;
 
   constructor(
