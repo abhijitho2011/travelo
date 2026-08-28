@@ -107,7 +107,15 @@ export type SubscriptionAction = "suspend" | "reactivate" | "cancel";
 export function useSubscriptionAction() {
   const invalidate = useSubscriptionInvalidation();
   return useMutation({
-    mutationFn: ({ id, action, reason }: { id: string; action: SubscriptionAction; reason?: string }) =>
+    mutationFn: ({
+      id,
+      action,
+      reason,
+    }: {
+      id: string;
+      action: SubscriptionAction;
+      reason?: string;
+    }) =>
       apiFetch<Subscription>(`/subscriptions/${id}/${action}`, {
         method: "POST",
         body: { reason },

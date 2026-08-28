@@ -89,7 +89,9 @@ export function ConfirmDialog({
           <AlertDialogAction
             disabled={blocked}
             className={
-              destructive ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : undefined
+              destructive
+                ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                : undefined
             }
             onClick={(e) => {
               e.preventDefault();

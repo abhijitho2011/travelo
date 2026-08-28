@@ -59,8 +59,7 @@ export function useGlobalSearch(q: string, types?: string) {
 export function useSystemHealth() {
   return useQuery({
     queryKey: qk.health,
-    queryFn: () =>
-      apiFetch<HealthReport>("/health", { baseUrl: platformRootUrl(), auth: false }),
+    queryFn: () => apiFetch<HealthReport>("/health", { baseUrl: platformRootUrl(), auth: false }),
     refetchInterval: 30_000,
   });
 }

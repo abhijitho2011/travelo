@@ -129,7 +129,11 @@ function DashboardPage() {
                         <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="var(--color-border)"
+                      vertical={false}
+                    />
                     <XAxis
                       dataKey="day"
                       tickFormatter={(v: string) => formatDate(v).slice(0, 6)}

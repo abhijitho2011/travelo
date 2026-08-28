@@ -1,113 +1,112 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
 
 import { DataTable, type Column } from "@/components/admin/data-table";
+import { StatusFilter, ToolbarActions } from "@/components/admin/list-toolbar";
 import { PageHeader, StatusBadge } from "@/components/admin/primitives";
-import { Button } from "@/components/ui/button";
 import type { IntegrationConnection } from "@/hooks/api/types";
 import { useIntegrations } from "@/hooks/api/use-operations";
-import { humanise, relativeTime, shortId } from "@/lib/format";
+import { useListParams } from "@/hooks/use-list-params";
+import { num, relativeTime } from "@/lib/format";
 
 export const Route = createFileRoute("/integrations")({
   head: () => ({
     meta: [
       { title: "Integrations · Tavelo Super Admin" },
-      {
-        name: "description",
-        content: "Channel manager and distribution integration health across the platform.",
-      },
+      { name: "description", content: "Channel manager and PMS connections across properties." },
     ],
   }),
   component: IntegrationsPage,
 });
 
-const STATUSES = ["", "HEALTHY", "WARNING", "ERROR", "DISCONNECTED"];
-const LIMIT = 25;
+const INTEGRATION_STATUSES = ["CONNECTED", "DEGRADED", "DISCONNECTED", "ERROR", "PENDING"];
 
 function IntegrationsPage() {
-  const [status, setStatus] = useState("");
-  const [offset, setOffset] = useState(0);
-
-  const query = useIntegrations({ limit: LIMIT, offset, status: status || undefined });
-  const page = query.data;
+  const list = useListParams();
+  const query = useIntegrations({
+    limit: list.limit,
+    offset: list.offset,
+    status: list.statusParam,
+  });
 
   const columns: Column<IntegrationConnection>[] = [
-    {
-      key: "provider",
-      header: "Provider",
-      cell: (row) => <span className="font-medium text-foreground">{humanise(row.provider)}</span>,
-    },
-    {
-      key: "status",
-      header: "Status",
-      cell: (row) => <StatusBadge status={row.status} />,
-    },
+    { key: "provider", header: "Provider", cell: (i) => i.provider },
     {
       key: "property",
       header: "Property",
-      cell: (row) => (
-        <span className="text-muted-foreground">
-          {row.propertyId ? shortId(row.propertyId) : "—"}
-        </span>
-      ),
+      cell: (i) =>
+        i.propertyId ? (
+          <Link
+            to="/properties/$propertyId"
+            params={{ propertyId: i.propertyId }}
+            className="text-primary hover:underline"
+          >
+            View property
+          </Link>
+        ) : (
+          "—"
+        ),
     },
     {
-      key: "lastSync",
-      header: "Last sync",
-      cell: (row) => <span className="text-muted-foreground">{relativeTime(row.lastSyncAt)}</span>,
+      key: "owner",
+      header: "Owner",
+      cell: (i) =>
+        i.ownerId ? (
+          <Link
+            to="/owners/$ownerId"
+            params={{ ownerId: i.ownerId }}
+            className="text-primary hover:underline"
+          >
+            View owner
+          </Link>
+        ) : (
+          "—"
+        ),
     },
-    {
-      key: "errors",
-      header: "Errors",
-      align: "right",
-      cell: (row) => (
-        <span className={row.errorCount ? "text-destructive" : "text-muted-foreground"}>
-          {row.errorCount ?? 0}
-        </span>
-      ),
-    },
+    { key: "status", header: "Status", cell: (i) => <StatusBadge status={i.status} /> },
+    { key: "errors", header: "Errors", align: "right", cell: (i) => num(i.errorCount ?? 0) },
+    { key: "sync", header: "Last sync", cell: (i) => relativeTime(i.lastSyncAt) },
+    { key: "updated", header: "Updated", cell: (i) => relativeTime(i.updatedAt) },
   ];
 
   return (
-    <div className="space-y-5">
+    <>
       <PageHeader
+        eyebrow="Operations"
         title="Integrations"
-        description="Connection health for channel managers and distribution partners."
+        description="Channel manager and PMS connections, with their sync health."
       />
-
-      <DataTable
-        rows={page?.items ?? []}
-        columns={columns}
-        rowKey={(row) => row.id}
-        loading={query.isLoading}
-        error={query.error}
-        onRetry={() => void query.refetch()}
-        emptyTitle="No integrations connected"
-        emptyDescription="Integration health appears once a property connects a channel manager."
-        toolbar={
-          <div className="flex flex-wrap gap-1.5">
-            {STATUSES.map((value) => (
-              <Button
-                key={value || "all"}
-                size="sm"
-                variant={status === value ? "default" : "outline"}
-                onClick={() => {
-                  setStatus(value);
-                  setOffset(0);
-                }}
-              >
-                {value ? humanise(value) : "All"}
-              </Button>
-            ))}
-          </div>
-        }
-        pagination={{
-          total: page?.total ?? 0,
-          limit: LIMIT,
-          offset,
-          onOffsetChange: setOffset,
-        }}
-      />
-    </div>
+      <div className="p-5 lg:p-6">
+        <DataTable
+          rows={query.data?.items ?? []}
+          columns={columns}
+          rowKey={(i) => i.id}
+          loading={query.isLoading}
+          error={query.error}
+          onRetry={() => query.refetch()}
+          emptyTitle="No integrations"
+          emptyDescription="Connections appear once owners link a channel manager or PMS."
+          pagination={{
+            total: query.data?.total ?? 0,
+            limit: list.limit,
+            offset: list.offset,
+            onOffsetChange: list.setOffset,
+          }}
+          toolbar={
+            <>
+              <StatusFilter
+                value={list.status}
+                onChange={list.setStatus}
+                options={INTEGRATION_STATUSES}
+              />
+              <ToolbarActions>
+                <span className="tnum text-xs text-muted-foreground">
+                  {query.data?.items?.length ?? 0} shown
+                </span>
+              </ToolbarActions>
+            </>
+          }
+        />
+      </div>
+    </>
   );
 }

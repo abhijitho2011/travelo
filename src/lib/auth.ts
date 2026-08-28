@@ -4,13 +4,7 @@
  */
 import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 
-import {
-  apiFetch,
-  clearTokens,
-  readAccessToken,
-  readRefreshToken,
-  storeTokens,
-} from "@/lib/api";
+import { apiFetch, clearTokens, readAccessToken, readRefreshToken, storeTokens } from "@/lib/api";
 
 export type AdminRole = { key: string; name: string };
 
@@ -96,10 +90,12 @@ export function hasPermission(admin: CurrentAdmin | undefined, permission: strin
 
 export function initials(name?: string | null): string {
   if (!name) return "AD";
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .join("") || "AD";
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase() ?? "")
+      .join("") || "AD"
+  );
 }

@@ -1,85 +1,83 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
 
-import { AsyncSection, PageHeader } from "@/components/admin/primitives";
-import { Button } from "@/components/ui/button";
+import { DataTable, type Column } from "@/components/admin/data-table";
+import { ToolbarActions } from "@/components/admin/list-toolbar";
+import { PageHeader } from "@/components/admin/primitives";
+import type { AuditLog } from "@/hooks/api/types";
 import { useAuditLogs } from "@/hooks/api/use-operations";
-import { formatDateTime, humanise, shortId } from "@/lib/format";
+import { useListParams } from "@/hooks/use-list-params";
+import { formatDateTime, humanise, relativeTime } from "@/lib/format";
 
 export const Route = createFileRoute("/activity")({
   head: () => ({
     meta: [
-      { title: "Activity · Tavelo Super Admin" },
-      { name: "description", content: "Recent platform activity across owners and properties." },
+      { title: "Owner activity · Tavelo Super Admin" },
+      { name: "description", content: "Recent admin actions taken against owner accounts." },
     ],
   }),
   component: ActivityPage,
 });
 
-const LIMIT = 30;
-
 function ActivityPage() {
-  const [offset, setOffset] = useState(0);
-  const query = useAuditLogs({ limit: LIMIT, offset });
-  const items = query.data?.items ?? [];
-  const total = query.data?.total ?? 0;
+  const list = useListParams();
+  // Owner activity is the owner-scoped slice of the platform audit trail.
+  const query = useAuditLogs({ limit: list.limit, offset: list.offset, entity: "owner" });
+
+  const columns: Column<AuditLog>[] = [
+    { key: "ts", header: "When", cell: (l) => formatDateTime(l.ts) },
+    {
+      key: "action",
+      header: "Action",
+      cell: (l) => <span className="font-medium">{humanise(l.action.replace(/\./g, " "))}</span>,
+    },
+    {
+      key: "entity",
+      header: "Owner",
+      cell: (l) => (
+        <span className="font-mono text-xs text-muted-foreground">{l.entityId ?? "—"}</span>
+      ),
+    },
+    { key: "actor", header: "Admin", cell: (l) => l.actor ?? "—" },
+    {
+      key: "reason",
+      header: "Reason",
+      cell: (l) => <span className="text-xs text-muted-foreground">{l.reason ?? "—"}</span>,
+    },
+    { key: "ago", header: "Age", cell: (l) => relativeTime(l.ts) },
+  ];
 
   return (
-    <div className="space-y-5">
+    <>
       <PageHeader
-        title="Activity"
-        description="A chronological view of platform events, sourced from the audit trail."
+        eyebrow="Customers"
+        title="Owner activity"
+        description="Every admin action recorded against an owner account."
       />
-
-      <AsyncSection
-        loading={query.isLoading}
-        error={query.error}
-        onRetry={() => void query.refetch()}
-        isEmpty={items.length === 0}
-        emptyTitle="No activity yet"
-        emptyDescription="Platform events appear here as owners and admins use Tavelo."
-      >
-        <ol className="panel divide-y divide-border">
-          {items.map((item) => (
-            <li key={item.id} className="flex gap-3 p-4">
-              <span aria-hidden className="mt-1.5 size-2 shrink-0 rounded-full bg-primary/70" />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm text-foreground">
-                  <span className="font-medium">{item.actor ?? "System"}</span>{" "}
-                  <span className="text-muted-foreground">{humanise(item.action)}</span>{" "}
-                  <span className="font-medium">{humanise(item.entity)}</span>{" "}
-                  <span className="text-muted-foreground">{shortId(item.entityId)}</span>
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{formatDateTime(item.ts)}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-
-        <div className="flex items-center justify-between pt-3">
-          <span className="text-xs text-muted-foreground">
-            Showing {offset + 1}–{offset + items.length} of {total}
-          </span>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={offset === 0}
-              onClick={() => setOffset(Math.max(0, offset - LIMIT))}
-            >
-              Previous
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={offset + LIMIT >= total}
-              onClick={() => setOffset(offset + LIMIT)}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      </AsyncSection>
-    </div>
+      <div className="p-5 lg:p-6">
+        <DataTable
+          rows={query.data?.items ?? []}
+          columns={columns}
+          rowKey={(l) => l.id}
+          loading={query.isLoading}
+          error={query.error}
+          onRetry={() => query.refetch()}
+          emptyTitle="No owner activity yet"
+          emptyDescription="Status changes and edits to owner accounts appear here."
+          pagination={{
+            total: query.data?.total ?? 0,
+            limit: list.limit,
+            offset: list.offset,
+            onOffsetChange: list.setOffset,
+          }}
+          toolbar={
+            <ToolbarActions>
+              <span className="tnum text-xs text-muted-foreground">
+                {query.data?.total ?? 0} entries
+              </span>
+            </ToolbarActions>
+          }
+        />
+      </div>
+    </>
   );
 }

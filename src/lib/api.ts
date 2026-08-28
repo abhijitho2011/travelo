@@ -95,10 +95,7 @@ export function clearTokens() {
   }
 }
 
-export type QueryParams = Record<
-  string,
-  string | number | boolean | null | undefined
->;
+export type QueryParams = Record<string, string | number | boolean | null | undefined>;
 
 export function buildQuery(params?: QueryParams): string {
   if (!params) return "";
@@ -145,9 +142,10 @@ async function refreshAccessToken(): Promise<string | null> {
 
   if (!res.ok) return null;
 
-  const payload = (await res.json().catch(() => null)) as
-    | ApiEnvelope<{ accessToken: string; refreshToken: string }>
-    | null;
+  const payload = (await res.json().catch(() => null)) as ApiEnvelope<{
+    accessToken: string;
+    refreshToken: string;
+  }> | null;
   const data = payload?.data;
   if (!data?.accessToken || !data?.refreshToken) return null;
 
@@ -237,7 +235,12 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
 
   const payload = (await res.json().catch(() => null)) as ApiEnvelope<T> | T | null;
   if (payload === null) return undefined as T;
-  if (typeof payload === "object" && payload !== null && "data" in payload && "success" in payload) {
+  if (
+    typeof payload === "object" &&
+    payload !== null &&
+    "data" in payload &&
+    "success" in payload
+  ) {
     return (payload as ApiEnvelope<T>).data;
   }
   return payload as T;
@@ -252,7 +255,11 @@ export type Paginated<T> = {
 };
 
 /** Some endpoints return a bare array; normalise both into `Paginated`. */
-export function toPaginated<T>(value: Paginated<T> | T[] | undefined, limit: number, offset: number): Paginated<T> {
+export function toPaginated<T>(
+  value: Paginated<T> | T[] | undefined,
+  limit: number,
+  offset: number,
+): Paginated<T> {
   if (Array.isArray(value)) {
     // Endpoints that return a bare array do not report a total; derive a
     // best-effort one so pagination can still advance while more rows exist.

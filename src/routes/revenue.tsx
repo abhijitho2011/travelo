@@ -1,136 +1,232 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import {
-  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart,
-  ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from "recharts";
 
-import { PageHeader, Section } from "@/components/admin/primitives";
-import { DataTable, type Column } from "@/components/admin/data-table";
-import { growthSeries, inr, revenueByPlan, revenueSeries, saasMetrics } from "@/lib/travelo-data";
+import {
+  AsyncSection,
+  ChartSkeleton,
+  KpiCard,
+  PageHeader,
+  Section,
+} from "@/components/admin/primitives";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useAnalyticsOverview, useRevenueSeries } from "@/hooks/api/use-analytics";
+import { useRefunds } from "@/hooks/api/use-billing";
+import { compactInr, formatDate, inr, num } from "@/lib/format";
 
 export const Route = createFileRoute("/revenue")({
   head: () => ({
     meta: [
-      { title: "Revenue Analytics · Travelo Super Admin" },
-      { name: "description", content: "MRR, ARR, ARPU, expansion and churn analytics for the Travelo hotel SaaS platform." },
-      { property: "og:title", content: "Revenue Analytics · Travelo Super Admin" },
-      { property: "og:description", content: "SaaS revenue performance across plans and regions." },
+      { title: "Revenue · Tavelo Super Admin" },
+      { name: "description", content: "MRR, ARR and revenue movement across the platform." },
     ],
   }),
   component: RevenuePage,
 });
 
-const pieColors = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)"];
-
-type PlanRow = (typeof revenueByPlan)[number];
+function isoDaysAgo(days: number) {
+  return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+}
 
 function RevenuePage() {
-  const columns: Column<PlanRow>[] = [
-    { key: "plan", header: "Plan", cell: (r) => <span className="font-semibold">{r.plan}</span> },
-    { key: "customers", header: "Customers", align: "right", sortValue: (r) => r.customers, cell: (r) => <span className="tnum">{r.customers}</span> },
-    { key: "mrr", header: "MRR", align: "right", sortValue: (r) => r.mrr, cell: (r) => <span className="tnum">{inr(r.mrr)}</span> },
-    { key: "arr", header: "ARR", align: "right", cell: (r) => <span className="tnum">{inr(r.mrr * 12)}</span> },
-    { key: "arpu", header: "ARPU", align: "right", cell: (r) => <span className="tnum">{inr(Math.round(r.mrr / r.customers))}</span> },
-    {
-      key: "share", header: "Revenue share", align: "right",
-      cell: (r) => {
-        const total = revenueByPlan.reduce((s, x) => s + x.mrr, 0);
-        return <span className="tnum">{((r.mrr / total) * 100).toFixed(1)}%</span>;
-      },
-    },
-  ];
+  const [from, setFrom] = useState(isoDaysAgo(180));
+  const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
+
+  const overview = useAnalyticsOverview();
+  const series = useRevenueSeries(from, to);
+  const refunds = useRefunds({ limit: 10 });
+
+  const points = series.data ?? [];
 
   return (
     <>
       <PageHeader
         eyebrow="Monetization"
-        title="Revenue Analytics"
-        description="Recurring revenue performance, plan mix and retention economics."
-        breadcrumbs={[{ label: "Super Admin", to: "/" }, { label: "Revenue" }]}
+        title="Revenue"
+        description="Recurring revenue, movement and refunds across the platform."
+        actions={
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="space-y-1">
+              <Label htmlFor="rev-from" className="text-xs">
+                From
+              </Label>
+              <Input
+                id="rev-from"
+                type="date"
+                className="h-8 w-[150px]"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="rev-to" className="text-xs">
+                To
+              </Label>
+              <Input
+                id="rev-to"
+                type="date"
+                className="h-8 w-[150px]"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+              />
+            </div>
+          </div>
+        }
       />
-      <div className="space-y-4 p-4 lg:p-6">
-        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border md:grid-cols-4 xl:grid-cols-8">
-          {saasMetrics.map((m) => (
-            <div key={m.label} className="bg-surface p-3.5">
-              <p className="eyebrow truncate">{m.label}</p>
-              <p className="tnum mt-1 text-xl font-bold text-foreground">{m.value}</p>
-              <p className={`tnum text-xs font-semibold ${m.delta.startsWith("-") ? "text-warning" : "text-success"}`}>{m.delta}</p>
-            </div>
-          ))}
+
+      <div className="space-y-4 p-5 lg:p-6">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {overview.isLoading
+            ? Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-[86px] w-full rounded-lg" />
+              ))
+            : [
+                { label: "MRR", value: compactInr(overview.data?.mrr) },
+                { label: "ARR", value: compactInr(overview.data?.arr) },
+                { label: "ARPU", value: inr(overview.data?.arpu) },
+                { label: "Active subscriptions", value: num(overview.data?.subsActive) },
+              ].map((kpi) => <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} />)}
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-3">
-          <Section title="Recurring revenue trend" description="MRR vs collected cash, last 9 months" className="xl:col-span-2">
-            <div className="h-[300px] p-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={revenueSeries}>
-                  <defs>
-                    <linearGradient id="mrrFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
-                  <YAxis tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" tickFormatter={(v: number) => `${Math.round(v / 100000)}L`} />
-                  <Tooltip
-                    contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
-                    formatter={(v: number) => inr(v)}
+        <Section title="MRR and ARR" description="Daily platform metrics for the selected range">
+          <div className="p-4">
+            <AsyncSection
+              loading={series.isLoading}
+              error={series.error}
+              onRetry={() => series.refetch()}
+              isEmpty={points.length === 0}
+              emptyTitle="No metrics in this range"
+              emptyDescription="Widen the date range, or wait for the daily metrics job to run."
+              skeleton={<ChartSkeleton height={300} />}
+            >
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={points} margin={{ left: 4, right: 8, top: 8, bottom: 0 }}>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="var(--color-border)"
+                    vertical={false}
                   />
-                  <Area type="monotone" dataKey="mrr" name="MRR" stroke="var(--chart-1)" strokeWidth={2} fill="url(#mrrFill)" />
-                  <Area type="monotone" dataKey="collected" name="Collected" stroke="var(--chart-2)" strokeWidth={2} fill="transparent" />
-                </AreaChart>
+                  <XAxis
+                    dataKey="day"
+                    tickFormatter={(v: string) => formatDate(v).slice(0, 6)}
+                    tick={{ fontSize: 11 }}
+                    stroke="var(--color-muted-foreground)"
+                    minTickGap={24}
+                  />
+                  <YAxis
+                    tickFormatter={(v: number) => compactInr(v)}
+                    tick={{ fontSize: 11 }}
+                    stroke="var(--color-muted-foreground)"
+                    width={80}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => inr(value)}
+                    labelFormatter={(label: string) => formatDate(label)}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="mrr"
+                    name="MRR"
+                    stroke="var(--color-primary)"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="arr"
+                    name="ARR"
+                    stroke="var(--color-info)"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
               </ResponsiveContainer>
+            </AsyncSection>
+          </div>
+        </Section>
+
+        <div className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
+          <Section title="Revenue movement" description="New, expansion and churned MRR">
+            <div className="p-4">
+              <AsyncSection
+                loading={series.isLoading}
+                error={series.error}
+                onRetry={() => series.refetch()}
+                isEmpty={points.length === 0}
+                emptyTitle="No movement recorded"
+                emptyDescription="New, expansion and churn are recorded daily once billing runs."
+                skeleton={<ChartSkeleton height={260} />}
+              >
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={points} margin={{ left: 4, right: 8, top: 8, bottom: 0 }}>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="var(--color-border)"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="day"
+                      tickFormatter={(v: string) => formatDate(v).slice(0, 6)}
+                      tick={{ fontSize: 11 }}
+                      stroke="var(--color-muted-foreground)"
+                      minTickGap={24}
+                    />
+                    <YAxis
+                      tickFormatter={(v: number) => compactInr(v)}
+                      tick={{ fontSize: 11 }}
+                      stroke="var(--color-muted-foreground)"
+                      width={80}
+                    />
+                    <Tooltip formatter={(value: number) => inr(value)} />
+                    <Legend />
+                    <Bar dataKey="newMrr" name="New" fill="var(--color-success)" />
+                    <Bar dataKey="expansionMrr" name="Expansion" fill="var(--color-info)" />
+                    <Bar dataKey="churnedMrr" name="Churned" fill="var(--color-destructive)" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </AsyncSection>
             </div>
           </Section>
 
-          <Section title="Revenue by plan" description="Share of monthly recurring revenue">
-            <div className="h-[300px] p-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={revenueByPlan} dataKey="mrr" nameKey="plan" innerRadius={58} outerRadius={92} paddingAngle={2}>
-                    {revenueByPlan.map((entry, i) => (
-                      <Cell key={entry.plan} fill={pieColors[i % pieColors.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
-                    formatter={(v: number) => inr(v)}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+          <Section title="Recent refunds">
+            <div className="px-4 py-2">
+              <AsyncSection
+                loading={refunds.isLoading}
+                error={refunds.error}
+                onRetry={() => refunds.refetch()}
+                isEmpty={(refunds.data?.items?.length ?? 0) === 0}
+                emptyTitle="No refunds"
+                emptyDescription="Refunds issued from the payments screen appear here."
+              >
+                <ul className="divide-y divide-border">
+                  {refunds.data?.items?.map((r) => (
+                    <li key={r.id} className="flex items-center justify-between gap-3 py-2.5">
+                      <div className="min-w-0">
+                        <p className="tnum text-sm font-semibold">{inr(r.amount)}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {r.reason ?? "No reason recorded"} · {formatDate(r.createdAt)}
+                        </p>
+                      </div>
+                      <span className="text-xs text-muted-foreground">{r.status}</span>
+                    </li>
+                  ))}
+                </ul>
+              </AsyncSection>
             </div>
-          </Section>
-        </div>
-
-        <div className="grid gap-4 xl:grid-cols-2">
-          <Section title="Acquisition vs churn" description="New vs churned owner accounts per month">
-            <div className="h-[260px] p-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={growthSeries}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
-                  <YAxis tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
-                  <Tooltip
-                    contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
-                  />
-                  <Bar dataKey="owners" name="New owners" fill="var(--chart-2)" radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="churned" name="Churned owners" fill="var(--chart-5)" radius={[3, 3, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Section>
-
-          <Section title="Plan performance">
-            <DataTable
-              rows={revenueByPlan}
-              columns={columns}
-              rowKey={(r) => r.plan}
-              pageSize={6}
-              exportName="RevenueByPlan"
-              emptyTitle="No revenue data"
-              emptyDescription="Revenue appears once subscriptions are active."
-            />
           </Section>
         </div>
       </div>

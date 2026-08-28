@@ -59,7 +59,9 @@ function PropertyDetailPage() {
         eyebrow="Customers"
         title={overview.isLoading ? "Loading property…" : (property?.name ?? "Property")}
         description={
-          property ? [property.city, property.state, property.country].filter(Boolean).join(", ") : undefined
+          property
+            ? [property.city, property.state, property.country].filter(Boolean).join(", ")
+            : undefined
         }
         breadcrumbs={[
           { label: "Properties", to: "/properties" },
@@ -85,10 +87,16 @@ function PropertyDetailPage() {
           >
             <DetailGrid
               items={[
-                { label: "Status", value: property ? <StatusBadge status={property.status} /> : "—" },
+                {
+                  label: "Status",
+                  value: property ? <StatusBadge status={property.status} /> : "—",
+                },
                 { label: "Owner", value: property?.owner ?? "—" },
                 { label: "Category", value: property?.category ?? "—" },
-                { label: "Star rating", value: property?.starRating ? `${property.starRating}★` : "—" },
+                {
+                  label: "Star rating",
+                  value: property?.starRating ? `${property.starRating}★` : "—",
+                },
                 { label: "Rooms", value: num(property?.roomCount) },
                 { label: "Timezone", value: property?.timezone ?? "—" },
                 { label: "Slug", value: property?.slug ?? "—" },
@@ -100,10 +108,7 @@ function PropertyDetailPage() {
         </Section>
 
         <div className="grid gap-4 xl:grid-cols-2">
-          <Section
-            title="Listing completeness"
-            description="How ready this listing is for guests"
-          >
+          <Section title="Listing completeness" description="How ready this listing is for guests">
             <div className="p-4">
               <AsyncSection
                 loading={overview.isLoading}
@@ -118,7 +123,10 @@ function PropertyDetailPage() {
                     <ScoreBar value={score.overall} label="Overall completeness" />
                     <ul className="mt-4 divide-y divide-border">
                       {score.detail.map((d) => (
-                        <li key={d.label} className="flex items-center justify-between py-2 text-sm">
+                        <li
+                          key={d.label}
+                          className="flex items-center justify-between py-2 text-sm"
+                        >
                           <span className="flex items-center gap-2">
                             {d.ok ? (
                               <Check aria-hidden className="size-4 text-success" />

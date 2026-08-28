@@ -28,8 +28,7 @@ export function useCreateLocationState() {
 export function useDeleteLocationState() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) =>
-      apiFetch(`/settings/locations/states/${id}`, { method: "DELETE" }),
+    mutationFn: (id: string) => apiFetch(`/settings/locations/states/${id}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.locations.all }),
   });
 }

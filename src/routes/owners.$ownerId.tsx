@@ -42,7 +42,15 @@ export const Route = createFileRoute("/owners/$ownerId")({
   component: OwnerDetailPage,
 });
 
-function StatusActions({ ownerId, status, label }: { ownerId: string; status: string; label: string }) {
+function StatusActions({
+  ownerId,
+  status,
+  label,
+}: {
+  ownerId: string;
+  status: string;
+  label: string;
+}) {
   const setStatus = useSetOwnerStatus(ownerId);
 
   const run = async (action: OwnerStatusAction, reason: string) => {
@@ -202,7 +210,11 @@ function OwnerDetailPage() {
   if (overview.isError) {
     return (
       <>
-        <PageHeader eyebrow="Customers" title="Owner" breadcrumbs={[{ label: "Owners", to: "/owners" }]} />
+        <PageHeader
+          eyebrow="Customers"
+          title="Owner"
+          breadcrumbs={[{ label: "Owners", to: "/owners" }]}
+        />
         <div className="p-5 lg:p-6">
           <div className="panel">
             <ErrorState

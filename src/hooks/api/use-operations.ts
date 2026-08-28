@@ -181,7 +181,8 @@ export function useUpsertNotificationTemplate() {
       subject?: string | undefined;
       body: string;
       status?: string | undefined;
-    }) => apiFetch<NotificationTemplate>("/notifications/templates", { method: "POST", body: input }),
+    }) =>
+      apiFetch<NotificationTemplate>("/notifications/templates", { method: "POST", body: input }),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.notifications.templates }),
   });
 }

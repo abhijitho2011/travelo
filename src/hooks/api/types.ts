@@ -93,7 +93,12 @@ export type PlanDetail = {
   features: string[];
 };
 
-export type Feature = { key: string; name: string; description: string | null; group?: string | null };
+export type Feature = {
+  key: string;
+  name: string;
+  description: string | null;
+  group?: string | null;
+};
 
 export type Subscription = {
   id: string;

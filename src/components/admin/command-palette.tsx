@@ -117,11 +117,7 @@ export function CommandPalette({
         {data?.tickets?.length ? (
           <CommandGroup heading="Support tickets">
             {data.tickets.map((t) => (
-              <CommandItem
-                key={t.id}
-                value={t.subject}
-                onSelect={() => go(`/support/${t.id}`)}
-              >
+              <CommandItem key={t.id} value={t.subject} onSelect={() => go(`/support/${t.id}`)}>
                 <LifeBuoy className="mr-2 size-4" />
                 {t.subject}
                 <CommandShortcut>{t.status}</CommandShortcut>

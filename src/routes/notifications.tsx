@@ -92,9 +92,7 @@ function NotificationsPage() {
                     <span className="text-xs text-muted-foreground">{humanise(item.category)}</span>
                   )}
                 </div>
-                {item.body && (
-                  <p className="mt-1 text-sm text-muted-foreground">{item.body}</p>
-                )}
+                {item.body && <p className="mt-1 text-sm text-muted-foreground">{item.body}</p>}
                 <p className="mt-1 text-xs text-muted-foreground">{relativeTime(item.createdAt)}</p>
               </div>
               {!item.readAt && (

@@ -237,7 +237,9 @@ function AccountMenu() {
               <Skeleton className="h-4 w-24" />
             ) : (
               <>
-                <span className="block text-xs font-semibold">{admin?.name ?? "Administrator"}</span>
+                <span className="block text-xs font-semibold">
+                  {admin?.name ?? "Administrator"}
+                </span>
                 <span className="block text-[10px] text-muted-foreground">
                   {admin?.roles?.[0] ?? "Admin"}
                 </span>

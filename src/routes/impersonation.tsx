@@ -7,10 +7,7 @@ import { DataTable, type Column } from "@/components/admin/data-table";
 import { PageHeader, StatusBadge } from "@/components/admin/primitives";
 import { Button } from "@/components/ui/button";
 import type { ImpersonationSession } from "@/hooks/api/types";
-import {
-  useImpersonationHistory,
-  useTerminateImpersonation,
-} from "@/hooks/api/use-operations";
+import { useImpersonationHistory, useTerminateImpersonation } from "@/hooks/api/use-operations";
 import { errorMessage } from "@/lib/api";
 import { formatDateTime, humanise, shortId } from "@/lib/format";
 
@@ -41,12 +38,8 @@ function ImpersonationPage() {
       header: "Target",
       cell: (row) => (
         <div className="min-w-0">
-          <div className="truncate font-medium text-foreground">
-            {humanise(row.targetUserType)}
-          </div>
-          <div className="truncate text-xs text-muted-foreground">
-            {shortId(row.targetUserId)}
-          </div>
+          <div className="truncate font-medium text-foreground">{humanise(row.targetUserType)}</div>
+          <div className="truncate text-xs text-muted-foreground">{shortId(row.targetUserId)}</div>
         </div>
       ),
     },

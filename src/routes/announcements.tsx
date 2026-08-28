@@ -19,7 +19,10 @@ export const Route = createFileRoute("/announcements")({
   head: () => ({
     meta: [
       { title: "Announcements · Tavelo Super Admin" },
-      { name: "description", content: "Platform-wide announcements targeted at owners and hotels." },
+      {
+        name: "description",
+        content: "Platform-wide announcements targeted at owners and hotels.",
+      },
     ],
   }),
   component: AnnouncementsPage,

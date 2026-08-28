@@ -12,7 +12,8 @@ export const getRouter = () => {
         // Auth and "not implemented yet" failures should surface immediately;
         // transient network/server errors get one retry.
         retry: (failureCount, error) => {
-          if (error instanceof ApiError && [401, 403, 404, 400].includes(error.status)) return false;
+          if (error instanceof ApiError && [401, 403, 404, 400].includes(error.status))
+            return false;
           return failureCount < 1;
         },
       },

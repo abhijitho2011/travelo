@@ -180,7 +180,11 @@ function OwnersPage() {
                 onChange={list.setSearch}
                 placeholder="Search by name, email or company…"
               />
-              <StatusFilter value={list.status} onChange={list.setStatus} options={OWNER_STATUSES} />
+              <StatusFilter
+                value={list.status}
+                onChange={list.setStatus}
+                options={OWNER_STATUSES}
+              />
               <ToolbarActions>
                 <span className="tnum text-xs text-muted-foreground">
                   {query.data?.total ?? 0} total

@@ -1,122 +1,109 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
 import { DataTable, type Column } from "@/components/admin/data-table";
-import { KpiCard, PageHeader, StatusBadge } from "@/components/admin/primitives";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { tickets } from "@/lib/travelo-data";
+import { SearchBox, StatusFilter, ToolbarActions } from "@/components/admin/list-toolbar";
+import { PageHeader, StatusBadge } from "@/components/admin/primitives";
+import type { Ticket } from "@/hooks/api/types";
+import { useTickets } from "@/hooks/api/use-support";
+import { useListParams } from "@/hooks/use-list-params";
+import { humanise, relativeTime } from "@/lib/format";
 
 export const Route = createFileRoute("/support/")({
   head: () => ({
     meta: [
-      { title: "Support Tickets · Travelo Super Admin" },
-      { name: "description", content: "Triage, assign and resolve support tickets raised by hotel owners and general managers." },
-      { property: "og:title", content: "Support Tickets · Travelo Super Admin" },
-      { property: "og:description", content: "Support queue for the Travelo platform." },
+      { title: "Support tickets · Tavelo Super Admin" },
+      { name: "description", content: "Owner support requests and their resolution state." },
     ],
   }),
   component: SupportPage,
 });
 
-type Ticket = (typeof tickets)[number];
-
-const priorityClass: Record<string, string> = {
-  Critical: "font-semibold text-destructive",
-  High: "font-semibold text-warning",
-  Normal: "text-foreground",
-  Low: "text-muted-foreground",
-};
+const TICKET_STATUSES = ["OPEN", "IN_PROGRESS", "WAITING_FOR_OWNER", "RESOLVED", "CLOSED"];
 
 function SupportPage() {
   const navigate = useNavigate();
-  const [status, setStatus] = useState("open");
-  const [priority, setPriority] = useState("all");
-
-  const rows = tickets.filter((t) => {
-    const statusOk =
-      status === "all" ? true
-        : status === "open" ? !["Resolved", "Closed"].includes(t.status)
-          : t.status === status;
-    return statusOk && (priority === "all" || t.priority === priority);
+  const list = useListParams();
+  const query = useTickets({
+    limit: list.limit,
+    offset: list.offset,
+    q: list.q,
+    status: list.statusParam,
   });
 
   const columns: Column<Ticket>[] = [
-    { key: "id", header: "Ticket", cell: (t) => <span className="tnum font-semibold">{t.id}</span> },
     {
-      key: "subject", header: "Subject", sortValue: (t) => t.subject,
+      key: "subject",
+      header: "Subject",
       cell: (t) => (
-        <span>
-          <Link to="/support/$ticketId" params={{ ticketId: t.id }} onClick={(e) => e.stopPropagation()} className="font-medium hover:text-primary hover:underline">
-            {t.subject}
-          </Link>
-          <span className="block text-xs text-muted-foreground">{t.owner}{t.hotel !== "—" && ` · ${t.hotel}`}</span>
-        </span>
+        <div className="min-w-0">
+          <p className="truncate font-medium text-foreground">{t.subject}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {t.owner ?? "Unassigned owner"}
+            {t.hotel ? ` · ${t.hotel}` : ""}
+          </p>
+        </div>
       ),
     },
-    { key: "category", header: "Category", cell: (t) => <span className="text-muted-foreground">{t.category}</span> },
-    { key: "priority", header: "Priority", sortValue: (t) => t.priority, cell: (t) => <span className={priorityClass[t.priority]}>{t.priority}</span> },
-    { key: "assigned", header: "Assigned", cell: (t) => <span className={t.assigned === "Unassigned" ? "text-warning" : ""}>{t.assigned}</span> },
-    { key: "created", header: "Created", optional: true, cell: (t) => <span className="tnum text-muted-foreground">{t.created}</span> },
-    { key: "updated", header: "Updated", cell: (t) => <span className="text-muted-foreground">{t.updated}</span> },
+    { key: "priority", header: "Priority", cell: (t) => <StatusBadge status={t.priority} /> },
     { key: "status", header: "Status", cell: (t) => <StatusBadge status={t.status} /> },
+    { key: "category", header: "Category", cell: (t) => humanise(t.category) },
+    { key: "assigned", header: "Assigned", cell: (t) => t.assigned },
+    { key: "created", header: "Opened", cell: (t) => relativeTime(t.createdAt) },
+    {
+      key: "response",
+      header: "First response",
+      cell: (t) =>
+        t.firstResponseAt ? (
+          relativeTime(t.firstResponseAt)
+        ) : (
+          <span className="text-xs text-warning">Awaiting reply</span>
+        ),
+    },
   ];
 
   return (
     <>
       <PageHeader
         eyebrow="Support"
-        title="Support Tickets"
-        description="Owner and GM requests with SLA tracking, assignment and escalation."
-        breadcrumbs={[{ label: "Super Admin", to: "/" }, { label: "Support Tickets" }]}
+        title="Support tickets"
+        description="Owner requests, their priority and resolution state."
       />
-      <div className="space-y-4 p-4 lg:p-6">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <KpiCard label="Open tickets" value="5" trend="down" delta="2 unassigned" />
-          <KpiCard label="Critical" value="1" trend="down" delta="SLA 2h" />
-          <KpiCard label="First response" value="34 min" delta="-11 min" />
-          <KpiCard label="Resolved (7d)" value="46" delta="+8" />
-        </div>
-
+      <div className="p-5 lg:p-6">
         <DataTable
-          rows={rows}
+          rows={query.data?.items ?? []}
           columns={columns}
           rowKey={(t) => t.id}
-          searchKeys={(t) => `${t.id} ${t.subject} ${t.owner} ${t.hotel} ${t.assigned}`}
-          searchPlaceholder="Search ticket, owner or subject…"
-          exportName="SupportTickets"
+          loading={query.isLoading}
+          error={query.error}
+          onRetry={() => query.refetch()}
           onRowClick={(t) => navigate({ to: "/support/$ticketId", params: { ticketId: t.id } })}
-          filters={
+          emptyTitle="No tickets match this view"
+          emptyDescription="Adjust the search or status filter — or enjoy inbox zero."
+          pagination={{
+            total: query.data?.total ?? 0,
+            limit: list.limit,
+            offset: list.offset,
+            onOffsetChange: list.setOffset,
+          }}
+          toolbar={
             <>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="h-8 w-[170px] text-sm" aria-label="Filter by ticket status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="open">Open queue</SelectItem>
-                  <SelectItem value="all">All tickets</SelectItem>
-                  <SelectItem value="Open">Open</SelectItem>
-                  <SelectItem value="In Progress">In progress</SelectItem>
-                  <SelectItem value="Waiting for Owner">Waiting for owner</SelectItem>
-                  <SelectItem value="Resolved">Resolved</SelectItem>
-                  <SelectItem value="Closed">Closed</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={priority} onValueChange={setPriority}>
-                <SelectTrigger className="h-8 w-[150px] text-sm" aria-label="Filter by priority">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All priorities</SelectItem>
-                  <SelectItem value="Critical">Critical</SelectItem>
-                  <SelectItem value="High">High</SelectItem>
-                  <SelectItem value="Normal">Normal</SelectItem>
-                  <SelectItem value="Low">Low</SelectItem>
-                </SelectContent>
-              </Select>
+              <SearchBox
+                value={list.search}
+                onChange={list.setSearch}
+                placeholder="Search ticket subjects…"
+              />
+              <StatusFilter
+                value={list.status}
+                onChange={list.setStatus}
+                options={TICKET_STATUSES}
+              />
+              <ToolbarActions>
+                <span className="tnum text-xs text-muted-foreground">
+                  {query.data?.total ?? 0} total
+                </span>
+              </ToolbarActions>
             </>
           }
-          emptyTitle="Queue is clear"
-          emptyDescription="No tickets match this filter — nice work."
         />
       </div>
     </>

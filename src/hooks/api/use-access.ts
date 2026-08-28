@@ -6,7 +6,11 @@ import { qk } from "@/hooks/api/keys";
 import { currentAdminKey } from "@/lib/auth";
 import type { AdminSession, AdminUser, Permission, Role } from "@/hooks/api/types";
 
-export type AdminUserListParams = { limit?: number; offset?: number; q?: string };
+export type AdminUserListParams = {
+  limit?: number | undefined;
+  offset?: number | undefined;
+  q?: string | undefined;
+};
 
 export function useAdminUsers(params: AdminUserListParams) {
   return useQuery({
@@ -64,7 +68,11 @@ export function useSetAdminUserStatus() {
       id: string;
       status: "Active" | "Inactive" | "Blocked";
       reason?: string | undefined;
-    }) => apiFetch<AdminUser>(`/admin-users/${id}/status`, { method: "PATCH", body: { status, reason } }),
+    }) =>
+      apiFetch<AdminUser>(`/admin-users/${id}/status`, {
+        method: "PATCH",
+        body: { status, reason },
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.adminUsers.all });
       qc.invalidateQueries({ queryKey: qk.audit.all });
@@ -77,7 +85,8 @@ export function useRevokeAdminSession() {
   return useMutation({
     mutationFn: ({ adminId, sessionId }: { adminId: string; sessionId: string }) =>
       apiFetch(`/admin-users/${adminId}/sessions/${sessionId}`, { method: "DELETE" }),
-    onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: qk.adminUsers.sessions(vars.adminId) }),
+    onSuccess: (_data, vars) =>
+      qc.invalidateQueries({ queryKey: qk.adminUsers.sessions(vars.adminId) }),
   });
 }
 
@@ -109,8 +118,12 @@ export function usePermissions() {
 export function useCreateRole() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { key: string; name: string; description?: string; permissions?: string[] }) =>
-      apiFetch<Role>("/roles", { method: "POST", body: input }),
+    mutationFn: (input: {
+      key: string;
+      name: string;
+      description?: string;
+      permissions?: string[];
+    }) => apiFetch<Role>("/roles", { method: "POST", body: input }),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.roles.all }),
   });
 }

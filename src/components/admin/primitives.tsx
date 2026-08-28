@@ -1,7 +1,13 @@
 import { Link } from "@tanstack/react-router";
 import { cva, type VariantProps } from "class-variance-authority";
 import {
-  AlertTriangle, ChevronRight, Inbox, RefreshCw, ShieldAlert, ArrowUpRight, ArrowDownRight,
+  AlertTriangle,
+  ChevronRight,
+  Inbox,
+  RefreshCw,
+  ShieldAlert,
+  ArrowUpRight,
+  ArrowDownRight,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -73,7 +79,10 @@ export function PageHeader({
   return (
     <header className="border-b border-border bg-surface px-5 py-4 lg:px-8 lg:py-5">
       {breadcrumbs && breadcrumbs.length > 0 && (
-        <nav aria-label="Breadcrumb" className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
+        <nav
+          aria-label="Breadcrumb"
+          className="mb-2 flex items-center gap-1 text-xs text-muted-foreground"
+        >
           {breadcrumbs.map((b, i) => (
             <span key={b.label} className="flex items-center gap-1">
               {i > 0 && <ChevronRight aria-hidden className="size-3" />}
@@ -234,10 +243,7 @@ export function ErrorState({
   onRetry?: (() => void) | undefined;
 }) {
   return (
-    <div
-      role="alert"
-      className="flex flex-col items-center justify-center px-6 py-12 text-center"
-    >
+    <div role="alert" className="flex flex-col items-center justify-center px-6 py-12 text-center">
       <div className="mb-3 flex size-10 items-center justify-center rounded-lg border border-destructive/25 bg-destructive-soft">
         <AlertTriangle aria-hidden className="size-5 text-destructive" />
       </div>
@@ -259,8 +265,9 @@ export function PermissionDenied({ scope }: { scope: string }) {
       </div>
       <h3 className="text-sm font-bold text-foreground">Permission denied</h3>
       <p className="mt-1 max-w-md text-sm text-muted-foreground">
-        Your admin role does not include <span className="font-semibold text-foreground">{scope}</span>.
-        Request access from a Super Admin in Roles &amp; Permissions.
+        Your admin role does not include{" "}
+        <span className="font-semibold text-foreground">{scope}</span>. Request access from a Super
+        Admin in Roles &amp; Permissions.
       </p>
     </div>
   );

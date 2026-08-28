@@ -1,132 +1,119 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { RotateCw } from "lucide-react";
-import { useState } from "react";
 import { toast } from "sonner";
 
 import { DataTable, type Column } from "@/components/admin/data-table";
+import { StatusFilter, ToolbarActions } from "@/components/admin/list-toolbar";
 import { PageHeader, StatusBadge } from "@/components/admin/primitives";
 import { Button } from "@/components/ui/button";
 import type { BackgroundJob } from "@/hooks/api/types";
 import { useJobs, useRetryJob } from "@/hooks/api/use-operations";
+import { useListParams } from "@/hooks/use-list-params";
 import { errorMessage } from "@/lib/api";
-import { formatDateTime, humanise, relativeTime } from "@/lib/format";
+import { formatDateTime, num, relativeTime } from "@/lib/format";
 
 export const Route = createFileRoute("/jobs")({
   head: () => ({
     meta: [
       { title: "Background jobs · Tavelo Super Admin" },
-      { name: "description", content: "Queue health and background job execution history." },
+      { name: "description", content: "Queue state for platform background workers." },
     ],
   }),
   component: JobsPage,
 });
 
-const STATES = ["", "waiting", "active", "completed", "failed", "delayed"];
-const LIMIT = 25;
+const JOB_STATES = ["Pending", "Running", "Completed", "Failed"];
 
 function JobsPage() {
-  const [state, setState] = useState("");
-  const [offset, setOffset] = useState(0);
-
-  const query = useJobs({ limit: LIMIT, offset, state: state || undefined });
+  const list = useListParams();
+  const query = useJobs({ limit: list.limit, offset: list.offset, state: list.statusParam });
   const retry = useRetryJob();
-  const page = query.data;
+
+  const runRetry = async (job: BackgroundJob) => {
+    try {
+      await retry.mutateAsync(job.id);
+      toast.success("Job requeued", { description: `${job.name} will run again shortly.` });
+    } catch (error) {
+      toast.error("Could not retry job", { description: errorMessage(error) });
+    }
+  };
 
   const columns: Column<BackgroundJob>[] = [
     {
       key: "name",
       header: "Job",
-      cell: (row) => (
+      cell: (j) => (
         <div className="min-w-0">
-          <div className="truncate font-medium text-foreground">{row.name}</div>
-          <div className="truncate text-xs text-muted-foreground">{row.queue}</div>
+          <p className="truncate font-medium text-foreground">{j.name}</p>
+          <p className="truncate text-xs text-muted-foreground">{j.queue}</p>
         </div>
       ),
     },
-    { key: "state", header: "State", cell: (row) => <StatusBadge status={row.state} /> },
-    {
-      key: "attempts",
-      header: "Attempts",
-      align: "right",
-      cell: (row) => <span className="text-muted-foreground">{row.attempts}</span>,
-    },
-    {
-      key: "created",
-      header: "Created",
-      cell: (row) => <span className="text-muted-foreground">{relativeTime(row.createdAt)}</span>,
-    },
-    {
-      key: "finished",
-      header: "Finished",
-      cell: (row) => (
-        <span className="text-muted-foreground">{formatDateTime(row.finishedAt)}</span>
-      ),
-    },
+    { key: "state", header: "State", cell: (j) => <StatusBadge status={j.state} /> },
+    { key: "attempts", header: "Attempts", align: "right", cell: (j) => num(j.attempts) },
     {
       key: "error",
       header: "Error",
-      cell: (row) =>
-        row.error ? (
-          <span className="line-clamp-1 text-xs text-destructive">{row.error}</span>
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        ),
+      cell: (j) => <span className="text-xs text-muted-foreground">{j.error ?? "—"}</span>,
     },
+    { key: "scheduled", header: "Scheduled", cell: (j) => formatDateTime(j.scheduledFor) },
+    { key: "finished", header: "Finished", cell: (j) => relativeTime(j.finishedAt) },
   ];
 
   return (
-    <div className="space-y-5">
+    <>
       <PageHeader
+        eyebrow="Operations"
         title="Background jobs"
-        description="Queue execution history. Failed jobs can be retried by authorised admins."
+        description="Queue state for reminders, metrics rollups and integration syncs."
       />
-
-      <DataTable
-        rows={page?.items ?? []}
-        columns={columns}
-        rowKey={(row) => row.id}
-        loading={query.isLoading}
-        error={query.error}
-        onRetry={() => void query.refetch()}
-        emptyTitle="No jobs recorded"
-        emptyDescription="Background jobs appear here once workers begin processing."
-        rowActions={(row) =>
-          row.state === "failed" ? (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={retry.isPending}
-              onClick={() =>
-                retry.mutate(row.id, {
-                  onSuccess: () => toast.success("Job requeued"),
-                  onError: (error) => toast.error(errorMessage(error)),
-                })
-              }
-            >
-              <RotateCw className="mr-1.5 size-3.5" />
-              Retry
-            </Button>
-          ) : null
-        }
-        toolbar={
-          <div className="flex flex-wrap gap-1.5">
-            {STATES.map((value) => (
+      <div className="p-5 lg:p-6">
+        <DataTable
+          rows={query.data?.items ?? []}
+          columns={columns}
+          rowKey={(j) => j.id}
+          loading={query.isLoading}
+          error={query.error}
+          onRetry={() => query.refetch()}
+          rowActions={(j) =>
+            j.state === "Failed" ? (
               <Button
-                key={value || "all"}
+                variant="ghost"
                 size="sm"
-                variant={state === value ? "default" : "outline"}
-                onClick={() => {
-                  setState(value);
-                  setOffset(0);
-                }}
+                className="h-7 text-xs"
+                disabled={retry.isPending}
+                onClick={() => void runRetry(j)}
               >
-                {value ? humanise(value) : "All"}
+                <RotateCw aria-hidden className="mr-1.5 size-3.5" /> Retry
               </Button>
-            ))}
-          </div>
-        }
-        pagination={{ total: page?.total ?? 0, limit: LIMIT, offset, onOffsetChange: setOffset }}
-      />
-    </div>
+            ) : null
+          }
+          emptyTitle="Queue is empty"
+          emptyDescription="No jobs match this filter right now."
+          pagination={{
+            total: query.data?.total ?? 0,
+            limit: list.limit,
+            offset: list.offset,
+            onOffsetChange: list.setOffset,
+          }}
+          toolbar={
+            <>
+              <StatusFilter
+                value={list.status}
+                onChange={list.setStatus}
+                options={JOB_STATES}
+                label="Job state"
+                allLabel="All states"
+              />
+              <ToolbarActions>
+                <span className="tnum text-xs text-muted-foreground">
+                  {query.data?.items?.length ?? 0} shown
+                </span>
+              </ToolbarActions>
+            </>
+          }
+        />
+      </div>
+    </>
   );
 }

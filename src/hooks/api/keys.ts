@@ -5,7 +5,8 @@ export const qk = {
     overview: ["analytics", "overview"] as const,
     subscriptions: ["analytics", "subscriptions"] as const,
     owners: ["analytics", "owners"] as const,
-    revenue: (from?: string, to?: string) => ["analytics", "revenue", from ?? null, to ?? null] as const,
+    revenue: (from?: string, to?: string) =>
+      ["analytics", "revenue", from ?? null, to ?? null] as const,
   },
   owners: {
     all: ["owners"] as const,

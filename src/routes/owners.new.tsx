@@ -96,7 +96,13 @@ function NewOwnerPage() {
             <div className="grid gap-4 p-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="owner-name">Primary contact name *</Label>
-                <Input id="owner-name" value={form.name} onChange={set("name")} required minLength={2} />
+                <Input
+                  id="owner-name"
+                  value={form.name}
+                  onChange={set("name")}
+                  required
+                  minLength={2}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="owner-email">Email *</Label>
@@ -136,7 +142,9 @@ function NewOwnerPage() {
               <Link to="/owners">Cancel</Link>
             </Button>
             <Button type="submit" disabled={createOwner.isPending}>
-              {createOwner.isPending && <Loader2 aria-hidden className="mr-2 size-4 animate-spin" />}
+              {createOwner.isPending && (
+                <Loader2 aria-hidden className="mr-2 size-4 animate-spin" />
+              )}
               Create owner
             </Button>
           </div>

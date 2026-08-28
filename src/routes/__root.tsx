@@ -101,8 +101,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Tavelo Super Admin" },
       {
         name: "description",
-        content:
-          "Tavelo platform control plane for owners, properties, subscriptions and billing.",
+        content: "Tavelo platform control plane for owners, properties, subscriptions and billing.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

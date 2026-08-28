@@ -41,8 +41,7 @@ function CreatePlanDialog() {
   const [limit, setLimit] = useState("1");
   const createPlan = useCreatePlan();
 
-  const invalid =
-    name.trim().length < 2 || !monthly.trim() || !annual.trim() || Number(limit) < 1;
+  const invalid = name.trim().length < 2 || !monthly.trim() || !annual.trim() || Number(limit) < 1;
 
   const submit = async () => {
     try {
@@ -215,7 +214,10 @@ function PlansPage() {
                       confirmLabel="Archive plan"
                       title="Archive plan"
                       description={`${plan.name} will no longer be offered to new owners.`}
-                      impact={["Existing subscriptions keep running", "The plan is hidden from signup"]}
+                      impact={[
+                        "Existing subscriptions keep running",
+                        "The plan is hidden from signup",
+                      ]}
                       onConfirm={() => archive(plan.id, plan.name)}
                       trigger={
                         <Button variant="outline" size="sm" className="w-full">

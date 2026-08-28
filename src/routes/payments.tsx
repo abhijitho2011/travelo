@@ -35,13 +35,7 @@ export const Route = createFileRoute("/payments")({
   component: PaymentsPage,
 });
 
-const PAYMENT_STATUSES = [
-  "SUCCESS",
-  "PENDING",
-  "FAILED",
-  "REFUNDED",
-  "PARTIALLY_REFUNDED",
-];
+const PAYMENT_STATUSES = ["SUCCESS", "PENDING", "FAILED", "REFUNDED", "PARTIALLY_REFUNDED"];
 
 function RefundDialog({ payment }: { payment: Payment }) {
   const [open, setOpen] = useState(false);
@@ -148,9 +142,7 @@ function PaymentsPage() {
     {
       key: "failure",
       header: "Failure reason",
-      cell: (p) => (
-        <span className="text-xs text-muted-foreground">{p.failureReason ?? "—"}</span>
-      ),
+      cell: (p) => <span className="text-xs text-muted-foreground">{p.failureReason ?? "—"}</span>,
     },
     { key: "created", header: "Date", cell: (p) => formatDateTime(p.createdAt) },
   ];
