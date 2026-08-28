@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ArrowLeft, KeyRound, Loader2, Smartphone } from "lucide-react";
+import { KeyRound, Loader2, Smartphone } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError, errorMessage } from "@/lib/api";
-import { login, loginWithGoogle, loginWithOtp, requestLoginOtp } from "@/lib/auth";
+import { loginWithGoogle, loginWithOtp, requestLoginOtp } from "@/lib/auth";
 import { signInWithGoogleIdToken } from "@/lib/firebase";
 
 type LoginSearch = { next?: string | undefined };
@@ -38,8 +38,8 @@ function safeNext(next?: string) {
 
 /**
  * Copy for every failure the API can return. Nothing here reveals whether a
- * particular email or number is registered — that is a backend guarantee the
- * UI must not undo.
+ * particular account is registered — that is a backend guarantee the UI must
+ * not undo.
  */
 function authErrorCopy(err: unknown): string {
   const code = err instanceof ApiError ? err.code : "";
@@ -89,12 +89,6 @@ function GoogleMark() {
 
 function LoginPage() {
   const { next } = Route.useSearch();
-  const [method, setMethod] = useState<"password" | "mobile">("password");
-
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [mfaCode, setMfaCode] = useState("");
-  const [needsMfa, setNeedsMfa] = useState(false);
 
   const [mobile, setMobile] = useState("");
   const [otp, setOtp] = useState("");
@@ -102,7 +96,7 @@ function LoginPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [resendIn, setResendIn] = useState(0);
 
-  const [busy, setBusy] = useState<null | "password" | "google" | "otp-send" | "otp-verify">(null);
+  const [busy, setBusy] = useState<null | "google" | "otp-send" | "otp-verify">(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -113,27 +107,6 @@ function LoginPage() {
 
   // Full navigation so every provider re-reads the fresh session.
   const finish = () => window.location.assign(safeNext(next));
-
-  const switchMethod = (to: "password" | "mobile") => {
-    setMethod(to);
-    setError(null);
-    setNotice(null);
-  };
-
-  const submitPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy("password");
-    setError(null);
-    try {
-      await login(email.trim(), password, needsMfa ? mfaCode.trim() : undefined);
-      finish();
-    } catch (err) {
-      const message = errorMessage(err);
-      if (/mfa|two.?factor|otp/i.test(message)) setNeedsMfa(true);
-      setError(message);
-      setBusy(null);
-    }
-  };
 
   const submitGoogle = async () => {
     setBusy("google");
@@ -223,9 +196,9 @@ function LoginPage() {
           <p className="eyebrow">Super Admin</p>
           <h1 className="mt-1 text-2xl font-bold">Sign in to continue</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            {method === "password"
-              ? "Use your Tavelo administrator account."
-              : "We'll text a one-time code to your registered mobile."}
+            {otpSent
+              ? "Enter the 6-digit code we sent to your mobile."
+              : "Continue with your Tavelo Google account, or a code sent to your registered mobile."}
           </p>
 
           {error && (
@@ -245,59 +218,82 @@ function LoginPage() {
             </div>
           )}
 
-          {method === "password" ? (
-            <>
-              <form onSubmit={submitPassword} className="mt-6 space-y-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="email">Work email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    autoComplete="username"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                {needsMfa && (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="otp">Authentication code</Label>
-                    <Input
-                      id="otp"
-                      inputMode="numeric"
-                      maxLength={6}
-                      value={mfaCode}
-                      onChange={(e) => setMfaCode(e.target.value)}
-                      placeholder="123456"
-                      className="tnum text-center text-lg tracking-[0.4em]"
-                      required
-                    />
-                  </div>
+          {otpSent ? (
+            <form onSubmit={submitOtp} className="mt-6 space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="signin-otp">6-digit code</Label>
+                <Input
+                  id="signin-otp"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  placeholder="123456"
+                  className="tnum text-center text-lg tracking-[0.4em]"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                  required
+                  autoFocus
+                />
+                <p className="text-xs text-muted-foreground">Sent to {mobile.trim()}</p>
+              </div>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={busy !== null || otp.trim().length < 4}
+              >
+                {busy === "otp-verify" ? (
+                  <>
+                    <Loader2 aria-hidden className="mr-2 size-4 animate-spin" /> Verifying…
+                  </>
+                ) : (
+                  <>
+                    <KeyRound aria-hidden className="mr-2 size-4" /> Verify and sign in
+                  </>
                 )}
-
-                <Button type="submit" className="w-full" disabled={busy !== null}>
-                  {busy === "password" ? (
-                    <>
-                      <Loader2 aria-hidden className="mr-2 size-4 animate-spin" /> Signing in…
-                    </>
-                  ) : (
-                    <>
-                      <KeyRound aria-hidden className="mr-2 size-4" /> Sign in
-                    </>
-                  )}
-                </Button>
-              </form>
+              </Button>
+              <div className="flex items-center justify-between text-xs">
+                <button
+                  type="button"
+                  className="text-muted-foreground underline-offset-4 hover:underline"
+                  onClick={() => {
+                    setOtpSent(false);
+                    setOtp("");
+                    setError(null);
+                    setNotice(null);
+                  }}
+                  disabled={busy !== null}
+                >
+                  Use a different number
+                </button>
+                <button
+                  type="button"
+                  className="font-medium text-primary underline-offset-4 hover:underline disabled:text-muted-foreground disabled:no-underline"
+                  onClick={() => void sendOtp()}
+                  disabled={busy !== null || resendIn > 0}
+                >
+                  {resendIn > 0 ? `Resend in ${resendIn}s` : "Resend code"}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <>
+              <Button
+                type="button"
+                className="mt-6 w-full"
+                variant="outline"
+                onClick={submitGoogle}
+                disabled={busy !== null}
+              >
+                {busy === "google" ? (
+                  <>
+                    <Loader2 aria-hidden className="mr-2 size-4 animate-spin" /> Connecting…
+                  </>
+                ) : (
+                  <>
+                    <GoogleMark /> Continue with Google
+                  </>
+                )}
+              </Button>
 
               <div className="my-6 flex items-center gap-3">
                 <span className="h-px flex-1 bg-border" />
@@ -307,133 +303,35 @@ function LoginPage() {
                 <span className="h-px flex-1 bg-border" />
               </div>
 
-              <div className="space-y-2.5">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={submitGoogle}
-                  disabled={busy !== null}
-                >
-                  {busy === "google" ? (
+              <form onSubmit={sendOtp} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="mobile">Registered mobile</Label>
+                  <Input
+                    id="mobile"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    placeholder="98765 43210"
+                    value={mobile}
+                    onChange={(e) => setMobile(e.target.value)}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Indian numbers, with or without +91.
+                  </p>
+                </div>
+                <Button type="submit" className="w-full" disabled={busy !== null}>
+                  {busy === "otp-send" ? (
                     <>
-                      <Loader2 aria-hidden className="mr-2 size-4 animate-spin" /> Connecting…
+                      <Loader2 aria-hidden className="mr-2 size-4 animate-spin" /> Sending code…
                     </>
                   ) : (
                     <>
-                      <GoogleMark /> Continue with Google
+                      <Smartphone aria-hidden className="mr-2 size-4" /> Send sign-in code
                     </>
                   )}
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => switchMethod("mobile")}
-                  disabled={busy !== null}
-                >
-                  <Smartphone aria-hidden className="mr-2 size-4" /> Sign in with mobile OTP
-                </Button>
-              </div>
-            </>
-          ) : (
-            <>
-              {!otpSent ? (
-                <form onSubmit={sendOtp} className="mt-6 space-y-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="mobile">Registered mobile</Label>
-                    <Input
-                      id="mobile"
-                      type="tel"
-                      inputMode="tel"
-                      autoComplete="tel"
-                      placeholder="98765 43210"
-                      value={mobile}
-                      onChange={(e) => setMobile(e.target.value)}
-                      required
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Indian numbers, with or without +91.
-                    </p>
-                  </div>
-                  <Button type="submit" className="w-full" disabled={busy !== null}>
-                    {busy === "otp-send" ? (
-                      <>
-                        <Loader2 aria-hidden className="mr-2 size-4 animate-spin" /> Sending code…
-                      </>
-                    ) : (
-                      <>
-                        <Smartphone aria-hidden className="mr-2 size-4" /> Send code
-                      </>
-                    )}
-                  </Button>
-                </form>
-              ) : (
-                <form onSubmit={submitOtp} className="mt-6 space-y-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="signin-otp">6-digit code</Label>
-                    <Input
-                      id="signin-otp"
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      maxLength={6}
-                      placeholder="123456"
-                      className="tnum text-center text-lg tracking-[0.4em]"
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                      required
-                    />
-                    <p className="text-xs text-muted-foreground">Sent to {mobile.trim()}</p>
-                  </div>
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={busy !== null || otp.trim().length < 4}
-                  >
-                    {busy === "otp-verify" ? (
-                      <>
-                        <Loader2 aria-hidden className="mr-2 size-4 animate-spin" /> Verifying…
-                      </>
-                    ) : (
-                      <>
-                        <KeyRound aria-hidden className="mr-2 size-4" /> Verify and sign in
-                      </>
-                    )}
-                  </Button>
-                  <div className="flex items-center justify-between text-xs">
-                    <button
-                      type="button"
-                      className="text-muted-foreground underline-offset-4 hover:underline"
-                      onClick={() => {
-                        setOtpSent(false);
-                        setOtp("");
-                        setError(null);
-                        setNotice(null);
-                      }}
-                      disabled={busy !== null}
-                    >
-                      Change number
-                    </button>
-                    <button
-                      type="button"
-                      className="font-medium text-primary underline-offset-4 hover:underline disabled:text-muted-foreground disabled:no-underline"
-                      onClick={() => void sendOtp()}
-                      disabled={busy !== null || resendIn > 0}
-                    >
-                      {resendIn > 0 ? `Resend in ${resendIn}s` : "Resend code"}
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              <button
-                type="button"
-                className="mt-6 inline-flex items-center text-xs text-muted-foreground underline-offset-4 hover:underline"
-                onClick={() => switchMethod("password")}
-                disabled={busy !== null}
-              >
-                <ArrowLeft aria-hidden className="mr-1.5 size-3.5" /> Back to email and password
-              </button>
+              </form>
             </>
           )}
 

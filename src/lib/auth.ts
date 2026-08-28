@@ -39,15 +39,8 @@ export function isAuthenticated(): boolean {
   return !!readAccessToken();
 }
 
-export async function login(email: string, password: string, mfaCode?: string) {
-  const data = await apiFetch<LoginResponse>("/auth/login", {
-    method: "POST",
-    auth: false,
-    body: mfaCode ? { email, password, mfaCode } : { email, password },
-  });
-  storeTokens(data.accessToken, data.refreshToken);
-  return data;
-}
+// Password sign-in has been removed from the platform: the API no longer
+// exposes /auth/login. Google and mobile OTP below are the only ways in.
 
 /**
  * Exchanges a Firebase ID token for an admin session. The backend re-verifies
