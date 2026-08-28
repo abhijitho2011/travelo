@@ -1,0 +1,16 @@
+node_modules
+dist
+coverage
+.git
+.env
+.env.local
+*.log
+.DS_Store
+.vscode
+.idea
+test
+docs
+README.md
+ARCHITECTURE.md
+AUTH.md
+RBAC.md
