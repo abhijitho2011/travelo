@@ -1,4 +1,10 @@
-import { normalizeMobile, mobileMatches, normalizeEmail } from '../shared-auth/mobile.util';
+import { Logger } from '@nestjs/common';
+import {
+  normalizeMobile,
+  mobileMatches,
+  normalizeEmail,
+  maskMobile,
+} from '../shared-auth/mobile.util';
 import { AdminOtpService } from './admin-otp.service';
 import { AdminAltAuthService } from './admin-alt-auth.service';
 
@@ -57,6 +63,12 @@ describe('mobile normalisation', () => {
     expect(mobileMatches('9999999999', SUPER_MOBILE)).toBe(false);
   });
 
+  it('masks all but the last four digits for logs', () => {
+    expect(maskMobile('+919895077492')).toBe('******7492');
+    expect(maskMobile('9895077492')).toBe('******7492');
+    expect(maskMobile(undefined)).toBe('****');
+  });
+
   it('normalises emails case-insensitively and trimmed', () => {
     expect(normalizeEmail('  ABhijitho2011@Gmail.com ')).toBe(SUPER_EMAIL);
     expect(normalizeEmail(undefined)).toBeNull();
@@ -99,15 +111,27 @@ describe('AdminOtpService allowlist', () => {
 
 describe('AdminAltAuthService', () => {
   const audit = { record: async () => undefined } as never;
-  const sms = { sendOtp: jest.fn(async () => undefined) } as never;
 
   function build(opts: {
     env: Record<string, string | undefined>;
     verifiedEmail?: string | null;
     rows?: unknown[];
+    otpRows?: unknown[];
+    smsFails?: boolean;
+    verifyThrows?: unknown;
   }) {
     const config = configWith(opts.env);
-    const otp = new AdminOtpService(dbReturning([]), null, config);
+    const sms = {
+      sendOtp: jest.fn(async () => {
+        if (opts.smsFails) throw new Error('BSNL gateway unreachable');
+      }),
+    };
+    const otp = new AdminOtpService(dbReturning(opts.otpRows ?? []), null, config);
+    if (opts.verifyThrows !== undefined) {
+      otp.verify = jest.fn(async () => {
+        throw opts.verifyThrows;
+      }) as never;
+    }
     const firebase = {
       verifyIdToken: async () => ({
         uid: 'u1',
@@ -128,14 +152,14 @@ describe('AdminAltAuthService', () => {
     };
     const svc = new AdminAltAuthService(
       dbReturning(opts.rows ?? []),
-      sms,
+      sms as never,
       config,
       otp,
       auth as never,
       firebase,
       audit,
     );
-    return { svc, auth };
+    return { svc, auth, sms, otp };
   }
 
   it('rejects a Google email that is not the allowlisted one', async () => {
@@ -179,11 +203,79 @@ describe('AdminAltAuthService', () => {
   });
 
   it('answers otp/request generically and sends nothing for a non-allowlisted mobile', async () => {
-    const { svc } = build({ env: { SUPER_ADMIN_MOBILE: SUPER_MOBILE } });
+    const { svc, sms } = build({ env: { SUPER_ADMIN_MOBILE: SUPER_MOBILE } });
     const res = await svc.requestOtp('9999999999');
     expect(res.message).toMatch(/if this number is registered/i);
     expect(res.expiresAt).toEqual(expect.any(String));
     expect(res.message).not.toContain(SUPER_MOBILE);
-    expect((sms as unknown as { sendOtp: jest.Mock }).sendOtp).not.toHaveBeenCalled();
+    expect(sms.sendOtp).not.toHaveBeenCalled();
+  });
+
+  it('still answers generically — and never returns the code — when OTP generation blows up', async () => {
+    const { svc, otp } = build({ env: { SUPER_ADMIN_MOBILE: SUPER_MOBILE } });
+    otp.generateForMobile = jest.fn(async () => {
+      throw new Error('database is down');
+    }) as never;
+    const res = await svc.requestOtp(SUPER_MOBILE);
+    expect(res.message).toMatch(/if this number is registered/i);
+    expect(JSON.stringify(res)).not.toMatch(/\d{6}/);
+  });
+
+  it('logs the code (masked number) at WARN when SMS dispatch fails, and never on success', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    try {
+      const failing = build({ env: { SUPER_ADMIN_MOBILE: SUPER_MOBILE }, smsFails: true });
+      failing.otp.generateForMobile = jest.fn(async () => ({
+        otp: '424242',
+        expiresAt: new Date(Date.now() + 60000),
+      })) as never;
+      await failing.svc.requestOtp(SUPER_MOBILE);
+
+      const breakGlass = warn.mock.calls
+        .map((c) => String(c[0]))
+        .find((m) => m.includes('[ADMIN-OTP]'));
+      expect(breakGlass).toContain('424242');
+      expect(breakGlass).toContain('******7492');
+      expect(breakGlass).not.toContain(SUPER_MOBILE);
+
+      warn.mockClear();
+      const ok = build({ env: { SUPER_ADMIN_MOBILE: SUPER_MOBILE } });
+      ok.otp.generateForMobile = jest.fn(async () => ({
+        otp: '424242',
+        expiresAt: new Date(Date.now() + 60000),
+      })) as never;
+      await ok.svc.requestOtp(SUPER_MOBILE);
+      expect(warn.mock.calls.map((c) => String(c[0])).join('\n')).not.toContain('[ADMIN-OTP]');
+    } finally {
+      jest.restoreAllMocks();
+    }
+  });
+
+  it('turns an unexpected verification failure into a typed error, never a 500', async () => {
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    try {
+      const { svc } = build({
+        env: { SUPER_ADMIN_MOBILE: SUPER_MOBILE },
+        verifyThrows: new Error('redis exploded'),
+      });
+      await expect(svc.verifyOtp(SUPER_MOBILE, '123456')).rejects.toMatchObject({
+        response: { error: 'INVALID_OTP' },
+      });
+    } finally {
+      jest.restoreAllMocks();
+    }
+  });
+
+  it('warns loudly at boot when no sign-in identity is configured', () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    try {
+      build({ env: {} }).svc.onModuleInit();
+      expect(warn.mock.calls.map((c) => String(c[0])).join('\n')).toMatch(
+        /ADMIN SIGN-IN IS IMPOSSIBLE/,
+      );
+    } finally {
+      jest.restoreAllMocks();
+    }
   });
 });

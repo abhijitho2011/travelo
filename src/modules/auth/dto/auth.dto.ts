@@ -1,21 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsOptional, IsString, Length, Matches, MinLength } from 'class-validator';
-
-export class LoginDto {
-  @ApiProperty({ example: 'admin@tavelo.local' })
-  @IsEmail()
-  email!: string;
-
-  @ApiProperty({ example: 'ChangeMe!12345' })
-  @IsString()
-  @MinLength(8)
-  password!: string;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  mfaCode?: string;
-}
+import { IsString, Length, Matches } from 'class-validator';
 
 export class RefreshDto {
   @ApiProperty()

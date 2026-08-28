@@ -27,6 +27,16 @@ export function mobileMatches(a: string | null | undefined, b: string | null | u
   return left !== null && right !== null && left === right;
 }
 
+/**
+ * Log-safe rendering of a mobile: only the last four digits survive, so a log
+ * line can identify the number without publishing it.
+ */
+export function maskMobile(raw: string | null | undefined): string {
+  const digits = normalizeMobile(raw) ?? String(raw ?? '').replace(/\D+/g, '');
+  if (digits.length <= 4) return '*'.repeat(digits.length || 4);
+  return `${'*'.repeat(digits.length - 4)}${digits.slice(-4)}`;
+}
+
 /** Canonical form for an email used in an allowlist comparison. */
 export function normalizeEmail(raw: string | null | undefined): string | null {
   if (!raw) return null;

@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { HttpException, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { and, eq, isNull } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
@@ -7,7 +7,7 @@ import { AuditService } from '../audit/audit.service';
 import { getRequestContext } from '../../common/context/request-context';
 import { FirebaseService } from '../shared-auth/firebase.service';
 import { SMS_PROVIDER, SmsProvider } from '../shared-auth/sms/sms-provider.interface';
-import { normalizeEmail } from '../shared-auth/mobile.util';
+import { maskMobile, normalizeEmail, normalizeMobile } from '../shared-auth/mobile.util';
 import { AuthService, AdminLoginResult } from './auth.service';
 import { AdminOtpService } from './admin-otp.service';
 import { AdminAuthErrors } from './admin-auth-errors';
@@ -15,13 +15,19 @@ import { AdminAuthErrors } from './admin-auth-errors';
 /**
  * Google and mobile-OTP sign-in for the super-admin portal.
  *
- * Both methods are gated by a server-side allowlist read from the environment
- * on every attempt (`SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_MOBILE`): change the
- * env value and only the new identity can sign in. Email+password login is
- * untouched and remains the break-glass path.
+ * These are the ONLY ways into the admin portal — password sign-in no longer
+ * exists. Both are gated by a server-side allowlist read from the environment
+ * on every attempt (`SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_MOBILE`): change the env
+ * value and only the new identity can sign in.
+ *
+ * Because there is no password fallback, this service is deliberately
+ * lockout-averse: it warns loudly at boot when no identity is configured, it
+ * writes the OTP to the server log when (and only when) SMS dispatch fails so
+ * the operator can still get in from the deploy log, and it never lets an
+ * unexpected error surface as an opaque 500.
  */
 @Injectable()
-export class AdminAltAuthService {
+export class AdminAltAuthService implements OnModuleInit {
   private readonly logger = new Logger(AdminAltAuthService.name);
 
   constructor(
@@ -35,24 +41,55 @@ export class AdminAltAuthService {
   ) {}
 
   /**
+   * Boot-time guard: with no password fallback, an unconfigured allowlist means
+   * nobody can sign in at all. Say so loudly — but never crash the process.
+   */
+  onModuleInit(): void {
+    const email = normalizeEmail(this.config.get<string>('SUPER_ADMIN_EMAIL'));
+    const mobile = normalizeMobile(this.config.get<string>('SUPER_ADMIN_MOBILE'));
+    if (!email && !mobile) {
+      this.logger.warn(
+        '*** ADMIN SIGN-IN IS IMPOSSIBLE: neither SUPER_ADMIN_EMAIL nor SUPER_ADMIN_MOBILE is set, ' +
+          'and password login no longer exists. Set at least one of them and redeploy. ***',
+      );
+      return;
+    }
+    if (!email) this.logger.warn('SUPER_ADMIN_EMAIL is not set — Google sign-in is disabled.');
+    if (!mobile) this.logger.warn('SUPER_ADMIN_MOBILE is not set — OTP sign-in is disabled.');
+  }
+
+  /**
    * Always answers with the same envelope, whether or not the number is the
-   * allowlisted one — the configured number is never disclosed.
+   * allowlisted one — the configured number is never disclosed. Unexpected
+   * failures are swallowed for the same reason (only throttling is surfaced).
    */
   async requestOtp(mobile: string): Promise<{ message: string; expiresAt: string }> {
     await this.otp.enforceRequestRateLimit(mobile);
-    const generated = await this.otp.generateForMobile(mobile);
-    const expiresAt = generated?.expiresAt ?? this.otp.genericExpiry();
+
+    let generated: { otp: string; expiresAt: Date } | null = null;
+    try {
+      generated = await this.otp.generateForMobile(mobile);
+    } catch (err) {
+      if (err instanceof HttpException) throw err;
+      this.logger.error(`Admin OTP generation failed: ${(err as Error).message}`);
+    }
+
     if (generated) {
       try {
         await this.sms.sendOtp(mobile, generated.otp);
       } catch (err) {
-        // Never leak dispatch failures to the client; the answer stays generic.
+        // BREAK-GLASS: SMS is the only delivery channel and there is no password
+        // login, so a dispatch failure must not lock the operator out. The code
+        // goes to the server log (visible in the Railway deploy log) — never to
+        // the client, and never on the success path.
         this.logger.error(`Failed to dispatch admin OTP SMS: ${(err as Error).message}`);
+        this.logger.warn(`[ADMIN-OTP] code for ${maskMobile(mobile)}: ${generated.otp}`);
       }
     }
+
     return {
       message: 'If this number is registered, a sign-in code has been sent.',
-      expiresAt: expiresAt.toISOString(),
+      expiresAt: (generated?.expiresAt ?? this.otp.genericExpiry()).toISOString(),
     };
   }
 
@@ -62,11 +99,19 @@ export class AdminAltAuthService {
       return await this.auth.issueLoginForAdmin(adminId, 'otp');
     } catch (err) {
       await this.recordFailure('otp');
-      throw err;
+      throw this.asTypedError(err, 'otp');
     }
   }
 
   async google(idToken: string): Promise<AdminLoginResult> {
+    try {
+      return await this.googleInner(idToken);
+    } catch (err) {
+      throw this.asTypedError(err, 'google');
+    }
+  }
+
+  private async googleInner(idToken: string): Promise<AdminLoginResult> {
     const allowedEmail = normalizeEmail(this.config.get<string>('SUPER_ADMIN_EMAIL'));
     if (!allowedEmail) {
       // Method cleanly disabled rather than crashing boot.
@@ -108,6 +153,20 @@ export class AdminAltAuthService {
     }
 
     return this.auth.issueLoginForAdmin(admin.id, 'google');
+  }
+
+  /**
+   * Guarantees a typed, meaningful error. A misconfigured env value or an
+   * unreachable dependency degrades to "cannot sign in" plus a server-side log
+   * — never an opaque 500.
+   */
+  private asTypedError(err: unknown, method: 'google' | 'otp'): unknown {
+    if (err instanceof HttpException) return err;
+    this.logger.error(
+      `Unexpected failure during ${method} sign-in: ${(err as Error)?.message ?? String(err)}`,
+      (err as Error)?.stack,
+    );
+    return method === 'google' ? AdminAuthErrors.adminNotFound() : AdminAuthErrors.invalidOtp();
   }
 
   private async recordFailure(method: 'google' | 'otp', actorEmail?: string): Promise<void> {

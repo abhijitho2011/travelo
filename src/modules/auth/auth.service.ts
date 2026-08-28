@@ -39,6 +39,11 @@ export class AuthService {
     private readonly audit: AuditService,
   ) {}
 
+  /**
+   * Generic argon2id helpers. Used to hash refresh tokens (and to fill the
+   * legacy `admins.password_hash` column when an admin row is created) —
+   * NOT for authentication: there is no password sign-in any more.
+   */
   static async hashPassword(pw: string): Promise<string> {
     return argon2.hash(pw, { type: argon2.argon2id });
   }
@@ -51,37 +56,11 @@ export class AuthService {
     }
   }
 
-  async login(email: string, password: string): Promise<AdminLoginResult> {
-    const [admin] = await this.db
-      .select()
-      .from(admins)
-      .where(and(eq(admins.email, email.toLowerCase()), isNull(admins.deletedAt)))
-      .limit(1);
-
-    if (!admin) throw new UnauthorizedException('Invalid credentials');
-    if (admin.status !== 'Active')
-      throw new UnauthorizedException(`Account ${admin.status.toLowerCase()}`);
-
-    const ok = await AuthService.verifyPassword(admin.passwordHash, password);
-    if (!ok) {
-      await this.audit.record({
-        action: 'auth.login.failed',
-        entity: 'admin',
-        entityId: admin.id,
-        actorId: admin.id,
-        actorEmail: admin.email,
-      });
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    return this.establishSession(admin.id, 'password', 'auth.login.success');
-  }
-
   /**
    * Issues a real admin session + token pair for an already-authenticated
-   * admin id. Used by the Google and mobile-OTP sign-in paths so there is
-   * exactly ONE admin token type and one session table — never a second
-   * bespoke token. The caller is responsible for having authenticated the
+   * admin id — the ONLY way an admin session is created. Used by the Google
+   * and mobile-OTP sign-in paths so there is exactly one admin token type and
+   * one session table. The caller is responsible for having authenticated the
    * identity (and for the allowlist check).
    */
   async issueLoginForAdmin(adminId: string, method: 'google' | 'otp'): Promise<AdminLoginResult> {
@@ -90,7 +69,7 @@ export class AuthService {
 
   private async establishSession(
     adminId: string,
-    method: 'password' | 'google' | 'otp',
+    method: 'google' | 'otp',
     action: string,
   ): Promise<AdminLoginResult> {
     const [admin] = await this.db

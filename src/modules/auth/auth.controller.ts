@@ -5,7 +5,6 @@ import {
   AdminGoogleLoginDto,
   AdminRequestOtpDto,
   AdminVerifyOtpDto,
-  LoginDto,
   RefreshDto,
 } from './dto/auth.dto';
 import { AdminAltAuthService } from './admin-alt-auth.service';
@@ -35,12 +34,10 @@ export class AuthController {
     };
   }
 
-  @Public()
-  @Post('login')
-  @HttpCode(200)
-  async login(@Body() dto: LoginDto) {
-    return AuthController.tokenResponse(await this.auth.login(dto.email, dto.password));
-  }
+  // NOTE: there is deliberately no password login route. The super-admin
+  // portal authenticates ONLY through mobile OTP and Google, both gated by the
+  // SUPER_ADMIN_MOBILE / SUPER_ADMIN_EMAIL allowlist. Password hashes remain in
+  // the database but can no longer authenticate anyone.
 
   /**
    * Always returns a generic success envelope — never discloses whether the
