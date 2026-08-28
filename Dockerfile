@@ -23,8 +23,6 @@ COPY --from=build /app/src/database/migrations ./src/database/migrations
 COPY --from=build /app/scripts ./scripts
 COPY --from=build /app/drizzle.config.ts ./drizzle.config.ts
 COPY --from=build /app/tsconfig.json ./tsconfig.json
-# tsx (dev-only) required for migrate script at boot; install it as runtime dep
-RUN npm install --no-audit --no-fund tsx@^4.19.2
 USER app
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s CMD wget -qO- http://0.0.0.0:${PORT:-3000}/health/live || exit 1

@@ -14,7 +14,7 @@
     "dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main.js",
-    "start:railway": "npm run db:migrate && node dist/main.js",
+    "start:railway": "node scripts/railway-boot.mjs",
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
