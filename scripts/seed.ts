@@ -9,7 +9,7 @@ import { normalizeMobile } from '../src/modules/shared-auth/mobile.util';
 
 // ---------- Permission catalog ----------
 const PERMISSIONS: { key: string; group: string; description: string }[] = [
-  ...groupPerms('Owner', 'owner', ['view', 'create', 'edit', 'suspend']),
+  ...groupPerms('Owner', 'owner', ['view', 'create', 'edit', 'suspend', 'delete']),
   ...groupPerms('Property', 'property', ['view', 'edit', 'suspend']),
   ...groupPerms('Subscription', 'subscription', ['view', 'edit', 'cancel']),
   ...groupPerms('Plan', 'plan', ['view', 'edit']),

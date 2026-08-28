@@ -42,6 +42,13 @@ export const owners = pgTable(
     status: varchar('status', { length: 32 }).notNull().default('PENDING').$type<OwnerStatus>(),
     city: varchar('city', { length: 128 }),
     country: varchar('country', { length: 128 }),
+    // Admin-managed location catalogue. The FK constraints live in SQL only:
+    // location_states/location_districts are declared in ./owner.ts, which
+    // already imports this file, so a Drizzle .references() here would be a
+    // circular import.
+    stateId: uuid('state_id'),
+    districtId: uuid('district_id'),
+    pinCode: varchar('pin_code', { length: 6 }),
     createdBy: uuid('created_by').references(() => admins.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -51,6 +58,8 @@ export const owners = pgTable(
   (t) => ({
     statusIdx: index('owners_status_idx').on(t.status),
     emailIdx: index('owners_email_idx').on(t.email),
+    stateIdx: index('owners_state_idx').on(t.stateId),
+    districtIdx: index('owners_district_idx').on(t.districtId),
     nameTrgm: index('owners_name_trgm_idx').using('gin', sql`${t.name} gin_trgm_ops`),
     companyTrgm: index('owners_company_trgm_idx').using('gin', sql`${t.company} gin_trgm_ops`),
   }),
@@ -120,8 +129,11 @@ export const subscriptionPlans = pgTable('subscription_plans', {
     .default(sql`gen_random_uuid()`),
   name: varchar('name', { length: 128 }).notNull().unique(),
   description: text('description'),
-  monthlyPrice: integer('monthly_price').notNull(), // paise
-  annualPrice: integer('annual_price').notNull(),
+  monthlyPrice: integer('monthly_price').notNull(), // paise, per month
+  annualPrice: integer('annual_price').notNull(), // legacy; not used for period maths
+  // Billing period length. The total charged for one period is
+  // monthlyPrice * durationMonths — monthlyPrice stays the single source of truth.
+  durationMonths: integer('duration_months').notNull().default(1),
   currency: varchar('currency', { length: 8 }).notNull().default('INR'),
   propertyLimit: integer('property_limit').notNull().default(1),
   status: varchar('status', { length: 16 }).notNull().default('ACTIVE').$type<PlanStatus>(),

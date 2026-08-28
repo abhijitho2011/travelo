@@ -40,6 +40,8 @@ export class PlansService {
       limit: p.propertyLimit,
       monthly: p.monthlyPrice,
       annual: p.annualPrice,
+      durationMonths: p.durationMonths,
+      periodPrice: p.monthlyPrice * p.durationMonths,
       currency: p.currency,
       status: p.status === 'ACTIVE' ? 'Active' : 'Inactive',
       features: featuresByPlan.get(p.id) ?? [],
@@ -58,7 +60,11 @@ export class PlansService {
       .select({ key: planFeatures.featureKey })
       .from(planFeatures)
       .where(eq(planFeatures.planId, id));
-    return { ...row, features: fs.map((f) => f.key) };
+    return {
+      ...row,
+      periodPrice: row.monthlyPrice * row.durationMonths,
+      features: fs.map((f) => f.key),
+    };
   }
 
   async create(dto: {
@@ -67,6 +73,7 @@ export class PlansService {
     monthlyPrice: number;
     annualPrice: number;
     propertyLimit: number;
+    durationMonths?: number;
     currency?: string;
     features?: string[];
   }) {
@@ -78,6 +85,7 @@ export class PlansService {
         monthlyPrice: dto.monthlyPrice,
         annualPrice: dto.annualPrice,
         propertyLimit: dto.propertyLimit,
+        durationMonths: dto.durationMonths ?? 1,
         currency: dto.currency ?? 'INR',
       })
       .returning();
@@ -104,6 +112,7 @@ export class PlansService {
       monthlyPrice: number;
       annualPrice: number;
       propertyLimit: number;
+      durationMonths: number;
       status: 'ACTIVE' | 'ARCHIVED';
     }>,
   ) {

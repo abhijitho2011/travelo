@@ -1,6 +1,6 @@
 import { Controller, Get, Inject, Injectable, Module, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { ilike, or, sql } from 'drizzle-orm';
+import { and, ilike, isNull, or, sql } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import { invoices, owners, properties, supportTickets } from '../../database/schema';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -26,7 +26,13 @@ export class SearchService {
           email: owners.email,
         })
         .from(owners)
-        .where(or(ilike(owners.name, like), ilike(owners.company, like), ilike(owners.email, like)))
+        // Soft-deleted owners must not surface anywhere in the admin panel.
+        .where(
+          and(
+            isNull(owners.deletedAt),
+            or(ilike(owners.name, like), ilike(owners.company, like), ilike(owners.email, like)),
+          ),
+        )
         .limit(10);
     }
     if (wanted.has('properties')) {

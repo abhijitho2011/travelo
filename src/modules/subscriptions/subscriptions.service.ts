@@ -12,6 +12,7 @@ import {
 } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { getRequestContext } from '../../common/context/request-context';
+import { addMonths } from '../../common/date/add-months';
 
 export interface ExtendInput {
   days: number;
@@ -26,6 +27,17 @@ export class SubscriptionsService {
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly audit: AuditService,
   ) {}
+
+  /**
+   * A billing period runs for the plan's `durationMonths` — never a hard-coded
+   * month or year. Day-of-month is clamped (Jan 31 + 1 month => Feb 28/29).
+   */
+  static computePeriodEnd(start: Date, durationMonths: number): Date {
+    if (!Number.isInteger(durationMonths) || durationMonths < 1 || durationMonths > 120) {
+      throw new BadRequestException('durationMonths must be an integer between 1 and 120');
+    }
+    return addMonths(start, durationMonths);
+  }
 
   static computeNewExpiry(
     current: Date,
@@ -90,11 +102,10 @@ export class SubscriptionsService {
       .where(eq(subscriptionPlans.id, dto.planId))
       .limit(1);
     if (!plan) throw new NotFoundException('Plan not found');
-    const cycle = dto.billingCycle ?? 'MONTHLY';
+    // The period length comes from the plan, not from the billing cycle label.
+    const cycle = dto.billingCycle ?? (plan.durationMonths % 12 === 0 ? 'ANNUAL' : 'MONTHLY');
     const start = dto.startsAt ?? new Date();
-    const end = new Date(start);
-    if (cycle === 'ANNUAL') end.setFullYear(end.getFullYear() + 1);
-    else end.setMonth(end.getMonth() + 1);
+    const end = SubscriptionsService.computePeriodEnd(start, plan.durationMonths);
     const [row] = await this.db
       .insert(subscriptions)
       .values({

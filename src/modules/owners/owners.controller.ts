@@ -1,10 +1,26 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { OwnersService } from './owners.service';
-import { CreateOwnerDto, OwnerFilterDto, SetOwnerStatusDto, UpdateOwnerDto } from './dto';
+import {
+  CreateOwnerDto,
+  DeleteOwnerDto,
+  OwnerFilterDto,
+  SetOwnerStatusDto,
+  UpdateOwnerDto,
+} from './dto';
 
 @ApiTags('Owners')
 @ApiBearerAuth()
@@ -35,6 +51,12 @@ export class OwnersController {
   @RequirePermissions('owner.edit')
   update(@Param('id') id: string, @Body() dto: UpdateOwnerDto) {
     return this.svc.update(id, dto);
+  }
+
+  @Delete(':id')
+  @RequirePermissions('owner.delete')
+  remove(@Param('id') id: string, @Body() dto: DeleteOwnerDto) {
+    return this.svc.remove(id, dto?.reason);
   }
 
   @Post(':id/activate')

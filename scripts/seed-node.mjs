@@ -6,7 +6,7 @@ import pg from 'pg';
 import argon2 from 'argon2';
 
 const PERMISSIONS = [
-  ['Owner', 'owner', ['view', 'create', 'edit', 'suspend']],
+  ['Owner', 'owner', ['view', 'create', 'edit', 'suspend', 'delete']],
   ['Property', 'property', ['view', 'edit', 'suspend']],
   ['Subscription', 'subscription', ['view', 'edit', 'cancel']],
   ['Plan', 'plan', ['view', 'edit']],

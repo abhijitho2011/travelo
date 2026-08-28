@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, between, desc, eq, gte, isNotNull, lte, sql } from 'drizzle-orm';
+import { and, between, desc, eq, gte, isNotNull, isNull, lte, sql } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import {
   dailyPlatformMetrics,
@@ -16,10 +16,12 @@ export class AnalyticsService {
   async overview() {
     const [{ ownersTotal }] = await this.db
       .select({ ownersTotal: sql<number>`count(*)::int` })
-      .from(owners);
+      .from(owners)
+      .where(isNull(owners.deletedAt));
     const [{ ownersActive }] = await this.db
       .select({ ownersActive: sql<number>`count(*) filter (where status='ACTIVE')::int` })
-      .from(owners);
+      .from(owners)
+      .where(isNull(owners.deletedAt));
     const [{ propertiesTotal }] = await this.db
       .select({ propertiesTotal: sql<number>`count(*)::int` })
       .from(properties);
@@ -81,6 +83,7 @@ export class AnalyticsService {
     const rows = await this.db
       .select({ status: owners.status, count: sql<number>`count(*)::int` })
       .from(owners)
+      .where(isNull(owners.deletedAt))
       .groupBy(owners.status);
     return rows;
   }

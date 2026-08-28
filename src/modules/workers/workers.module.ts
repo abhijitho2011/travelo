@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, Module, OnModuleInit } from '@nestjs/common';
-import { and, eq, lte, sql } from 'drizzle-orm';
+import { and, eq, isNull, lte, sql } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import {
   announcements,
@@ -77,7 +77,8 @@ export class DailyMetricsAggregator {
     }
     const [{ ownersActive }] = await this.db
       .select({ ownersActive: sql<number>`count(*) filter (where status='ACTIVE')::int` })
-      .from(owners);
+      .from(owners)
+      .where(isNull(owners.deletedAt));
     await this.db
       .insert(dailyPlatformMetrics)
       .values({
