@@ -1,4 +1,4 @@
-package com.travelo.travelo_owner
+package com.tavelo.tavelo_owner
 
 import io.flutter.embedding.android.FlutterActivity
 

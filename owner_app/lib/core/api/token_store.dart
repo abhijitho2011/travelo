@@ -6,8 +6,8 @@ class TokenStore {
 
   final FlutterSecureStorage _storage;
 
-  static const _kAccess = 'travelo.owner.access';
-  static const _kRefresh = 'travelo.owner.refresh';
+  static const _kAccess = 'tavelo.owner.access';
+  static const _kRefresh = 'tavelo.owner.refresh';
 
   String? _accessCache;
 

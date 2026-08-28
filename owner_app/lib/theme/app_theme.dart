@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Travelo Owner design system — premium, restrained B2B SaaS.
+/// Tavelo Owner design system — premium, restrained B2B SaaS.
 /// Deep slate ink, a confident teal-forward primary, generous whitespace.
 class AppColors {
   AppColors._();

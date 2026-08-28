@@ -1,6 +1,6 @@
 {
-    "name": "travelo_owner",
-    "short_name": "travelo_owner",
+    "name": "tavelo_owner",
+    "short_name": "tavelo_owner",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

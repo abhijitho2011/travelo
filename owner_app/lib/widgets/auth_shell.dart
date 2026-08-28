@@ -177,7 +177,7 @@ class _AuthFooter extends StatelessWidget {
             children: [
               const TextSpan(text: 'Need help?  '),
               TextSpan(
-                text: 'Contact Travelo Support',
+                text: 'Contact Tavelo Support',
                 style: const TextStyle(
                   color: AppColors.primary,
                   fontWeight: FontWeight.w600,

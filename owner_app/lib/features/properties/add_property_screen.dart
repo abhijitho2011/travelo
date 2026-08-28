@@ -79,7 +79,7 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
       context.pop();
     } on ApiException catch (e) {
       setState(() => _error = e.code == 'PROPERTY_LIMIT_REACHED'
-          ? 'You have reached the number of properties included in your plan. Contact Travelo to increase your limit.'
+          ? 'You have reached the number of properties included in your plan. Contact Tavelo to increase your limit.'
           : e.message);
     } finally {
       if (mounted) setState(() => _busy = false);

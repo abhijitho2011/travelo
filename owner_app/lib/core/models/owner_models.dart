@@ -101,7 +101,7 @@ class SubscriptionInfo {
     if (end != null) days = end.difference(DateTime.now()).inDays;
     return SubscriptionInfo(
       state: subStateFrom(_asStr(j['status'] ?? j['state'])),
-      planName: _asStr(j['planName'] ?? j['plan'] ?? 'Travelo'),
+      planName: _asStr(j['planName'] ?? j['plan'] ?? 'Tavelo'),
       currentPeriodEnd: end,
       daysToExpiry: days,
     );

@@ -52,7 +52,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       setState(() => _step = _Step.otp);
     } on ApiException catch (e) {
       setState(() => _banner = e.isNetwork
-          ? "We couldn't reach Travelo. Check your connection and try again."
+          ? "We couldn't reach Tavelo. Check your connection and try again."
           : e.message);
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -78,13 +78,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       setState(() {
         switch (e.code) {
           case 'ACCOUNT_SUSPENDED':
-            _banner = 'Your account is currently suspended. Please contact Travelo Support.';
+            _banner = 'Your account is currently suspended. Please contact Tavelo Support.';
             break;
           case 'ACCOUNT_BLOCKED':
-            _banner = 'Your account has been blocked. Contact Travelo Support for assistance.';
+            _banner = 'Your account has been blocked. Contact Tavelo Support for assistance.';
             break;
           case 'NETWORK':
-            _banner = "We couldn't reach Travelo. Check your connection and try again.";
+            _banner = "We couldn't reach Tavelo. Check your connection and try again.";
             break;
           default:
             _otpError = 'Incorrect or expired code.';
@@ -239,18 +239,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       setState(() {
         switch (e.code) {
           case 'ACCOUNT_SUSPENDED':
-            _banner = 'Your account is currently suspended. Please contact Travelo Support.';
+            _banner = 'Your account is currently suspended. Please contact Tavelo Support.';
             break;
           case 'ACCOUNT_BLOCKED':
-            _banner = 'Your account has been blocked. Contact Travelo Support for assistance.';
+            _banner = 'Your account has been blocked. Contact Tavelo Support for assistance.';
             break;
           case 'OWNER_NOT_FOUND':
           case 'NOT_FOUND':
             _banner =
-                'This Google account is not registered with Travelo. Ask your Travelo administrator for an invitation.';
+                'This Google account is not registered with Tavelo. Ask your Tavelo administrator for an invitation.';
             break;
           case 'NETWORK':
-            _banner = "We couldn't reach Travelo. Check your connection and try again.";
+            _banner = "We couldn't reach Tavelo. Check your connection and try again.";
             break;
           default:
             _banner = 'Google sign-in failed. Please try again.';

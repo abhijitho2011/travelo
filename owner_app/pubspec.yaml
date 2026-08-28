@@ -1,5 +1,5 @@
-name: travelo_owner
-description: "Travelo — Owner portal. Manage your entire hotel portfolio from one place."
+name: tavelo_owner
+description: "Tavelo — Owner portal. Manage your entire hotel portfolio from one place."
 publish_to: "none"
 version: 0.1.0+1
 

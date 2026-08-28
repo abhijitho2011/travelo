@@ -65,7 +65,7 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
       // Router redirects to dashboard on auth.
     } on ApiException catch (e) {
       setState(() => _error = e.code == 'INVITATION_EXPIRED'
-          ? 'This invitation is no longer valid. Contact Travelo Support for a new one.'
+          ? 'This invitation is no longer valid. Contact Tavelo Support for a new one.'
           : 'Incorrect or expired code.');
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -81,7 +81,7 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
           const Text("You're invited",
               style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.ink)),
           const SizedBox(height: 6),
-          const Text('Activate your Travelo account to manage your hotel portfolio.',
+          const Text('Activate your Tavelo account to manage your hotel portfolio.',
               style: TextStyle(color: AppColors.inkMuted, fontSize: 15)),
           const SizedBox(height: 24),
           if (_error != null) ...[

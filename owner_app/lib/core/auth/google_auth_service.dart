@@ -5,7 +5,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../api/api_exception.dart';
 
 /// Performs Google sign-in through Firebase and returns the Firebase ID token.
-/// The backend verifies this token and only issues a Travelo session when the
+/// The backend verifies this token and only issues a Tavelo session when the
 /// email matches an owner account created by the Super Admin.
 class GoogleAuthService {
   /// Returns a fresh Firebase ID token, or throws [ApiException] on failure /

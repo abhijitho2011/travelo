@@ -33,7 +33,7 @@ class PortfolioScreen extends ConsumerWidget {
               child: const Icon(Icons.apartment_rounded, color: Colors.white, size: 18),
             ),
             const SizedBox(width: 10),
-            const Text('Travelo', style: TextStyle(fontWeight: FontWeight.w700)),
+            const Text('Tavelo', style: TextStyle(fontWeight: FontWeight.w700)),
           ],
         ),
         actions: [
@@ -335,7 +335,7 @@ class _SubscriptionNotice extends StatelessWidget {
           tone: BannerTone.danger,
           icon: Icons.lock_clock_outlined,
           text:
-              'Your Travelo subscription has expired. Your hotel data is safe, but some features are unavailable.',
+              'Your Tavelo subscription has expired. Your hotel data is safe, but some features are unavailable.',
           action: FilledButton(
             style: FilledButton.styleFrom(
               minimumSize: const Size(0, 40),

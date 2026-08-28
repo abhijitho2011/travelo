@@ -6,7 +6,7 @@
 class AppConfig {
   AppConfig._();
 
-  /// Base URL of the Travelo API (without a trailing slash).
+  /// Base URL of the Tavelo API (without a trailing slash).
   /// Defaults to the deployed Railway backend — never a localhost address.
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
@@ -16,7 +16,7 @@ class AppConfig {
   /// Owner-scoped API root.
   static String get ownerApi => '$apiBaseUrl/owner';
 
-  static const String supportEmail = 'support@travelo.app';
-  static const String appName = 'Travelo';
+  static const String supportEmail = 'support@tavelo.app';
+  static const String appName = 'Tavelo';
   static const String tagline = 'One platform. Every hotel.';
 }

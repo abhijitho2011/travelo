@@ -2,11 +2,11 @@ import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
-/// Firebase configuration for the Travelo owner app.
+/// Firebase configuration for the Tavelo owner app.
 ///
 /// These values are the Firebase *web* app config. Firebase web API keys are
 /// public by design (they identify the project, they are not a secret); access
-/// is controlled by Firebase Authorized Domains and by the Travelo backend,
+/// is controlled by Firebase Authorized Domains and by the Tavelo backend,
 /// which independently verifies each Google ID token and only issues a session
 /// to an owner account created by the Super Admin.
 ///
@@ -27,7 +27,7 @@ class DefaultFirebaseOptions {
   }
 
   // Values come from --dart-define (set as Railway service variables and passed
-  // through as Docker build args). The defaults are the current Travelo project
+  // through as Docker build args). The defaults are the current Tavelo project
   // so local builds work without extra flags.
   static const String _apiKey = String.fromEnvironment(
     'FIREBASE_API_KEY',
@@ -86,6 +86,6 @@ class DefaultFirebaseOptions {
     messagingSenderId: _senderId,
     projectId: _projectId,
     storageBucket: _storageBucket,
-    iosBundleId: 'com.travelo.travelo_owner',
+    iosBundleId: 'com.tavelo.tavelo_owner',
   );
 }

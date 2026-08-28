@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="travelo_owner"
+        android:label="tavelo_owner"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

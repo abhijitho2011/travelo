@@ -59,7 +59,7 @@ class AuthController extends StateNotifier<AuthState> {
     await _loadMe();
   }
 
-  /// Google sign-in → Firebase ID token → backend exchange for a Travelo
+  /// Google sign-in → Firebase ID token → backend exchange for a Tavelo
   /// session. The backend only issues tokens for an existing owner account.
   Future<void> signInWithGoogle() async {
     final idToken = await _google.signInAndGetIdToken();

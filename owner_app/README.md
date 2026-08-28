@@ -1,4 +1,4 @@
-# Travelo — Owner App (Flutter)
+# Tavelo — Owner App (Flutter)
 
 Cross-platform (iOS / Android / Web) portal for **hotel owners**. Owner accounts
 are created by the Super Admin; only an existing owner account can sign in.
