@@ -66,20 +66,76 @@ async function runMigrations() {
   const client = await connectFirst(configs);
   try {
     const { readFile } = await import('node:fs/promises');
+
+    // A database provisioned before tracking existed already has these applied.
+    await adoptPreexistingMigrations(client, files);
+
+    // Track what has already run. Without this every migration re-executes on
+    // each boot: harmless-looking for idempotent DDL, but it masks real errors
+    // and would re-apply a destructive statement.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS _boot_migrations (
+        filename    text PRIMARY KEY,
+        applied_at  timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    const { rows } = await client.query('SELECT filename FROM _boot_migrations');
+    const applied = new Set(rows.map((r) => r.filename));
+
+    let ran = 0;
     for (const file of files) {
+      if (applied.has(file)) {
+        log(`migration already applied, skipping: ${file}`);
+        continue;
+      }
       const sql = await readFile(path.join(MIGRATIONS_DIR, file), 'utf8');
       log(`applying migration: ${file} (${sql.length} bytes)`);
       try {
+        // Each migration and its bookkeeping commit together, so a crash can
+        // never leave a migration applied but unrecorded (or vice versa).
+        await client.query('BEGIN');
         await client.query(sql);
+        await client.query('INSERT INTO _boot_migrations (filename) VALUES ($1)', [file]);
+        await client.query('COMMIT');
+        ran += 1;
         log(`migration OK: ${file}`);
       } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
         log(`migration FAILED (${file}): ${err.message ?? err}`);
         throw err;
       }
     }
-    log(`applied ${files.length} migration(s)`);
+    log(`applied ${ran} new migration(s), ${files.length - ran} already present`);
   } finally {
     await client.end();
+  }
+}
+
+/**
+ * Migrations that ran before `_boot_migrations` existed are already in the
+ * database. Record them as applied so this boot does not try to re-run them.
+ */
+async function adoptPreexistingMigrations(client, files) {
+  const { rows } = await client.query(
+    "SELECT to_regclass('public._boot_migrations') IS NOT NULL AS present",
+  );
+  if (rows[0]?.present) return;
+  const { rows: adminRows } = await client.query(
+    "SELECT to_regclass('public.admins') IS NOT NULL AS present",
+  );
+  if (!adminRows[0]?.present) return; // fresh database — nothing to adopt
+  log('adopting pre-existing migrations into the tracking table');
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS _boot_migrations (
+      filename    text PRIMARY KEY,
+      applied_at  timestamptz NOT NULL DEFAULT now()
+    )
+  `);
+  for (const file of files) {
+    await client.query(
+      'INSERT INTO _boot_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING',
+      [file],
+    );
   }
 }
 
