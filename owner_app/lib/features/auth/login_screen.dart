@@ -117,39 +117,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ],
           _label('Mobile number'),
           const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _mobile,
-                  enabled: _step == _Step.mobile && !_busy,
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(10),
-                  ],
-                  decoration: InputDecoration(
-                    hintText: '98••• •••92',
-                    prefixText: '+91  ',
-                    errorText: _mobileError,
+          TextField(
+            controller: _mobile,
+            enabled: _step == _Step.mobile && !_busy,
+            autofocus: true,
+            keyboardType: TextInputType.phone,
+            textInputAction: TextInputAction.done,
+            style: const TextStyle(
+              fontSize: 16,
+              color: AppColors.ink,
+              letterSpacing: 0.4,
+            ),
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(10),
+            ],
+            decoration: InputDecoration(
+              hintText: '10-digit mobile number',
+              errorText: _mobileError,
+              // A prefixIcon always paints (prefixText only shows once focused).
+              prefixIcon: const Padding(
+                padding: EdgeInsets.only(left: 16, right: 10),
+                child: Text(
+                  '+91',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ink,
                   ),
-                  onSubmitted: (_) => _sendOtp(),
                 ),
               ),
-              if (_step == _Step.mobile) ...[
-                const SizedBox(width: 10),
-                SizedBox(
-                  height: 52,
-                  child: OutlinedButton(
-                    onPressed: _busy ? null : _sendOtp,
-                    child: _busy
-                        ? const _Spin()
-                        : const Text('Send OTP'),
-                  ),
-                ),
-              ],
-            ],
+              prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+            ),
+            onSubmitted: (_) => _sendOtp(),
           ),
           if (_step == _Step.otp) ...[
             const SizedBox(height: 18),
@@ -195,7 +195,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             onPressed: _busy ? null : (_step == _Step.mobile ? _sendOtp : _verify),
             child: _busy
                 ? const _Spin(light: true)
-                : Text(_step == _Step.mobile ? 'Continue' : 'Sign in'),
+                : Text(_step == _Step.mobile ? 'Send OTP' : 'Sign in'),
           ),
           const SizedBox(height: 16),
           Row(
