@@ -19,6 +19,7 @@ export const auditLogs = pgTable(
     ip: varchar('ip', { length: 64 }),
     userAgent: varchar('user_agent', { length: 512 }),
     requestId: varchar('request_id', { length: 64 }),
+    impersonatedUserId: varchar('impersonated_user_id', { length: 128 }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

@@ -1,4 +1,4 @@
-/* Seeds base permissions, system roles, and a super admin. Idempotent. */
+/* Seeds phase-1 auth + phase-2 catalog (features/plans) + sample owners/properties/subscriptions. */
 import 'dotenv/config';
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -6,108 +6,91 @@ import { eq } from 'drizzle-orm';
 import * as argon2 from 'argon2';
 import * as schema from '../src/database/schema';
 
-// Permission catalog (see spec §RBAC). Each key is `group.action`.
+// ---------- Permission catalog ----------
 const PERMISSIONS: { key: string; group: string; description: string }[] = [
-  // owners
-  { key: 'owner.view', group: 'Owner', description: 'View owners' },
-  { key: 'owner.create', group: 'Owner', description: 'Create owners' },
-  { key: 'owner.edit', group: 'Owner', description: 'Edit owners' },
-  { key: 'owner.suspend', group: 'Owner', description: 'Suspend owners' },
-  // property
-  { key: 'property.view', group: 'Property', description: 'View properties' },
-  { key: 'property.edit', group: 'Property', description: 'Edit properties' },
-  { key: 'property.suspend', group: 'Property', description: 'Suspend properties' },
-  // subscription
-  { key: 'subscription.view', group: 'Subscription', description: 'View subscriptions' },
-  { key: 'subscription.edit', group: 'Subscription', description: 'Edit subscriptions' },
-  { key: 'subscription.cancel', group: 'Subscription', description: 'Cancel subscriptions' },
-  // billing
-  { key: 'billing.view', group: 'Billing', description: 'View billing' },
-  { key: 'billing.refund', group: 'Billing', description: 'Issue refunds' },
-  { key: 'billing.export', group: 'Billing', description: 'Export billing data' },
-  // support
-  { key: 'support.view', group: 'Support', description: 'View tickets' },
-  { key: 'support.reply', group: 'Support', description: 'Reply to tickets' },
-  { key: 'support.assign', group: 'Support', description: 'Assign tickets' },
-  { key: 'support.resolve', group: 'Support', description: 'Resolve tickets' },
-  // audit
-  { key: 'audit.view', group: 'Audit', description: 'View audit logs' },
-  { key: 'audit.export', group: 'Audit', description: 'Export audit logs' },
-  // admin
-  { key: 'admin.view', group: 'Admin', description: 'View admins/roles' },
-  { key: 'admin.create', group: 'Admin', description: 'Create admins/roles' },
-  { key: 'admin.edit', group: 'Admin', description: 'Edit admins/roles' },
-  // impersonation
-  { key: 'impersonation.start', group: 'Impersonation', description: 'Begin impersonation' },
-  { key: 'impersonation.stop', group: 'Impersonation', description: 'End impersonation' },
+  ...groupPerms('Owner', 'owner', ['view', 'create', 'edit', 'suspend']),
+  ...groupPerms('Property', 'property', ['view', 'edit', 'suspend']),
+  ...groupPerms('Subscription', 'subscription', ['view', 'edit', 'cancel']),
+  ...groupPerms('Plan', 'plan', ['view', 'edit']),
+  ...groupPerms('Billing', 'billing', ['view', 'refund', 'export']),
+  ...groupPerms('Refund', 'refund', ['view', 'create']),
+  ...groupPerms('Invoice', 'invoice', ['view', 'create', 'edit']),
+  ...groupPerms('Support', 'support', ['view', 'reply', 'assign', 'resolve']),
+  ...groupPerms('Impersonation', 'impersonation', ['view', 'start', 'stop']),
+  ...groupPerms('Announcement', 'announcement', ['view', 'edit']),
+  ...groupPerms('Notification', 'notification', ['view', 'edit']),
+  ...groupPerms('Integration', 'integration', ['view']),
+  ...groupPerms('Job', 'job', ['view', 'retry']),
+  ...groupPerms('Analytics', 'analytics', ['view']),
+  ...groupPerms('Search', 'search', ['query']),
+  ...groupPerms('Audit', 'audit', ['view', 'export']),
+  ...groupPerms('Admin', 'admin', ['view', 'create', 'edit']),
 ];
 
-const ROLES: {
-  key: string;
-  name: string;
-  description: string;
-  isSystem: boolean;
-  permissions: string[];
-}[] = [
-  {
-    key: 'super_admin',
-    name: 'Super Admin',
-    description: 'Unrestricted access to every capability',
-    isSystem: true,
-    permissions: ['*'],
-  },
+function groupPerms(group: string, prefix: string, actions: string[]) {
+  return actions.map((a) => ({
+    key: `${prefix}.${a}`,
+    group,
+    description: `${a} ${group.toLowerCase()}`,
+  }));
+}
+
+const ROLES = [
+  { key: 'super_admin', name: 'Super Admin', description: 'Unrestricted access', isSystem: true, permissions: ['*'] },
   {
     key: 'finance_admin',
     name: 'Finance Admin',
-    description: 'Billing, refunds, subscription visibility',
+    description: 'Billing, refunds, subscriptions, invoices',
     isSystem: true,
     permissions: [
-      'billing.view',
-      'billing.refund',
-      'billing.export',
-      'subscription.view',
-      'owner.view',
+      'billing.view', 'billing.refund', 'billing.export',
+      'refund.view', 'refund.create',
+      'invoice.view', 'invoice.create', 'invoice.edit',
+      'subscription.view', 'subscription.edit',
+      'owner.view', 'analytics.view', 'search.query', 'notification.view',
     ],
   },
   {
     key: 'support_admin',
     name: 'Support Admin',
-    description: 'Ticketing and owner support',
+    description: 'Ticketing, owner support, impersonation',
     isSystem: true,
     permissions: [
-      'support.view',
-      'support.reply',
-      'support.assign',
-      'support.resolve',
-      'owner.view',
-      'impersonation.start',
+      'support.view', 'support.reply', 'support.assign', 'support.resolve',
+      'owner.view', 'property.view', 'subscription.view',
+      'impersonation.start', 'impersonation.stop', 'impersonation.view',
+      'notification.view', 'search.query',
     ],
   },
   {
     key: 'operations_admin',
     name: 'Operations Admin',
-    description: 'Read-only operations view',
+    description: 'Operational view + jobs',
     isSystem: true,
-    permissions: ['owner.view', 'subscription.view', 'property.view'],
+    permissions: [
+      'owner.view', 'subscription.view', 'property.view',
+      'integration.view', 'job.view', 'job.retry',
+      'analytics.view', 'search.query', 'notification.view',
+    ],
   },
   {
     key: 'platform_admin',
     name: 'Platform Admin',
-    description: 'Platform configuration and owner lifecycle',
+    description: 'Plans, announcements, notifications',
     isSystem: true,
     permissions: [
-      'owner.view',
-      'owner.create',
-      'owner.edit',
-      'subscription.view',
-      'subscription.edit',
-      'property.view',
-      'property.edit',
+      'owner.view', 'owner.create', 'owner.edit',
+      'property.view', 'property.edit',
+      'subscription.view', 'subscription.edit',
+      'plan.view', 'plan.edit',
+      'announcement.view', 'announcement.edit',
+      'notification.view', 'notification.edit',
+      'search.query', 'analytics.view',
     ],
   },
 ];
 
-const SEED_ADMINS: { email: string; name: string; roleKey: string; envPassword?: string }[] = [
+const SEED_ADMINS = [
   {
     email: process.env.SEED_SUPER_ADMIN_EMAIL ?? 'admin@travelo.local',
     name: 'Super Admin',
@@ -118,6 +101,36 @@ const SEED_ADMINS: { email: string; name: string; roleKey: string; envPassword?:
   { email: 'support@travelo.local', name: 'Support Admin', roleKey: 'support_admin' },
   { email: 'ops@travelo.local', name: 'Operations Admin', roleKey: 'operations_admin' },
   { email: 'platform@travelo.local', name: 'Platform Admin', roleKey: 'platform_admin' },
+];
+
+const FEATURES = [
+  'PMS', 'BOOKING_ENGINE', 'CHANNEL_MANAGER', 'HOUSEKEEPING', 'MAINTENANCE',
+  'PROCUREMENT', 'INVENTORY', 'RESTAURANT', 'ERP', 'CRM', 'ANALYTICS', 'API', 'OFFLINE_MODE',
+];
+
+const PLANS = [
+  {
+    name: 'BASIC',
+    description: 'Starter plan — 1 property',
+    monthlyPrice: 400000, // ₹4000 = 400000 paise
+    annualPrice: 4000000,
+    propertyLimit: 1,
+    features: ['PMS', 'BOOKING_ENGINE', 'HOUSEKEEPING', 'ANALYTICS'],
+  },
+  {
+    name: 'PRO',
+    description: 'Pro plan — 3 properties',
+    monthlyPrice: 800000, // ₹8000
+    annualPrice: 8000000,
+    propertyLimit: 3,
+    features: ['PMS', 'BOOKING_ENGINE', 'CHANNEL_MANAGER', 'HOUSEKEEPING', 'MAINTENANCE', 'RESTAURANT', 'CRM', 'ANALYTICS', 'API'],
+  },
+];
+
+const SAMPLE_OWNERS = [
+  { name: 'Rajesh Menon', email: 'rajesh@abchospitality.in', company: 'ABC Hospitality Pvt Ltd', city: 'Kochi', country: 'India', plan: 'PRO', propertyName: 'Kochi Grand Hotel' },
+  { name: 'Anita Deshpande', email: 'anita@sahyadriresorts.com', company: 'Sahyadri Resorts LLP', city: 'Pune', country: 'India', plan: 'BASIC', propertyName: 'Sahyadri Valley Resort' },
+  { name: 'Faisal Rahman', email: 'faisal@marinebay.co', company: 'Marine Bay Hotels', city: 'Dubai', country: 'UAE', plan: 'PRO', propertyName: 'Marine Bay Downtown' },
 ];
 
 async function main() {
@@ -184,10 +197,123 @@ async function main() {
     }
     const [role] = await db.select().from(schema.roles).where(eq(schema.roles.key, a.roleKey)).limit(1);
     if (role) {
+      await db.insert(schema.adminRoles).values({ adminId, roleId: role.id }).onConflictDoNothing();
+    }
+  }
+
+  console.log('Seeding feature catalog...');
+  for (const key of FEATURES) {
+    await db
+      .insert(schema.features)
+      .values({ key, name: key.replace(/_/g, ' ') })
+      .onConflictDoNothing({ target: schema.features.key });
+  }
+
+  console.log('Seeding plans...');
+  const planIds = new Map<string, string>();
+  for (const p of PLANS) {
+    const existing = await db
+      .select()
+      .from(schema.subscriptionPlans)
+      .where(eq(schema.subscriptionPlans.name, p.name))
+      .limit(1);
+    let id: string;
+    if (existing.length) {
+      id = existing[0].id;
       await db
-        .insert(schema.adminRoles)
-        .values({ adminId, roleId: role.id })
-        .onConflictDoNothing();
+        .update(schema.subscriptionPlans)
+        .set({
+          description: p.description,
+          monthlyPrice: p.monthlyPrice,
+          annualPrice: p.annualPrice,
+          propertyLimit: p.propertyLimit,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.subscriptionPlans.id, id));
+    } else {
+      const [inserted] = await db
+        .insert(schema.subscriptionPlans)
+        .values({
+          name: p.name,
+          description: p.description,
+          monthlyPrice: p.monthlyPrice,
+          annualPrice: p.annualPrice,
+          propertyLimit: p.propertyLimit,
+        })
+        .returning();
+      id = inserted.id;
+    }
+    planIds.set(p.name, id);
+    await db.delete(schema.planFeatures).where(eq(schema.planFeatures.planId, id));
+    await db
+      .insert(schema.planFeatures)
+      .values(p.features.map((k) => ({ planId: id, featureKey: k })))
+      .onConflictDoNothing();
+  }
+
+  console.log('Seeding sample owners/properties/subscriptions...');
+  for (const s of SAMPLE_OWNERS) {
+    const [existing] = await db
+      .select()
+      .from(schema.owners)
+      .where(eq(schema.owners.email, s.email.toLowerCase()))
+      .limit(1);
+    let ownerId: string;
+    if (existing) {
+      ownerId = existing.id;
+    } else {
+      const [row] = await db
+        .insert(schema.owners)
+        .values({
+          name: s.name,
+          email: s.email.toLowerCase(),
+          company: s.company,
+          city: s.city,
+          country: s.country,
+          status: 'ACTIVE',
+        })
+        .returning();
+      ownerId = row.id;
+    }
+    const [prop] = await db
+      .select()
+      .from(schema.properties)
+      .where(eq(schema.properties.ownerId, ownerId))
+      .limit(1);
+    if (!prop) {
+      await db.insert(schema.properties).values({
+        ownerId,
+        name: s.propertyName,
+        slug: s.propertyName.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Math.random().toString(36).slice(2, 6),
+        city: s.city,
+        country: s.country,
+        status: 'ACTIVE',
+        listingStatus: 'Published',
+        roomCount: 60,
+        listingCompleteness: 80,
+      });
+    }
+    const planId = planIds.get(s.plan);
+    if (planId) {
+      const [sub] = await db
+        .select()
+        .from(schema.subscriptions)
+        .where(eq(schema.subscriptions.ownerId, ownerId))
+        .limit(1);
+      if (!sub) {
+        const now = new Date();
+        const end = new Date(now);
+        end.setMonth(end.getMonth() + 12);
+        await db.insert(schema.subscriptions).values({
+          ownerId,
+          planId,
+          status: 'ACTIVE',
+          billingCycle: 'ANNUAL',
+          startsAt: now,
+          currentPeriodStart: now,
+          currentPeriodEnd: end,
+        });
+      }
     }
   }
 

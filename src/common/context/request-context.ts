@@ -6,6 +6,9 @@ export interface RequestContextStore {
   sessionId?: string;
   adminEmail?: string;
   adminRole?: string;
+  actorAdminId?: string;
+  impersonatedUserId?: string;
+  impersonationSessionId?: string;
   ip?: string;
   userAgent?: string;
 }

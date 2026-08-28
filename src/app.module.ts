@@ -11,6 +11,21 @@ import { RolesModule } from './modules/roles/roles.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { HealthModule } from './modules/health/health.module';
+import { OwnersModule } from './modules/owners/owners.module';
+import { PropertiesModule } from './modules/properties/properties.module';
+import { EntitlementsModule } from './modules/entitlements/entitlements.module';
+import { PlansModule } from './modules/plans/plans.module';
+import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { BillingModule } from './modules/billing/billing.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { SupportModule } from './modules/support/support.module';
+import { ImpersonationModule } from './modules/impersonation/impersonation.module';
+import { AnnouncementsModule } from './modules/announcements/announcements.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { IntegrationsModule } from './modules/integrations/integrations.module';
+import { JobsModule } from './modules/jobs/jobs.module';
+import { SearchModule } from './modules/search/search.module';
+import { WorkersModule } from './modules/workers/workers.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { RequestContextMiddleware } from './common/middleware/request-context.middleware';
@@ -55,6 +70,21 @@ import { ConfigService } from '@nestjs/config';
     AdminsModule,
     RolesModule,
     HealthModule,
+    OwnersModule,
+    EntitlementsModule,
+    PropertiesModule,
+    PlansModule,
+    SubscriptionsModule,
+    BillingModule,
+    AnalyticsModule,
+    SupportModule,
+    ImpersonationModule,
+    AnnouncementsModule,
+    NotificationsModule,
+    IntegrationsModule,
+    JobsModule,
+    SearchModule,
+    WorkersModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

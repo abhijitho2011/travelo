@@ -8,6 +8,7 @@ import { Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { Logger as PinoLogger } from 'nestjs-pino';
+import * as express from 'express';
 import { AppModule } from './app.module';
 import { loadEnv } from './config/env';
 
@@ -15,7 +16,18 @@ async function bootstrap(): Promise<void> {
   const env = loadEnv();
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
+    bodyParser: false,
   });
+  // Capture raw body for webhook signature verification.
+  app.use(
+    express.json({
+      verify: (req: express.Request & { rawBody?: Buffer }, _res, buf) => {
+        req.rawBody = Buffer.from(buf);
+      },
+      limit: '2mb',
+    }),
+  );
+  app.use(express.urlencoded({ extended: true }));
   app.useLogger(app.get(PinoLogger));
 
   app.set('trust proxy', 1);

@@ -25,6 +25,13 @@ const envSchema = z.object({
 
   SEED_SUPER_ADMIN_EMAIL: z.string().email().default('admin@travelo.local'),
   SEED_SUPER_ADMIN_PASSWORD: z.string().min(8).default('ChangeMe!12345'),
+
+  PAYMENT_WEBHOOK_SECRET_RAZORPAY: z.string().optional(),
+  PAYMENT_WEBHOOK_SECRET_CASHFREE: z.string().optional(),
+  RUN_SEED: z
+    .string()
+    .default('false')
+    .transform((v) => v === 'true'),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

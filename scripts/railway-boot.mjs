@@ -42,11 +42,24 @@ async function runMigrations() {
   }
 }
 
+async function runSeedIfRequested() {
+  if (process.env.RUN_SEED !== 'true') return;
+  console.log('[boot] RUN_SEED=true — running seed');
+  const { fileURLToPath } = await import('node:url');
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const seedPath = path.join(here, 'seed-node.mjs');
+  const res = spawn(process.execPath, [seedPath], { stdio: 'inherit', env: process.env });
+  await new Promise((resolve, reject) =>
+    res.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`seed exit ${code}`)))),
+  );
+}
+
 async function main() {
   try {
     await runMigrations();
+    await runSeedIfRequested();
   } catch (err) {
-    console.error('[boot] migration failed:', err);
+    console.error('[boot] pre-start step failed:', err);
     process.exit(1);
   }
   const child = spawn(process.execPath, ['dist/main.js'], {
