@@ -2,7 +2,7 @@ import { HttpException, Inject, Injectable, Logger, OnModuleInit } from '@nestjs
 import { ConfigService } from '@nestjs/config';
 import { and, eq, isNull } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
-import { admins } from '../../database/schema';
+import { adminRoles, admins, roles } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { getRequestContext } from '../../common/context/request-context';
 import { FirebaseService } from '../shared-auth/firebase.service';
@@ -77,9 +77,11 @@ export class AdminAltAuthService implements OnModuleInit {
         .where(and(eq(admins.email, email), isNull(admins.deletedAt)))
         .limit(1);
       if (!admin) {
-        this.logger.warn(
-          `SUPER_ADMIN_EMAIL does not match any admin row — sign-in will fail until one exists (run the seed).`,
-        );
+        // No row for the allowlisted email. With password sign-in gone, waiting
+        // for a seed run would mean nobody can get in — and the demo seed also
+        // inserts sample owners/properties, which must never touch production.
+        // Provision just this one account instead.
+        await this.provisionSuperAdmin(email, mobile);
         return;
       }
       if (admin.mobile === mobile) return;
@@ -93,6 +95,67 @@ export class AdminAltAuthService implements OnModuleInit {
     } catch (err) {
       // Never block boot on this; /health must still come up.
       this.logger.error(`Could not sync the super-admin mobile: ${(err as Error).message}`);
+    }
+  }
+
+  /**
+   * Creates the allowlisted super-admin account and grants it the SUPER_ADMIN
+   * role. Idempotent, and deliberately narrower than the seed: it inserts this
+   * one account and nothing else, so production never receives demo records.
+   *
+   * `password_hash` is NOT NULL in the schema but is no longer consulted by any
+   * code path — password sign-in was removed — so it is filled with a value that
+   * is not a valid hash and therefore cannot verify against any input.
+   */
+  private async provisionSuperAdmin(email: string, mobile: string | null): Promise<void> {
+    try {
+      const [role] = await this.db
+        .select({ id: roles.id })
+        .from(roles)
+        .where(eq(roles.key, 'SUPER_ADMIN'))
+        .limit(1);
+
+      if (!role) {
+        this.logger.error(
+          'Cannot provision the super admin: the SUPER_ADMIN role is missing. Run the migrations/seed for roles first.',
+        );
+        return;
+      }
+
+      const [created] = await this.db
+        .insert(admins)
+        .values({
+          email,
+          name: 'Super Admin',
+          mobile,
+          status: 'Active',
+          passwordHash: 'disabled:no-password-sign-in',
+        })
+        .onConflictDoNothing({ target: admins.email })
+        .returning({ id: admins.id });
+
+      const adminId =
+        created?.id ??
+        (
+          await this.db
+            .select({ id: admins.id })
+            .from(admins)
+            .where(eq(admins.email, email))
+            .limit(1)
+        )[0]?.id;
+
+      if (!adminId) {
+        this.logger.error('Could not resolve the super-admin row after provisioning.');
+        return;
+      }
+
+      await this.db.insert(adminRoles).values({ adminId, roleId: role.id }).onConflictDoNothing();
+
+      this.logger.log(
+        `Provisioned super admin ${email} (${maskMobile(mobile)}) with the SUPER_ADMIN role — sign-in enabled.`,
+      );
+    } catch (err) {
+      this.logger.error(`Could not provision the super admin: ${(err as Error).message}`);
     }
   }
 
