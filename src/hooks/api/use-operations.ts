@@ -72,7 +72,11 @@ export function useTerminateImpersonation() {
 
 /* ------------------------------------------------------------ announcements */
 
-export type AnnouncementListParams = { limit?: number; offset?: number; status?: string };
+export type AnnouncementListParams = {
+  limit?: number | undefined;
+  offset?: number | undefined;
+  status?: string | undefined;
+};
 
 export function useAnnouncements(params: AnnouncementListParams) {
   const limit = params.limit ?? 25;

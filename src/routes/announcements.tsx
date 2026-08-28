@@ -1,127 +1,143 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Megaphone } from "lucide-react";
+import { Send, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { DataTable, type Column } from "@/components/admin/data-table";
-import { KpiCard, PageHeader, StatusBadge } from "@/components/admin/primitives";
+import { PageHeader, StatusBadge } from "@/components/admin/primitives";
 import { Button } from "@/components/ui/button";
+import type { Announcement } from "@/hooks/api/types";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { announcements } from "@/lib/travelo-data";
+  useAnnouncements,
+  useDeleteAnnouncement,
+  usePublishAnnouncement,
+} from "@/hooks/api/use-operations";
+import { errorMessage } from "@/lib/api";
+import { formatDateTime, humanise } from "@/lib/format";
 
 export const Route = createFileRoute("/announcements")({
   head: () => ({
     meta: [
-      { title: "Announcements · Travelo Super Admin" },
-      { name: "description", content: "Broadcast maintenance windows, feature launches and policy updates to hotel owners and staff." },
-      { property: "og:title", content: "Announcements · Travelo Super Admin" },
-      { property: "og:description", content: "Platform-wide announcements and broadcasts." },
+      { title: "Announcements · Tavelo Super Admin" },
+      { name: "description", content: "Platform-wide announcements targeted at owners and hotels." },
     ],
   }),
   component: AnnouncementsPage,
 });
 
-type Announcement = (typeof announcements)[number];
+const STATUSES = ["", "DRAFT", "SCHEDULED", "PUBLISHED", "EXPIRED"];
+const LIMIT = 25;
 
 function AnnouncementsPage() {
+  const [status, setStatus] = useState("");
+  const [offset, setOffset] = useState(0);
+
+  const query = useAnnouncements({ limit: LIMIT, offset, status: status || undefined });
+  const publish = usePublishAnnouncement();
+  const remove = useDeleteAnnouncement();
+  const page = query.data;
+
   const columns: Column<Announcement>[] = [
-    { key: "title", header: "Announcement", sortValue: (a) => a.title, cell: (a) => <span className="font-semibold">{a.title}</span> },
-    { key: "audience", header: "Audience", cell: (a) => <span className="text-muted-foreground">{a.audience}</span> },
-    { key: "channels", header: "Channels", cell: (a) => <span className="text-muted-foreground">{a.channels}</span> },
-    { key: "priority", header: "Priority", cell: (a) => <span className={a.priority === "Critical" ? "font-semibold text-destructive" : a.priority === "High" ? "font-semibold text-warning" : ""}>{a.priority}</span> },
-    { key: "sent", header: "Schedule", cell: (a) => <span className="tnum">{a.sent}</span> },
-    { key: "status", header: "Status", cell: (a) => <StatusBadge status={a.status} /> },
+    {
+      key: "title",
+      header: "Announcement",
+      cell: (row) => (
+        <div className="min-w-0">
+          <div className="truncate font-medium text-foreground">{row.title}</div>
+          <div className="line-clamp-1 text-xs text-muted-foreground">{row.message}</div>
+        </div>
+      ),
+    },
+    { key: "status", header: "Status", cell: (row) => <StatusBadge status={row.status} /> },
+    {
+      key: "priority",
+      header: "Priority",
+      cell: (row) => <span className="text-muted-foreground">{humanise(row.priority)}</span>,
+    },
+    {
+      key: "scheduled",
+      header: "Scheduled",
+      cell: (row) => (
+        <span className="text-muted-foreground">{formatDateTime(row.scheduledAt)}</span>
+      ),
+    },
+    {
+      key: "published",
+      header: "Published",
+      cell: (row) => (
+        <span className="text-muted-foreground">{formatDateTime(row.publishedAt)}</span>
+      ),
+    },
   ];
 
   return (
-    <>
+    <div className="space-y-5">
       <PageHeader
-        eyebrow="Support"
         title="Announcements"
-        description="Broadcasts to owners and hotel staff, targeted by plan, region or property."
-        breadcrumbs={[{ label: "Super Admin", to: "/" }, { label: "Announcements" }]}
-        actions={<ComposeDialog />}
+        description="Broadcast platform news to every owner, or to a selected audience."
       />
-      <div className="space-y-4 p-4 lg:p-6">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <KpiCard label="Published (30d)" value="6" delta="+2" />
-          <KpiCard label="Scheduled" value="1" hint="02 Sep maintenance" />
-          <KpiCard label="Average open rate" value="72%" delta="+5 pts" />
-          <KpiCard label="Recipients reached" value="4,782" delta="+312" />
-        </div>
-        <DataTable
-          rows={announcements}
-          columns={columns}
-          rowKey={(a) => a.title}
-          searchKeys={(a) => `${a.title} ${a.audience}`}
-          searchPlaceholder="Search announcements…"
-          exportName="Announcements"
-          emptyTitle="No announcements"
-          emptyDescription="Compose a broadcast to reach owners and hotel staff."
-        />
-      </div>
-    </>
-  );
-}
 
-function ComposeDialog() {
-  const [open, setOpen] = useState(false);
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" className="h-8">
-          <Megaphone aria-hidden className="mr-1.5 size-3.5" /> New announcement
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Compose announcement</DialogTitle>
-          <DialogDescription>Delivered in-app and via the channels you select.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="ann-title">Title</Label>
-            <Input id="ann-title" placeholder="Scheduled maintenance — 02 Sep" />
+      <DataTable
+        rows={page?.items ?? []}
+        columns={columns}
+        rowKey={(row) => row.id}
+        loading={query.isLoading}
+        error={query.error}
+        onRetry={() => void query.refetch()}
+        emptyTitle="No announcements"
+        emptyDescription="Create an announcement to notify owners about platform changes."
+        rowActions={(row) => (
+          <div className="flex gap-1.5">
+            {row.status !== "PUBLISHED" && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={publish.isPending}
+                onClick={() =>
+                  publish.mutate(row.id, {
+                    onSuccess: () => toast.success("Announcement published"),
+                    onError: (error) => toast.error(errorMessage(error)),
+                  })
+                }
+              >
+                <Send className="mr-1.5 size-3.5" />
+                Publish
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={remove.isPending}
+              onClick={() =>
+                remove.mutate(row.id, {
+                  onSuccess: () => toast.success("Announcement deleted"),
+                  onError: (error) => toast.error(errorMessage(error)),
+                })
+              }
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="ann-body">Message</Label>
-            <Textarea id="ann-body" rows={4} placeholder="What owners need to know…" />
+        )}
+        toolbar={
+          <div className="flex flex-wrap gap-1.5">
+            {STATUSES.map((value) => (
+              <Button
+                key={value || "all"}
+                size="sm"
+                variant={status === value ? "default" : "outline"}
+                onClick={() => {
+                  setStatus(value);
+                  setOffset(0);
+                }}
+              >
+                {value ? humanise(value) : "All"}
+              </Button>
+            ))}
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="ann-audience">Audience</Label>
-              <Select defaultValue="all">
-                <SelectTrigger id="ann-audience" className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All owners</SelectItem>
-                  <SelectItem value="plan">By plan</SelectItem>
-                  <SelectItem value="region">By region</SelectItem>
-                  <SelectItem value="selected">Selected hotels</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="ann-priority">Priority</Label>
-              <Select defaultValue="Normal">
-                <SelectTrigger id="ann-priority" className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {["Critical", "High", "Normal", "Low"].map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => { setOpen(false); toast.success("Saved as draft"); }}>Save draft</Button>
-          <Button onClick={() => { setOpen(false); toast.success("Announcement published"); }}>Publish now</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        }
+        pagination={{ total: page?.total ?? 0, limit: LIMIT, offset, onOffsetChange: setOffset }}
+      />
+    </div>
   );
 }

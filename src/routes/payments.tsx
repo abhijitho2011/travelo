@@ -1,53 +1,158 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { MoreHorizontal } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { DataTable, type Column } from "@/components/admin/data-table";
-import { KpiCard, MetricRow, PageHeader, StatusBadge } from "@/components/admin/primitives";
+import { StatusFilter, ToolbarActions } from "@/components/admin/list-toolbar";
+import { PageHeader, StatusBadge } from "@/components/admin/primitives";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { inr, payments } from "@/lib/travelo-data";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import type { Payment } from "@/hooks/api/types";
+import { usePayments, useRefundPayment } from "@/hooks/api/use-billing";
+import { useListParams } from "@/hooks/use-list-params";
+import { errorMessage } from "@/lib/api";
+import { formatDateTime, humanise, inr } from "@/lib/format";
 
 export const Route = createFileRoute("/payments")({
   head: () => ({
     meta: [
-      { title: "Payments · Travelo Super Admin" },
-      { name: "description", content: "Monitor successful, failed, pending and refunded subscription payments across all hotel owners." },
-      { property: "og:title", content: "Payments · Travelo Super Admin" },
-      { property: "og:description", content: "Payment monitoring, retries and refunds for Travelo subscriptions." },
+      { title: "Payments · Tavelo Super Admin" },
+      { name: "description", content: "Subscription payments, failures and refunds." },
     ],
   }),
   component: PaymentsPage,
 });
 
-type Payment = (typeof payments)[number];
+const PAYMENT_STATUSES = [
+  "SUCCESS",
+  "PENDING",
+  "FAILED",
+  "REFUNDED",
+  "PARTIALLY_REFUNDED",
+];
+
+function RefundDialog({ payment }: { payment: Payment }) {
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState(String(payment.amount / 100));
+  const [reason, setReason] = useState("");
+  const refund = useRefundPayment();
+
+  const minorUnits = Math.round(Number(amount) * 100);
+  const invalid = !(minorUnits >= 1 && minorUnits <= payment.amount) || reason.trim().length < 4;
+
+  const submit = async () => {
+    try {
+      await refund.mutateAsync({ id: payment.id, amount: minorUnits, reason: reason.trim() });
+      toast.success("Refund created", {
+        description: `${inr(minorUnits)} queued for ${payment.owner ?? "the owner"}.`,
+      });
+      setOpen(false);
+      setReason("");
+    } catch (error) {
+      toast.error("Could not refund payment", { description: errorMessage(error) });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-7 text-xs">
+          Refund
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Refund payment</DialogTitle>
+          <DialogDescription>
+            Original charge {inr(payment.amount)} · {payment.provider ?? "unknown provider"}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="refund-amount">Refund amount (₹)</Label>
+            <Input
+              id="refund-amount"
+              type="number"
+              min={0.01}
+              step="0.01"
+              max={payment.amount / 100}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="refund-reason">Reason (recorded in audit log)</Label>
+            <Textarea
+              id="refund-reason"
+              rows={2}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button disabled={invalid || refund.isPending} onClick={() => void submit()}>
+            {refund.isPending && <Loader2 aria-hidden className="mr-2 size-4 animate-spin" />}
+            Issue refund
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function PaymentsPage() {
-  const [status, setStatus] = useState("all");
-  const [detail, setDetail] = useState<Payment | null>(null);
-  const rows = payments.filter((p) => status === "all" || p.status === status);
+  const list = useListParams();
+  const query = usePayments({
+    limit: list.limit,
+    offset: list.offset,
+    status: list.statusParam,
+  });
 
   const columns: Column<Payment>[] = [
-    { key: "id", header: "Payment ID", cell: (p) => <span className="tnum font-semibold">{p.id}</span> },
     {
-      key: "owner", header: "Owner", sortValue: (p) => p.owner,
+      key: "owner",
+      header: "Owner",
+      cell: (p) =>
+        p.ownerId ? (
+          <Link
+            to="/owners/$ownerId"
+            params={{ ownerId: p.ownerId }}
+            className="font-medium text-primary hover:underline"
+          >
+            {p.owner ?? p.ownerId}
+          </Link>
+        ) : (
+          (p.owner ?? "—")
+        ),
+    },
+    { key: "amount", header: "Amount", align: "right", cell: (p) => inr(p.amount) },
+    { key: "status", header: "Status", cell: (p) => <StatusBadge status={p.status} /> },
+    { key: "provider", header: "Provider", cell: (p) => p.provider ?? "—" },
+    { key: "method", header: "Method", cell: (p) => humanise(p.method) },
+    {
+      key: "failure",
+      header: "Failure reason",
       cell: (p) => (
-        <Link to="/owners/$ownerId" params={{ ownerId: p.ownerId }} onClick={(e) => e.stopPropagation()} className="hover:text-primary hover:underline">
-          {p.owner}
-        </Link>
+        <span className="text-xs text-muted-foreground">{p.failureReason ?? "—"}</span>
       ),
     },
-    { key: "plan", header: "Plan", optional: true, cell: (p) => <span className="text-muted-foreground">{p.plan}</span> },
-    { key: "amount", header: "Amount", align: "right", sortValue: (p) => p.amount, cell: (p) => <span className="tnum font-semibold">{inr(p.amount)}</span> },
-    { key: "method", header: "Method", cell: (p) => <span className="text-muted-foreground">{p.method}</span> },
-    { key: "date", header: "Date", sortValue: (p) => p.date, cell: (p) => <span className="tnum">{p.date}</span> },
-    { key: "status", header: "Status", cell: (p) => <StatusBadge status={p.status} /> },
+    { key: "created", header: "Date", cell: (p) => formatDateTime(p.createdAt) },
   ];
 
   return (
@@ -55,92 +160,45 @@ function PaymentsPage() {
       <PageHeader
         eyebrow="Monetization"
         title="Payments"
-        description="Every subscription charge with retry, refund and reconciliation controls."
-        breadcrumbs={[{ label: "Super Admin", to: "/" }, { label: "Payments" }]}
+        description="Every subscription charge, its outcome and refund state."
       />
-      <div className="space-y-4 p-4 lg:p-6">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <KpiCard label="Collected (MTD)" value="₹48.2L" delta="+9.1%" hint="vs last month" />
-          <KpiCard label="Successful" value="126" delta="+14" />
-          <KpiCard label="Failed" value="3" trend="down" delta="₹1.9L blocked" />
-          <KpiCard label="Refunded" value="₹45,000" trend="down" delta="1 payment" />
-        </div>
-
+      <div className="p-5 lg:p-6">
         <DataTable
-          rows={rows}
+          rows={query.data?.items ?? []}
           columns={columns}
           rowKey={(p) => p.id}
-          searchKeys={(p) => `${p.id} ${p.owner} ${p.method}`}
-          searchPlaceholder="Search payment ID, owner or method…"
-          exportName="Payments"
-          onRowClick={(p) => setDetail(p)}
-          filters={
-            <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger className="h-8 w-[170px] text-sm" aria-label="Filter by payment status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="Successful">Successful</SelectItem>
-                <SelectItem value="Failed">Failed</SelectItem>
-                <SelectItem value="Pending">Pending</SelectItem>
-                <SelectItem value="Refunded">Refunded</SelectItem>
-              </SelectContent>
-            </Select>
+          loading={query.isLoading}
+          error={query.error}
+          onRetry={() => query.refetch()}
+          rowActions={(p) =>
+            p.status === "SUCCESS" || p.status === "PARTIALLY_REFUNDED" ? (
+              <RefundDialog payment={p} />
+            ) : null
           }
-          rowActions={(p) => (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="size-7" aria-label={`Actions for ${p.id}`}>
-                  <MoreHorizontal aria-hidden className="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setDetail(p)}>View details</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => toast.success(`Retry initiated for ${p.id}`)}>Retry charge</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => toast.success("Receipt emailed to owner")}>Send receipt</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          emptyTitle="No payments found"
-          emptyDescription="Adjust the status filter to see other payment activity."
+          emptyTitle="No payments match this view"
+          emptyDescription="Change the status filter, or wait for the first charge to settle."
+          pagination={{
+            total: query.data?.total ?? 0,
+            limit: list.limit,
+            offset: list.offset,
+            onOffsetChange: list.setOffset,
+          }}
+          toolbar={
+            <>
+              <StatusFilter
+                value={list.status}
+                onChange={list.setStatus}
+                options={PAYMENT_STATUSES}
+              />
+              <ToolbarActions>
+                <span className="tnum text-xs text-muted-foreground">
+                  {query.data?.total ?? 0} total
+                </span>
+              </ToolbarActions>
+            </>
+          }
         />
       </div>
-
-      <Sheet open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
-        <SheetContent className="w-full sm:max-w-md">
-          {detail && (
-            <>
-              <SheetHeader>
-                <SheetTitle>{detail.id}</SheetTitle>
-                <SheetDescription>{detail.owner} · {detail.plan}</SheetDescription>
-              </SheetHeader>
-              <div className="mt-4 space-y-4">
-                <StatusBadge status={detail.status} />
-                <dl>
-                  <MetricRow label="Amount" value={inr(detail.amount)} />
-                  <MetricRow label="Tax (18% GST)" value={inr(Math.round(detail.amount * 0.18))} />
-                  <MetricRow label="Method" value={detail.method} />
-                  <MetricRow label="Date" value={detail.date} />
-                  <MetricRow label="Gateway" value="Razorpay" />
-                  <MetricRow label="Gateway reference" value={`rzp_${detail.id.toLowerCase()}`} />
-                </dl>
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" className="h-8" onClick={() => toast.success(`Retry initiated for ${detail.id}`)}>Retry charge</Button>
-                  <Button variant="outline" size="sm" className="h-8" onClick={() => toast.success("Receipt emailed")}>Send receipt</Button>
-                  <ConfirmDialog
-                    trigger={<Button variant="outline" size="sm" className="h-8 text-destructive">Issue refund</Button>}
-                    title={`Refund ${inr(detail.amount)} to ${detail.owner}?`}
-                    description="Refunds are irreversible and are reported in the finance ledger."
-                    impact={["Gateway refund initiated", "Invoice marked as credited", "Owner notified by email"]}
-                    confirmLabel="Issue refund"
-                  />
-                </div>
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
     </>
   );
 }

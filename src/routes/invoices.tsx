@@ -1,59 +1,116 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Download, Send } from "lucide-react";
-import { useState } from "react";
 import { toast } from "sonner";
 
 import { DataTable, type Column } from "@/components/admin/data-table";
-import { KpiCard, PageHeader, StatusBadge } from "@/components/admin/primitives";
+import { StatusFilter, ToolbarActions } from "@/components/admin/list-toolbar";
+import { PageHeader, StatusBadge } from "@/components/admin/primitives";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { inr, invoices } from "@/lib/travelo-data";
+import type { Invoice } from "@/hooks/api/types";
+import { useInvoiceAction, useInvoices, type InvoiceAction } from "@/hooks/api/use-billing";
+import { useListParams } from "@/hooks/use-list-params";
+import { errorMessage } from "@/lib/api";
+import { formatDate, inr } from "@/lib/format";
 
 export const Route = createFileRoute("/invoices")({
   head: () => ({
     meta: [
-      { title: "Invoices · Travelo Super Admin" },
-      { name: "description", content: "GST-compliant subscription invoices with status, dues and bulk export for finance reconciliation." },
-      { property: "og:title", content: "Invoices · Travelo Super Admin" },
-      { property: "og:description", content: "Invoice register for all Travelo hotel owners." },
+      { title: "Invoices · Tavelo Super Admin" },
+      { name: "description", content: "Draft, issued, paid and cancelled subscription invoices." },
     ],
   }),
   component: InvoicesPage,
 });
 
-type Invoice = (typeof invoices)[number];
+const INVOICE_STATUSES = ["DRAFT", "ISSUED", "PAID", "CANCELLED", "OVERDUE"];
+
+function InvoiceActions({ invoice }: { invoice: Invoice }) {
+  const action = useInvoiceAction();
+
+  const run = async (name: InvoiceAction, label: string) => {
+    try {
+      await action.mutateAsync({ id: invoice.id, action: name });
+      toast.success(label, { description: `Invoice ${invoice.invoiceNumber} updated.` });
+    } catch (error) {
+      toast.error("Could not update invoice", { description: errorMessage(error) });
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-end gap-1">
+      {invoice.status === "DRAFT" && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs"
+          disabled={action.isPending}
+          onClick={() => void run("issue", "Invoice issued")}
+        >
+          Issue
+        </Button>
+      )}
+      {invoice.status !== "PAID" && invoice.status !== "CANCELLED" && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs"
+          disabled={action.isPending}
+          onClick={() => void run("mark-paid", "Invoice marked paid")}
+        >
+          Mark paid
+        </Button>
+      )}
+      {invoice.status !== "CANCELLED" && invoice.status !== "PAID" && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs text-destructive"
+          disabled={action.isPending}
+          onClick={() => void run("cancel", "Invoice cancelled")}
+        >
+          Cancel
+        </Button>
+      )}
+    </div>
+  );
+}
 
 function InvoicesPage() {
-  const [status, setStatus] = useState("all");
-  const rows = invoices.filter((i) => status === "all" || i.status === status);
+  const list = useListParams();
+  const query = useInvoices({
+    limit: list.limit,
+    offset: list.offset,
+    status: list.statusParam,
+  });
 
   const columns: Column<Invoice>[] = [
-    { key: "id", header: "Invoice", cell: (i) => <span className="tnum font-semibold">{i.id}</span> },
     {
-      key: "owner", header: "Owner", sortValue: (i) => i.owner,
+      key: "number",
+      header: "Invoice",
+      cell: (i) => <span className="font-mono text-xs font-semibold">{i.invoiceNumber}</span>,
+    },
+    {
+      key: "owner",
+      header: "Owner",
       cell: (i) => (
-        <Link to="/owners/$ownerId" params={{ ownerId: i.ownerId }} className="hover:text-primary hover:underline">{i.owner}</Link>
+        <Link
+          to="/owners/$ownerId"
+          params={{ ownerId: i.ownerId }}
+          className="text-primary hover:underline"
+        >
+          {i.owner ?? i.ownerId}
+        </Link>
       ),
     },
-    { key: "period", header: "Billing period", optional: true, cell: (i) => <span className="text-muted-foreground">{i.period}</span> },
-    { key: "amount", header: "Subtotal", align: "right", sortValue: (i) => i.amount, cell: (i) => <span className="tnum">{inr(i.amount)}</span> },
-    { key: "tax", header: "GST", align: "right", optional: true, cell: (i) => <span className="tnum text-muted-foreground">{inr(i.tax)}</span> },
-    { key: "total", header: "Total", align: "right", sortValue: (i) => i.total, cell: (i) => <span className="tnum font-semibold">{inr(i.total)}</span> },
-    { key: "due", header: "Due date", sortValue: (i) => i.due, cell: (i) => <span className="tnum">{i.due}</span> },
+    {
+      key: "period",
+      header: "Billing period",
+      cell: (i) => `${formatDate(i.billingPeriodStart)} → ${formatDate(i.billingPeriodEnd)}`,
+    },
+    { key: "subtotal", header: "Subtotal", align: "right", cell: (i) => inr(i.subtotal) },
+    { key: "tax", header: "Tax", align: "right", cell: (i) => inr(i.tax) },
+    { key: "total", header: "Total", align: "right", cell: (i) => inr(i.total) },
     { key: "status", header: "Status", cell: (i) => <StatusBadge status={i.status} /> },
-    {
-      key: "actions", header: "",
-      cell: (i) => (
-        <span className="flex justify-end gap-1">
-          <Button variant="ghost" size="icon" className="size-7" aria-label={`Download ${i.id}`} onClick={() => toast.success(`${i.id}.pdf downloaded`)}>
-            <Download aria-hidden className="size-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="size-7" aria-label={`Email ${i.id}`} onClick={() => toast.success(`${i.id} emailed to ${i.owner}`)}>
-            <Send aria-hidden className="size-4" />
-          </Button>
-        </span>
-      ),
-    },
+    { key: "due", header: "Due", cell: (i) => formatDate(i.dueDate) },
   ];
 
   return (
@@ -61,44 +118,39 @@ function InvoicesPage() {
       <PageHeader
         eyebrow="Monetization"
         title="Invoices"
-        description="GST-compliant invoice register with dues tracking and finance-ready exports."
-        breadcrumbs={[{ label: "Super Admin", to: "/" }, { label: "Invoices" }]}
-        actions={
-          <Button variant="outline" size="sm" className="h-8" onClick={() => toast.success("Export queued", { description: "A CSV of the current view will download shortly." })}>
-            <Download aria-hidden className="mr-1.5 size-3.5" /> Export ledger
-          </Button>
-        }
+        description="Issue, settle or cancel subscription invoices."
       />
-      <div className="space-y-4 p-4 lg:p-6">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <KpiCard label="Invoiced (MTD)" value="₹52.9L" delta="+7.8%" />
-          <KpiCard label="Paid" value="₹45.4L" delta="86% collection" />
-          <KpiCard label="Pending" value="₹6.4L" hint="within terms" />
-          <KpiCard label="Overdue" value="₹1.1L" trend="down" delta="4 invoices" />
-        </div>
-
+      <div className="p-5 lg:p-6">
         <DataTable
-          rows={rows}
+          rows={query.data?.items ?? []}
           columns={columns}
           rowKey={(i) => i.id}
-          searchKeys={(i) => `${i.id} ${i.owner}`}
-          searchPlaceholder="Search invoice or owner…"
-          exportName="Invoices"
-          filters={
-            <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger className="h-8 w-[160px] text-sm" aria-label="Filter by invoice status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="Paid">Paid</SelectItem>
-                <SelectItem value="Pending">Pending</SelectItem>
-                <SelectItem value="Overdue">Overdue</SelectItem>
-              </SelectContent>
-            </Select>
+          loading={query.isLoading}
+          error={query.error}
+          onRetry={() => query.refetch()}
+          rowActions={(i) => <InvoiceActions invoice={i} />}
+          emptyTitle="No invoices match this view"
+          emptyDescription="Invoices appear once a billing period closes for a subscription."
+          pagination={{
+            total: query.data?.total ?? 0,
+            limit: list.limit,
+            offset: list.offset,
+            onOffsetChange: list.setOffset,
+          }}
+          toolbar={
+            <>
+              <StatusFilter
+                value={list.status}
+                onChange={list.setStatus}
+                options={INVOICE_STATUSES}
+              />
+              <ToolbarActions>
+                <span className="tnum text-xs text-muted-foreground">
+                  {query.data?.total ?? 0} total
+                </span>
+              </ToolbarActions>
+            </>
           }
-          emptyTitle="No invoices found"
-          emptyDescription="Invoices are generated automatically on each billing cycle."
         />
       </div>
     </>
