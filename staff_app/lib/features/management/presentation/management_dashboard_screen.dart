@@ -13,6 +13,8 @@ import '../../../core/widgets/cards.dart';
 import '../../../core/widgets/primitives.dart';
 import '../../../core/widgets/states.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../reception/application/reception_controllers.dart';
+import '../../reception/data/reception_models.dart';
 import '../application/management_controllers.dart';
 import '../data/management_models.dart';
 
@@ -29,11 +31,13 @@ class ManagementDashboardScreen extends ConsumerWidget {
     final c = context.colors;
     final session = ref.watch(sessionProvider);
     final overview = ref.watch(managementOverviewProvider);
+    final live = ref.watch(gmDashboardProvider);
     final approvals = ref.watch(approvalsProvider);
 
     return PageBody(
       onRefresh: () async {
         ref.invalidate(managementOverviewProvider);
+        ref.invalidate(gmDashboardProvider);
         await ref.read(approvalsProvider.notifier).refresh();
       },
       children: [
@@ -65,13 +69,27 @@ class ManagementDashboardScreen extends ConsumerWidget {
         ),
         gapSection,
 
-        overview.when(
+        // The real figures, straight off `GET /dashboard`. The legacy overview
+        // feed below still carries the alert cards, so the two coexist rather
+        // than one replacing the other wholesale.
+        live.when(
           loading: () => const KpiSkeleton(count: 6),
+          error: (e, _) => ErrorState(
+            error: e,
+            onRetry: () => ref.invalidate(gmDashboardProvider),
+          ),
+          data: (data) =>
+              data == null ? const SizedBox.shrink() : _LiveFigures(data: data),
+        ),
+
+        overview.when(
+          loading: () => const SizedBox.shrink(),
           error: (e, _) => ErrorState(
             error: e,
             onRetry: () => ref.invalidate(managementOverviewProvider),
           ),
-          data: (data) => _Overview(data: data),
+          data: (data) =>
+              _Overview(data: data, hasLiveFigures: live.value != null),
         ),
 
         gapSection,
@@ -149,14 +167,78 @@ class ManagementDashboardScreen extends ConsumerWidget {
   };
 }
 
+/// The GM tiles that come from the booking engine itself. Every number here is
+/// from one request, so occupancy and the room breakdown behind it can never
+/// disagree.
+class _LiveFigures extends ConsumerWidget {
+  const _LiveFigures({required this.data});
+
+  final GmDashboard data;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final rooms = data.rooms;
+    return KpiGrid(
+      children: [
+        KpiCard(
+          label: 'Occupancy',
+          value: Fmt.percent(data.occupancy),
+          hint: '${rooms.occupied} of ${rooms.total} rooms',
+        ),
+        KpiCard(
+          label: 'Arrivals',
+          value: Fmt.count(data.arrivalsToday),
+          hint: 'today',
+        ),
+        KpiCard(
+          label: 'Departures',
+          value: Fmt.count(data.departuresToday),
+          hint: 'today',
+        ),
+        KpiCard(label: 'In-house', value: Fmt.count(data.inHouse)),
+        KpiCard(
+          label: 'Rooms free',
+          value: Fmt.count(rooms.available),
+          hint: 'ready to sell',
+        ),
+        KpiCard(
+          label: 'Needs cleaning',
+          value: Fmt.count(rooms.dirty),
+          hint: rooms.maintenance == 0
+              ? null
+              : '${rooms.maintenance} out of service',
+        ),
+        // Month revenue is the one figure on this screen an AGM may not hold
+        // the key for, so it is gated at the tile rather than the page.
+        if (ref.watch(canProvider(P.revenueRead)))
+          KpiCard(
+            label: 'Revenue this month',
+            value: data.monthRevenueLabel,
+            hint: 'booked, approximate',
+          ),
+        KpiCard(
+          label: 'Awaiting approval',
+          value: Fmt.count(data.pendingApprovals),
+          hint: 'staff accounts',
+        ),
+      ],
+    );
+  }
+}
+
 class _Overview extends ConsumerWidget {
-  const _Overview({required this.data});
+  const _Overview({required this.data, this.hasLiveFigures = false});
 
   final ManagementOverview data;
+
+  /// When the real dashboard answered, an empty legacy feed is not news — the
+  /// screen already has its numbers and must not shout that it has none.
+  final bool hasLiveFigures;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (data.isEmpty) {
+      if (hasLiveFigures) return const SizedBox.shrink();
       return const EmptyState(
         title: 'Live figures are not available yet',
         hint:
@@ -172,7 +254,10 @@ class _Overview extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (s != null)
+        // The legacy snapshot repeats occupancy, arrivals and departures. When
+        // the real dashboard answered, showing both would print two versions
+        // of the same number a few pixels apart.
+        if (s != null && !hasLiveFigures)
           KpiGrid(
             children: [
               KpiCard(

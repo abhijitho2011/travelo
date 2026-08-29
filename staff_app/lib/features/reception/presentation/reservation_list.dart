@@ -6,13 +6,12 @@ import '../../../core/permissions/permission_gate.dart';
 import '../../../core/permissions/permission_keys.dart';
 import '../../../core/routing/routes.dart';
 import '../../../core/theme/app_spacing.dart';
-import '../../../core/utils/formatting.dart';
 import '../../../core/widgets/cards.dart';
 import '../../../core/widgets/states.dart';
 import '../data/reception_models.dart';
 
-/// Shared renderer for a list of bookings — used by the desk dashboard and by
-/// the full bookings screen so the two never drift apart.
+/// Shared renderer for a list of bookings — used by the desk board and by the
+/// full bookings screen so the two never drift apart.
 class ReservationList extends ConsumerWidget {
   const ReservationList({
     super.key,
@@ -42,32 +41,18 @@ class ReservationList extends ConsumerWidget {
             padding: const EdgeInsets.only(bottom: Sp.md),
             child: ReservationCard(
               guestName: r.guestName,
-              vip: r.vip,
-              reference: r.reference,
-              stay: _stayLine(r),
+              reference: r.reservationNumber,
+              stay: r.stayLine,
               statusLabel: r.status.label,
-              statusTone: r.status.tone,
-              roomLabel: r.roomAssigned ? 'Room ${r.roomNumber}' : 'No room',
-              balanceLabel: (r.balance ?? 0) > 0
-                  ? '${Fmt.money(r.balance)} due'
-                  : null,
+              statusTone: r.tone,
+              roomLabel: r.roomLabel,
+              balanceLabel: r.balancePaise > 0 ? '${r.balanceLabel} due' : null,
               onTap: () => context.go(Routes.reservation(r.id)),
               actions: _RowActions(reservation: r),
             ),
           ),
       ],
     );
-  }
-
-  static String _stayLine(Reservation r) {
-    final parts = <String>[
-      if (r.roomType != null) r.roomType!,
-      if (r.nights != null) '${r.nights}N',
-      if (r.checkIn != null) Fmt.dayMonth(r.checkIn),
-      if (r.eta != null) 'ETA ${r.eta}',
-      if (r.source != null) r.source!,
-    ];
-    return parts.isEmpty ? 'Booking' : parts.join(' · ');
   }
 }
 
@@ -89,7 +74,8 @@ class _RowActions extends ConsumerWidget {
         PermissionGate(
           permission: P.checkInPerform,
           child: FilledButton(
-            onPressed: () => context.go('${Routes.checkIn}?reservationId=${r.id}'),
+            onPressed: () =>
+                context.go('${Routes.checkIn}?reservationId=${r.id}'),
             child: const Text('Check in'),
           ),
         ),
@@ -101,7 +87,7 @@ class _RowActions extends ConsumerWidget {
             child: const Text('Check out'),
           ),
         ),
-      if (r.status.isOpen)
+      if (r.status.canCancel)
         PermissionGate(
           permission: P.reservationCancel,
           child: OutlinedButton(
