@@ -37,9 +37,14 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { RequestContextMiddleware } from './common/middleware/request-context.middleware';
 import { ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
+    // Drives the workers. Without it every worker class is dead code: nothing
+    // ever calls run(), so subscriptions never expire and queued notifications
+    // are never delivered.
+    ScheduleModule.forRoot(),
     AppConfigModule,
     LoggerModule.forRootAsync({
       inject: [ConfigService],

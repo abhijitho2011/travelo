@@ -17,6 +17,7 @@ import {
   type NotifyTarget,
 } from '../notifications/notification-delivery.service';
 import { inAppRecipient } from '../notifications/channels/channel.interface';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class SubscriptionLifecycleWorker {
@@ -326,9 +327,89 @@ export class ChannexSyncWorker {
   }
 }
 
+/**
+ * Actually runs the workers.
+ *
+ * Every worker class existed and was unit-tested, but nothing ever called
+ * `run()` — there was no scheduler, no cron and no queue processor anywhere in
+ * the app. So subscriptions never expired, `daily_platform_metrics` stayed
+ * empty, scheduled announcements never published, queued notifications were
+ * never delivered, and Channex never synced. All of it was dead code.
+ *
+ * Two guards make it safe to schedule aggressively:
+ *
+ *  - **No overlap.** Each tick is skipped while the previous one is still
+ *    running. A slow notification drain must not start a second drain that
+ *    sends the same rows twice.
+ *  - **No crash.** A worker that throws is logged and swallowed. One failing
+ *    worker must never stop the timer that drives all the others.
+ */
+@Injectable()
+export class WorkerSchedulerService {
+  private readonly logger = new Logger(WorkerSchedulerService.name);
+  private readonly running = new Set<string>();
+
+  constructor(
+    private readonly lifecycle: SubscriptionLifecycleWorker,
+    private readonly metrics: DailyMetricsAggregator,
+    private readonly announcements: AnnouncementPublisherWorker,
+    private readonly notifications: NotificationDispatchWorker,
+    private readonly channex: ChannexSyncWorker,
+  ) {}
+
+  /** Queued notifications are user-visible, so they drain often. */
+  @Cron(CronExpression.EVERY_MINUTE)
+  dispatchNotifications(): Promise<void> {
+    return this.guard('notifications', () => this.notifications.run());
+  }
+
+  /** Scheduled announcements should appear close to their stated time. */
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  publishAnnouncements(): Promise<void> {
+    return this.guard('announcements', () => this.announcements.run());
+  }
+
+  /** Channels expect inventory freshness in minutes. Inert unless configured. */
+  @Cron(CronExpression.EVERY_10_MINUTES)
+  syncChannex(): Promise<void> {
+    return this.guard('channex', () => this.channex.run());
+  }
+
+  /**
+   * Subscription state changes by the day, not the minute, but running hourly
+   * means a boot at any hour still catches up rather than waiting for midnight.
+   */
+  @Cron(CronExpression.EVERY_HOUR)
+  advanceSubscriptions(): Promise<void> {
+    return this.guard('subscriptions', () => this.lifecycle.run());
+  }
+
+  /** Yesterday's numbers, computed once the day is safely over. */
+  @Cron('15 0 * * *')
+  aggregateDailyMetrics(): Promise<void> {
+    return this.guard('metrics', () => this.metrics.run());
+  }
+
+  private async guard(name: string, run: () => Promise<unknown>): Promise<void> {
+    if (this.running.has(name)) {
+      this.logger.warn(`Skipping ${name}: the previous run has not finished`);
+      return;
+    }
+    this.running.add(name);
+    try {
+      await run();
+    } catch (err) {
+      this.logger.error(`Worker ${name} failed: ${(err as Error).message}`);
+    } finally {
+      this.running.delete(name);
+    }
+  }
+}
+
 @Module({
   imports: [IntegrationsModule, NotificationsModule],
   providers: [
+    WorkerSchedulerService,
     ChannexSyncWorker,
     SubscriptionLifecycleWorker,
     DailyMetricsAggregator,
