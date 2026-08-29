@@ -210,10 +210,7 @@ export class AdminMfaService {
           .select({ id: adminMfaRecoveryCodes.id })
           .from(adminMfaRecoveryCodes)
           .where(
-            and(
-              eq(adminMfaRecoveryCodes.adminId, adminId),
-              isNull(adminMfaRecoveryCodes.usedAt),
-            ),
+            and(eq(adminMfaRecoveryCodes.adminId, adminId), isNull(adminMfaRecoveryCodes.usedAt)),
           )
       : [];
     return {
@@ -326,9 +323,7 @@ export class AdminMfaService {
     const rows = await this.db
       .select()
       .from(adminMfaRecoveryCodes)
-      .where(
-        and(eq(adminMfaRecoveryCodes.adminId, adminId), isNull(adminMfaRecoveryCodes.usedAt)),
-      );
+      .where(and(eq(adminMfaRecoveryCodes.adminId, adminId), isNull(adminMfaRecoveryCodes.usedAt)));
     for (const row of rows) {
       let matches = false;
       try {

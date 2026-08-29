@@ -185,3 +185,92 @@ three surfaces read the same `hotel_staff` table: `GET /api/v1/owner/staff` and
 `GET /api/v1/admin/staff` / `POST /api/v1/admin/staff/:id/status`
 (`staff.manage`, audited as `staff.status.changed`) give the super admin
 platform-wide reach.
+
+---
+
+# Impersonation (Tavelo Support standing in an owner's shoes)
+
+`POST /api/v1/admin/impersonation` mints a token in a FOURTH family —
+issuer/audience `tavelo-impersonation`, signed with the admin access secret,
+~60 minute TTL — carrying `actorAdminId`, `targetUserId` and `sessionId`, and
+backed by a row in `impersonation_sessions`.
+
+## How an impersonated request is authorised
+
+`OwnerJwtGuard` recognises the token by its issuer, then hands it to
+`ImpersonationAccessService.authenticate()`, which:
+
+1. verifies signature + issuer + audience against `JWT_ACCESS_SECRET`;
+2. **re-reads the `impersonation_sessions` row on every single request** and
+   requires `status = 'ACTIVE'` with no `ended_at`;
+3. requires the row's `token_jti` to match the token's `jti`;
+4. requires `target_user_type = 'OWNER'`.
+
+Point 2 is the important one: `POST /api/v1/admin/impersonation/:id/terminate`
+takes effect on the support agent's **next request**, not when the token
+expires. Revocation is not deferred to token lifetime.
+
+## READ-ONLY — and why
+
+Impersonated requests may only use `GET` / `HEAD` / `OPTIONS`. Every
+state-changing verb is refused with a typed **`IMPERSONATION_READ_ONLY`**
+(HTTP 403) *in the guard*, before any controller runs.
+
+- A write made under impersonation is, to the customer, indistinguishable from
+  one they made themselves. "I never cancelled that booking" is an argument no
+  audit trail fully wins.
+- Support's job is to **diagnose** and then tell the customer what to do, or to
+  act through the admin console under their own admin identity — where the
+  permission model and the audit trail already name them as the actor.
+- It reduces a leaked impersonation token from a data-destruction incident to a
+  disclosure one.
+
+`WRITE_ALLOWLIST` in `src/modules/impersonation/impersonation-access.service.ts`
+is the escape hatch and is **deliberately empty**. Adding an entry is a security
+decision: narrowly scoped, idempotent, clearly support-owned, and reviewed as
+such. Do not widen it to unblock a support workflow — take that workflow to the
+admin console.
+
+## Dual-identity audit
+
+While serving an impersonated request the guard writes BOTH identities into the
+AsyncLocalStorage request context (`actorAdminId` + `adminId` + `adminEmail` =
+the real admin, `impersonatedUserId` + `impersonationSessionId` = the customer).
+`AuditService.record()` reads both, so every `audit_logs` row written during a
+support session names the employee who is responsible *and* the account whose
+data was touched. An ordinary owner request leaves `impersonated_user_id` null.
+
+## Client signal
+
+`GET /api/v1/owner/auth/me` adds an `impersonation: { active, byAdmin,
+byAdminEmail, sessionId, startedAt, readOnly }` block under a support session.
+The owner app renders a permanent banner from it and disables every write
+control, so the read-only rule is visible rather than a surprise at submit time.
+
+---
+
+# Admin TOTP MFA (opt-in)
+
+Per-admin, never mandatory. `admins.mfa_enabled` / `admins.mfa_secret` (which
+predated the feature) now carry it.
+
+- **Secret at rest**: AES-256-GCM, `v1:<iv>:<tag>:<ct>`, keyed by
+  `MFA_SECRET_KEY` (32 raw bytes, base64). With no usable key, **enrolment is
+  refused** with `MFA_NOT_CONFIGURED` — a plaintext TOTP secret is never stored.
+- **Enrol** `POST /api/v1/admin/profile/mfa/enroll` → `otpauth://` URI, an
+  inline data-URI QR, and 10 recovery codes returned **once** (argon2id hashes
+  in `admin_mfa_recovery_codes`). This does NOT switch MFA on.
+- **Verify** `POST /api/v1/admin/profile/mfa/verify` `{code}` → proves the
+  authenticator works, then flips `mfa_enabled`.
+- **Disable** `POST /api/v1/admin/profile/mfa/disable` `{code}` → requires a
+  live TOTP or an unused recovery code.
+
+## Login challenge
+
+When `mfa_enabled`, OTP-verify and Google sign-in **do not return tokens**. They
+return `{ mfaRequired: true, mfaToken }` — a 5-minute, single-purpose JWT under
+its own issuer/audience `tavelo-admin-mfa`, with no session behind it and no
+authority of its own. Only `POST /api/v1/admin/auth/mfa` `{ mfaToken, code }`
+exchanges it for a real session. A recovery code is accepted there too and is
+burned (`used_at`) so it can never be replayed. Repeated failures lock the
+challenge step for `MFA_LOCK_SECONDS` after `MFA_MAX_ATTEMPTS`.
