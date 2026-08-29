@@ -83,9 +83,7 @@ export class BsnlSmsProvider implements SmsProvider {
       Message_Type: 'TXN',
       Entity_Id: this.env.BSNL_ENTITY_ID,
       Content_Template_Id: templateId ?? this.env.BSNL_TEMPLATE_ID,
-      Template_Keys_and_Values: [
-        { Key: varKey ?? this.env.BSNL_TEMPLATE_VAR_KEY, Value: otp },
-      ],
+      Template_Keys_and_Values: [{ Key: varKey ?? this.env.BSNL_TEMPLATE_VAR_KEY, Value: otp }],
     };
     if (this.env.BSNL_SERVICE_ID) payload.Service_Id = this.env.BSNL_SERVICE_ID;
     return payload;

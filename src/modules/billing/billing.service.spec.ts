@@ -492,3 +492,60 @@ describe('invoice numbers stay unique', () => {
     expect(invNum.next).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('BillingService — notifying the owner cannot undo the money', () => {
+  it('enqueues payment.success after the commit, with the invoice number', async () => {
+    const { svc, notifications } = build({});
+    await svc.settleSuccessfulPayment({
+      ownerId: 'own-1',
+      subscriptionId: 'sub-1',
+      amountPaise: 250_000,
+      gateway: 'MANUAL',
+      source: 'manual',
+    });
+    const [req] = notifications.for('payment.success');
+    expect(req).toBeDefined();
+    expect(req.targets.map((t) => t.channel).sort()).toEqual(['EMAIL', 'IN_APP']);
+    expect(req.vars).toMatchObject({ invoiceNumber: 'INV-202608-000001', amount: '₹2500.00' });
+  });
+
+  it('still settles when the notification pipeline throws outright', async () => {
+    const db = mockDb({
+      select: {
+        subscriptions: [
+          [{ s: { id: 'sub-1', ownerId: 'own-1', currentPeriodEnd: new Date() }, p: PLAN }],
+        ],
+        owners: [[{ id: 'own-1', name: 'Asha', email: 'a@b.test' }]],
+      },
+      insert: {
+        invoices: [{ id: 'inv-1', invoiceNumber: 'INV-202608-000001' }],
+        payments: [{ id: 'pay-1' }],
+        subscription_events: [{ id: 'ev-1' }],
+      },
+      update: { payments: [{ id: 'pay-1' }] },
+    });
+    const exploding = {
+      notifyQuietly: async () => {
+        throw new Error('notification bus down');
+      },
+    };
+    const svc = new BillingService(
+      db as never,
+      mockAudit() as never,
+      { next: async () => 'INV-202608-000001' } as never,
+      { get: () => undefined } as never,
+      { getSignedUrl: async () => 'https://signed' } as never,
+      { generateQuietly: async () => undefined } as never,
+      { configured: false } as never,
+      exploding as never,
+    );
+    const result = await svc.settleSuccessfulPayment({
+      ownerId: 'own-1',
+      subscriptionId: 'sub-1',
+      amountPaise: 250_000,
+      gateway: 'MANUAL',
+      source: 'manual',
+    });
+    expect(result.invoice.id).toBe('inv-1');
+  });
+});

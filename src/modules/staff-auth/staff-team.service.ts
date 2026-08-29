@@ -1,7 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq, ilike, inArray, isNull, or, sql, SQL } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
-import { hotelStaff, properties, type HotelStaffRole, type HotelStaffStatus } from '../../database/schema';
+import {
+  hotelStaff,
+  properties,
+  type HotelStaffRole,
+  type HotelStaffStatus,
+} from '../../database/schema';
 import { NotificationDeliveryService } from '../notifications/notification-delivery.service';
 import { inAppRecipient } from '../notifications/channels/channel.interface';
 import { AuthenticatedStaff } from './current-staff.decorator';

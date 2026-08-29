@@ -184,7 +184,10 @@ export class NotificationDeliveryService {
    * A provider that throws costs that one row an attempt and nothing else: the
    * loop is per-row try/catch, so one broken channel can never stop the queue.
    */
-  async drain(limit = 50, now: Date = new Date()): Promise<{
+  async drain(
+    limit = 50,
+    now: Date = new Date(),
+  ): Promise<{
     processed: number;
     sent: number;
     failed: number;

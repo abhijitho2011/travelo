@@ -184,7 +184,9 @@ describe('StaffTeamService — cross-property access is a 404, not a 403', () =>
       (s: StaffTeamService) => s.remove(gm, 'x'),
     ]) {
       const db = makeDb([[]]);
-      await run(new StaffTeamService(db as never, mockNotifications() as never)).catch(() => undefined);
+      await run(new StaffTeamService(db as never, mockNotifications() as never)).catch(
+        () => undefined,
+      );
       expect(db.wheres[0]).toEqual(expect.arrayContaining(['id', 'property_id', 'deleted_at']));
     }
   });
@@ -200,9 +202,9 @@ describe('StaffTeamService — no self-service', () => {
       (s: StaffTeamService) => s.remove(gm, gm.id),
     ]) {
       const db = makeDb([[{ id: gm.id, status: 'PENDING_APPROVAL' }]]);
-      expect(await rejectionCode(run(new StaffTeamService(db as never, mockNotifications() as never)))).toBe(
-        'SELF_MODIFICATION_FORBIDDEN',
-      );
+      expect(
+        await rejectionCode(run(new StaffTeamService(db as never, mockNotifications() as never))),
+      ).toBe('SELF_MODIFICATION_FORBIDDEN');
       expect(db.updates).toEqual([]);
       expect(db.wheres).toEqual([]);
     }
@@ -269,7 +271,10 @@ describe('StaffTeamService — HR', () => {
 
   it('may create ordinary roles', async () => {
     const db = makeDb();
-    await new StaffTeamService(db as never, mockNotifications() as never).create(hr, validMember as never);
+    await new StaffTeamService(db as never, mockNotifications() as never).create(
+      hr,
+      validMember as never,
+    );
     expect(db.inserts[0]).toMatchObject({ role: 'RECEPTIONIST', propertyId: 'prop-A' });
   });
 
@@ -298,7 +303,11 @@ describe('StaffTeamService — HR', () => {
   it('may still block, suspend and deactivate — the restrictive moves', async () => {
     for (const status of ['BLOCKED', 'SUSPENDED', 'DEACTIVATED']) {
       const db = makeDb([[{ id: 'staff-2', status: 'ACTIVE', propertyId: 'prop-A' }]]);
-      await new StaffTeamService(db as never, mockNotifications() as never).setStatus(hr, 'staff-2', status);
+      await new StaffTeamService(db as never, mockNotifications() as never).setStatus(
+        hr,
+        'staff-2',
+        status,
+      );
       expect(db.updates[0]).toMatchObject({ status });
     }
   });
@@ -322,13 +331,19 @@ describe('StaffTeamService — HR', () => {
   // GM/AGM Approval Centre queries — so it surfaces there with no extra wiring.
   it('lands in the status the approval centre lists, and a GM can approve it', async () => {
     const db = makeDb();
-    await new StaffTeamService(db as never, mockNotifications() as never).create(hr, validMember as never);
+    await new StaffTeamService(db as never, mockNotifications() as never).create(
+      hr,
+      validMember as never,
+    );
     const created = db.inserts[0];
     expect(created.status).toBe('PENDING_APPROVAL');
 
     const gmDb = makeDb([[{ id: 'new-1', status: created.status, propertyId: 'prop-A' }]]);
     await expect(
-      new StaffTeamService(gmDb as never, mockNotifications() as never).approve(meAs('GENERAL_MANAGER'), 'new-1'),
+      new StaffTeamService(gmDb as never, mockNotifications() as never).approve(
+        meAs('GENERAL_MANAGER'),
+        'new-1',
+      ),
     ).resolves.toEqual({ id: 'new-1', status: 'ACTIVE' });
   });
 });
@@ -348,22 +363,31 @@ describe('StaffTeamService.create', () => {
 
   it('lower-cases the email so it matches Google sign-in', async () => {
     const db = makeDb();
-    await new StaffTeamService(db as never, mockNotifications() as never).create(meAs('GENERAL_MANAGER'), validMember as never);
+    await new StaffTeamService(db as never, mockNotifications() as never).create(
+      meAs('GENERAL_MANAGER'),
+      validMember as never,
+    );
     expect(db.inserts[0].email).toBe('asha@hotel.test');
   });
 
   it('creates as PENDING_APPROVAL by default', async () => {
     const db = makeDb();
-    await new StaffTeamService(db as never, mockNotifications() as never).create(meAs('GENERAL_MANAGER'), validMember as never);
+    await new StaffTeamService(db as never, mockNotifications() as never).create(
+      meAs('GENERAL_MANAGER'),
+      validMember as never,
+    );
     expect(db.inserts[0].status).toBe('PENDING_APPROVAL');
   });
 
   it('creates straight to ACTIVE only when the creator can approve AND asked to', async () => {
     const db = makeDb();
-    await new StaffTeamService(db as never, mockNotifications() as never).create(meAs('GENERAL_MANAGER'), {
-      ...validMember,
-      activate: true,
-    } as never);
+    await new StaffTeamService(db as never, mockNotifications() as never).create(
+      meAs('GENERAL_MANAGER'),
+      {
+        ...validMember,
+        activate: true,
+      } as never,
+    );
     expect(db.inserts[0].status).toBe('ACTIVE');
   });
 
@@ -383,7 +407,11 @@ describe('StaffTeamService.setStatus — activation is an approval', () => {
   it('lets a GM and an AGM reactivate, since both hold staff.approve', async () => {
     for (const role of ['GENERAL_MANAGER', 'ASSISTANT_GENERAL_MANAGER']) {
       const db = makeDb([[{ id: 'staff-2', status: 'SUSPENDED', propertyId: 'prop-A' }]]);
-      await new StaffTeamService(db as never, mockNotifications() as never).setStatus(meAs(role), 'staff-2', 'ACTIVE');
+      await new StaffTeamService(db as never, mockNotifications() as never).setStatus(
+        meAs(role),
+        'staff-2',
+        'ACTIVE',
+      );
       expect(db.updates[0]).toMatchObject({ status: 'ACTIVE' });
     }
   });
@@ -392,7 +420,13 @@ describe('StaffTeamService.setStatus — activation is an approval', () => {
     const actor = meAs('GENERAL_MANAGER', { permissions: ['staff.read', 'staff.update'] });
     const db = makeDb([[{ id: 'staff-2', status: 'BLOCKED', propertyId: 'prop-A' }]]);
     expect(
-      await rejectionCode(new StaffTeamService(db as never, mockNotifications() as never).setStatus(actor, 'staff-2', 'ACTIVE')),
+      await rejectionCode(
+        new StaffTeamService(db as never, mockNotifications() as never).setStatus(
+          actor,
+          'staff-2',
+          'ACTIVE',
+        ),
+      ),
     ).toBe('ACTIVATION_NOT_PERMITTED');
     expect(db.updates).toEqual([]);
   });
@@ -422,7 +456,10 @@ describe('StaffTeamService.approve', () => {
 describe('StaffTeamService.remove', () => {
   it('soft-deletes rather than hard-deletes', async () => {
     const db = makeDb([[{ id: 'staff-2', status: 'ACTIVE', propertyId: 'prop-A' }]]);
-    await new StaffTeamService(db as never, mockNotifications() as never).remove(meAs('GENERAL_MANAGER'), 'staff-2');
+    await new StaffTeamService(db as never, mockNotifications() as never).remove(
+      meAs('GENERAL_MANAGER'),
+      'staff-2',
+    );
     expect(db.updates[0].deletedAt).toBeInstanceOf(Date);
   });
 });
