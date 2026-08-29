@@ -4,6 +4,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { AppConfigModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
+import { StorageModule } from './modules/storage/storage.module';
 import { QueueModule } from './queue/queue.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AdminsModule } from './modules/admins/admins.module';
@@ -64,6 +65,7 @@ import { ConfigService } from '@nestjs/config';
       ],
     }),
     DatabaseModule,
+    StorageModule,
     QueueModule,
     AuditModule,
     PermissionsModule,

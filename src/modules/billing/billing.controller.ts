@@ -97,6 +97,13 @@ export class BillingController {
     return this.svc.getInvoice(id);
   }
 
+  /** Presigned URL for the invoice document; 404 until one is generated. */
+  @Get('invoices/:id/document')
+  @RequirePermissions('invoice.view')
+  invoiceDocument(@Param('id') id: string) {
+    return this.svc.invoiceDocumentUrl(id);
+  }
+
   @Post('invoices')
   @RequirePermissions('invoice.create')
   createInvoice(@Body() dto: CreateInvoiceDto) {

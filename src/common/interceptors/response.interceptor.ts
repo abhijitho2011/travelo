@@ -1,10 +1,4 @@
-import {
-  CallHandler,
-  ExecutionContext,
-  Injectable,
-  NestInterceptor,
-  StreamableFile,
-} from '@nestjs/common';
+import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
 import { Observable, map } from 'rxjs';
 import { getRequestContext } from '../context/request-context';
 
@@ -18,29 +12,17 @@ export interface SuccessEnvelope<T> {
 }
 
 @Injectable()
-export class ResponseInterceptor<T> implements NestInterceptor<
-  T,
-  SuccessEnvelope<T> | StreamableFile
-> {
-  intercept(
-    _context: ExecutionContext,
-    next: CallHandler<T>,
-  ): Observable<SuccessEnvelope<T> | StreamableFile> {
+export class ResponseInterceptor<T> implements NestInterceptor<T, SuccessEnvelope<T>> {
+  intercept(_context: ExecutionContext, next: CallHandler<T>): Observable<SuccessEnvelope<T>> {
     return next.handle().pipe(
-      map((data) =>
-        // A file download is the response body; wrapping it in the JSON
-        // envelope would corrupt it.
-        data instanceof StreamableFile
-          ? data
-          : {
-              success: true as const,
-              data,
-              meta: {
-                requestId: getRequestContext()?.requestId,
-                timestamp: new Date().toISOString(),
-              },
-            },
-      ),
+      map((data) => ({
+        success: true as const,
+        data,
+        meta: {
+          requestId: getRequestContext()?.requestId,
+          timestamp: new Date().toISOString(),
+        },
+      })),
     );
   }
 }

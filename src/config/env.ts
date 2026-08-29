@@ -67,6 +67,17 @@ const envSchema = z.object({
     .string()
     .default('false')
     .transform((v) => v === 'true'),
+  // ---------- Object storage (property photos, invoice documents) ----------
+  // `local` writes to the mounted volume; `s3` uses the Railway bucket. The
+  // credentials are supplied by Railway reference variables — never committed.
+  STORAGE_DRIVER: z.enum(['s3', 'local']).default('local'),
+  UPLOADS_DIR: z.string().optional(),
+  S3_ENDPOINT: z.string().optional(),
+  S3_REGION: z.string().optional(),
+  S3_BUCKET: z.string().optional(),
+  S3_ACCESS_KEY_ID: z.string().optional(),
+  S3_SECRET_ACCESS_KEY: z.string().optional(),
+
   RUN_SEED: z
     .string()
     .default('false')

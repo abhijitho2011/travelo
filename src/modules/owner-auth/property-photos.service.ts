@@ -1,15 +1,15 @@
-import { createReadStream } from 'node:fs';
-import { mkdir, unlink, writeFile } from 'node:fs/promises';
-import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import { properties, propertyPhotos } from '../../database/schema';
+import { StorageService } from '../storage/storage.service';
 import { OwnerErrors } from './owner-errors';
 
 export const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5 MB per file
 export const MAX_PHOTOS_PER_PROPERTY = 10;
+/** Photo URLs are short-lived: long enough to render a page, not to be shared. */
+export const PHOTO_URL_TTL_SECONDS = 3600;
 
 /** Only formats a browser and Flutter can both render. */
 const ALLOWED_MIME: Record<string, string> = {
@@ -27,23 +27,19 @@ export interface UploadedPhoto {
 }
 
 /**
- * Photo bytes are written to a mounted disk (a Railway volume in production),
- * never to Postgres. Only metadata is stored in `property_photos`, and files
- * are served back through an owner-scoped streaming endpoint so there is no
- * publicly listable static directory.
+ * Photo bytes live in the object store under `properties/<propertyId>/<uuid>.<ext>`;
+ * Postgres holds only the key. Clients receive presigned URLs, so the API never
+ * proxies image bytes and there is no publicly listable directory.
  */
 @Injectable()
 export class PropertyPhotosService {
-  private readonly root = process.env.UPLOADS_DIR?.trim() || path.resolve(process.cwd(), 'uploads');
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Database,
+    private readonly storage: StorageService,
+  ) {}
 
-  constructor(@Inject(DRIZZLE) private readonly db: Database) {}
-
-  static rawUrl(propertyId: string, photoId: string): string {
-    return `/api/v1/owner/properties/${propertyId}/photos/${photoId}/raw`;
-  }
-
-  private dir(propertyId: string): string {
-    return path.join(this.root, 'properties', propertyId);
+  static objectKey(propertyId: string, ext: string): string {
+    return `properties/${propertyId}/${randomUUID()}.${ext}`;
   }
 
   /** 404s rather than 403s for another tenant's property — nothing is leaked. */
@@ -63,7 +59,7 @@ export class PropertyPhotosService {
       .from(propertyPhotos)
       .where(eq(propertyPhotos.propertyId, propertyId))
       .orderBy(asc(propertyPhotos.sortOrder), asc(propertyPhotos.createdAt));
-    return rows.map((r) => this.serialize(r));
+    return Promise.all(rows.map((r) => this.serialize(r)));
   }
 
   async upload(ownerId: string, propertyId: string, files: UploadedPhoto[]) {
@@ -82,6 +78,8 @@ export class PropertyPhotosService {
       });
     }
 
+    // Validate everything before writing anything, so a bad file in the batch
+    // cannot leave half of it uploaded.
     for (const file of files) {
       if (!ALLOWED_MIME[file.mimetype]) {
         throw new BadRequestException({
@@ -97,24 +95,23 @@ export class PropertyPhotosService {
       }
     }
 
-    await mkdir(this.dir(propertyId), { recursive: true });
     const saved = [];
     let order = count;
     for (const file of files) {
-      const filename = `${randomUUID()}.${ALLOWED_MIME[file.mimetype]}`;
-      await writeFile(path.join(this.dir(propertyId), filename), file.buffer);
+      const key = PropertyPhotosService.objectKey(propertyId, ALLOWED_MIME[file.mimetype]);
+      await this.storage.put(key, file.buffer, file.mimetype);
       const [row] = await this.db
         .insert(propertyPhotos)
         .values({
           propertyId,
           ownerId,
-          filename,
+          storageKey: key,
           contentType: file.mimetype,
           sizeBytes: file.size,
           sortOrder: order++,
         })
         .returning();
-      saved.push(this.serialize(row));
+      saved.push(await this.serialize(row));
     }
     return saved;
   }
@@ -126,14 +123,17 @@ export class PropertyPhotosService {
       .where(and(eq(propertyPhotos.id, photoId), eq(propertyPhotos.propertyId, propertyId)))
       .returning();
     if (!row) throw new NotFoundException('Photo not found');
-    // The row is the source of truth; a leftover file is harmless, a missing
-    // one must not turn a successful delete into a 500.
-    await unlink(path.join(this.dir(propertyId), row.filename)).catch(() => undefined);
+    // The row is the source of truth; a leftover object is harmless, and a
+    // missing one must not turn a successful delete into a 500.
+    await this.storage.delete(row.storageKey).catch(() => undefined);
     return { deleted: true, photoId };
   }
 
-  /** Returns the stream plus its content type, for the raw endpoint. */
-  async readFile(ownerId: string, propertyId: string, photoId: string) {
+  /**
+   * What the raw endpoint needs: a presigned URL to redirect to under the s3
+   * driver, or a readable stream under the local driver (which cannot sign).
+   */
+  async resolveForServing(ownerId: string, propertyId: string, photoId: string) {
     await this.assertOwned(ownerId, propertyId);
     const [row] = await this.db
       .select()
@@ -141,30 +141,50 @@ export class PropertyPhotosService {
       .where(and(eq(propertyPhotos.id, photoId), eq(propertyPhotos.propertyId, propertyId)))
       .limit(1);
     if (!row) throw new NotFoundException('Photo not found');
+    if (this.storage.driver === 's3') {
+      return {
+        url: await this.storage.getSignedUrl(row.storageKey, PHOTO_URL_TTL_SECONDS),
+        contentType: row.contentType,
+        stream: null,
+      };
+    }
     return {
-      stream: createReadStream(path.join(this.dir(propertyId), row.filename)),
+      url: null,
       contentType: row.contentType,
-      sizeBytes: row.sizeBytes,
+      stream: this.storage.createLocalReadStream(row.storageKey),
     };
   }
 
-  /** propertyId -> raw URL of its first photo, for list responses. */
+  /** propertyId -> presigned URL of its first photo, for list responses. */
   async coverUrls(propertyIds: string[]): Promise<Map<string, string>> {
     const rows = await this.db
       .select()
       .from(propertyPhotos)
       .where(inArray(propertyPhotos.propertyId, propertyIds))
       .orderBy(asc(propertyPhotos.sortOrder), asc(propertyPhotos.createdAt));
+    const firsts = new Map<string, (typeof rows)[number]>();
+    for (const r of rows) if (!firsts.has(r.propertyId)) firsts.set(r.propertyId, r);
     const covers = new Map<string, string>();
-    for (const r of rows) {
-      if (!covers.has(r.propertyId)) {
-        covers.set(r.propertyId, PropertyPhotosService.rawUrl(r.propertyId, r.id));
-      }
-    }
+    await Promise.all(
+      [...firsts].map(async ([propertyId, row]) => {
+        covers.set(propertyId, await this.urlFor(propertyId, row.id, row.storageKey));
+      }),
+    );
     return covers;
   }
 
-  private serialize(r: typeof propertyPhotos.$inferSelect) {
+  /**
+   * s3 gives a presigned URL the client can fetch directly; the local driver has
+   * nothing to sign, so callers are pointed back at the owner-scoped raw route.
+   */
+  private async urlFor(propertyId: string, photoId: string, key: string): Promise<string> {
+    if (this.storage.driver === 's3') {
+      return this.storage.getSignedUrl(key, PHOTO_URL_TTL_SECONDS);
+    }
+    return `/api/v1/owner/properties/${propertyId}/photos/${photoId}/raw`;
+  }
+
+  private async serialize(r: typeof propertyPhotos.$inferSelect) {
     return {
       id: r.id,
       propertyId: r.propertyId,
@@ -172,7 +192,8 @@ export class PropertyPhotosService {
       sizeBytes: r.sizeBytes,
       sortOrder: r.sortOrder,
       createdAt: r.createdAt,
-      url: PropertyPhotosService.rawUrl(r.propertyId, r.id),
+      url: await this.urlFor(r.propertyId, r.id, r.storageKey),
+      expiresInSeconds: PHOTO_URL_TTL_SECONDS,
     };
   }
 }

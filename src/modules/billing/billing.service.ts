@@ -11,9 +11,13 @@ import {
   webhookEvents,
 } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
+import { StorageService } from '../storage/storage.service';
 import { InvoiceNumberService } from './invoice-number.service';
 import { PROVIDERS, WebhookInput } from './payment-providers';
 import { getRequestContext } from '../../common/context/request-context';
+
+/** Invoice documents are longer-lived than photos but still not permanent. */
+const INVOICE_URL_TTL_SECONDS = 900;
 
 @Injectable()
 export class BillingService {
@@ -23,6 +27,7 @@ export class BillingService {
     private readonly audit: AuditService,
     private readonly invNum: InvoiceNumberService,
     private readonly config: ConfigService,
+    private readonly storage: StorageService,
   ) {}
 
   // ---------- Payments ----------
@@ -160,7 +165,47 @@ export class BillingService {
   async getInvoice(id: string) {
     const [row] = await this.db.select().from(invoices).where(eq(invoices.id, id)).limit(1);
     if (!row) throw new NotFoundException('Invoice not found');
-    return row;
+    return { ...row, hasDocument: !!row.storageKey };
+  }
+
+  /**
+   * Presigned URL for the invoice document. PDF *generation* does not exist
+   * yet — this is the storage plumbing, so it 404s until something writes a
+   * key. Documents live under `invoices/<ownerId>/<invoiceNumber>.pdf`.
+   */
+  async invoiceDocumentUrl(id: string) {
+    const [row] = await this.db.select().from(invoices).where(eq(invoices.id, id)).limit(1);
+    if (!row) throw new NotFoundException('Invoice not found');
+    if (!row.storageKey) {
+      throw new NotFoundException({
+        error: 'INVOICE_DOCUMENT_NOT_AVAILABLE',
+        message: 'No document has been generated for this invoice yet',
+      });
+    }
+    return {
+      url: await this.storage.getSignedUrl(row.storageKey, INVOICE_URL_TTL_SECONDS),
+      expiresInSeconds: INVOICE_URL_TTL_SECONDS,
+    };
+  }
+
+  /** Object key an invoice document is (or will be) stored under. */
+  static invoiceObjectKey(ownerId: string, invoiceNumber: string): string {
+    return `invoices/${ownerId}/${invoiceNumber}.pdf`;
+  }
+
+  /** Records the document that was uploaded for an invoice. */
+  async attachInvoiceDocument(id: string, body: Buffer, contentType = 'application/pdf') {
+    const invoice = await this.getInvoice(id);
+    const key = BillingService.invoiceObjectKey(invoice.ownerId, invoice.invoiceNumber);
+    await this.storage.put(key, body, contentType);
+    await this.db.update(invoices).set({ storageKey: key }).where(eq(invoices.id, id));
+    await this.audit.record({
+      action: 'invoice.document.attached',
+      entity: 'invoice',
+      entityId: id,
+      after: { storageKey: key },
+    });
+    return { storageKey: key };
   }
 
   async createInvoice(dto: {

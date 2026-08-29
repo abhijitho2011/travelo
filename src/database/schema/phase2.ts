@@ -110,9 +110,9 @@ export const properties = pgTable(
 );
 
 /**
- * Property photos. Only metadata lives here — the bytes are written to the
- * API's mounted volume (UPLOADS_DIR, /app/uploads in production) and streamed
- * back through an owner-scoped endpoint, never a naked static directory.
+ * Property photos. Only metadata lives here — the bytes go to the object store
+ * (S3 bucket in production, the mounted volume under the local driver) and are
+ * handed to clients as short-lived presigned URLs.
  */
 export const propertyPhotos = pgTable(
   'property_photos',
@@ -126,7 +126,8 @@ export const propertyPhotos = pgTable(
     ownerId: uuid('owner_id')
       .notNull()
       .references(() => owners.id, { onDelete: 'cascade' }),
-    filename: varchar('filename', { length: 255 }).notNull(),
+    /** Object-store key, e.g. properties/<propertyId>/<uuid>.jpg — never bytes. */
+    storageKey: varchar('storage_key', { length: 512 }).notNull(),
     contentType: varchar('content_type', { length: 128 }).notNull(),
     sizeBytes: integer('size_bytes').notNull(),
     sortOrder: integer('sort_order').notNull().default(0),
@@ -332,6 +333,8 @@ export const invoices = pgTable(
     issuedAt: timestamp('issued_at', { withTimezone: true }),
     paidAt: timestamp('paid_at', { withTimezone: true }),
     pdfUrl: text('pdf_url'),
+    /** Object-store key of the invoice document, when one has been generated. */
+    storageKey: varchar('storage_key', { length: 512 }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

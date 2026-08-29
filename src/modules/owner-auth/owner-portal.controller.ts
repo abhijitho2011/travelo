@@ -3,15 +3,15 @@ import {
   Controller,
   Delete,
   Get,
-  Header,
   Param,
   Post,
-  StreamableFile,
+  Res,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
   VERSION_NEUTRAL,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { OwnerJwtGuard } from './owner-jwt.guard';
@@ -74,19 +74,30 @@ export class OwnerPortalController {
     return this.photos.upload(owner.id, id, files ?? []);
   }
 
-  /** Streams the stored bytes. Owner-scoped — there is no public static dir. */
+  /**
+   * Owner-scoped entry point for one photo. Auth is checked here, then the
+   * caller is redirected to a short-lived presigned URL, so image bytes never
+   * proxy through the API and there is no public static directory. Under the
+   * local (dev) driver there is nothing to sign, so the bytes are streamed.
+   *
+   * `@Res()` is deliberate: it takes this route out of the JSON envelope, which
+   * would otherwise wrap — and break — a redirect or a binary body.
+   */
   @Get('properties/:id/photos/:photoId/raw')
-  @Header('Cache-Control', 'private, max-age=3600')
   async rawPhoto(
     @CurrentOwner() owner: AuthenticatedOwner,
     @Param('id') id: string,
     @Param('photoId') photoId: string,
-  ): Promise<StreamableFile> {
-    const file = await this.photos.readFile(owner.id, id, photoId);
-    return new StreamableFile(file.stream, {
-      type: file.contentType,
-      length: file.sizeBytes,
-    });
+    @Res() res: Response,
+  ): Promise<void> {
+    const photo = await this.photos.resolveForServing(owner.id, id, photoId);
+    if (photo.url) {
+      res.redirect(302, photo.url);
+      return;
+    }
+    res.setHeader('Content-Type', photo.contentType);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    photo.stream!.pipe(res);
   }
 
   @Delete('properties/:id/photos/:photoId')
