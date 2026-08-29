@@ -1,10 +1,14 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import { invoices, properties, subscriptionPlans, subscriptions } from '../../database/schema';
 import { EntitlementsService } from '../entitlements/entitlements.service';
+import { StorageService } from '../storage/storage.service';
 import { OwnerErrors } from './owner-errors';
 import { OwnerPortalService } from './owner-portal.service';
+
+/** Owner-facing invoice links are short-lived; the list can always be refetched. */
+const INVOICE_URL_TTL_SECONDS = 900;
 
 /**
  * Read-only subscription view for the owner app. Owners cannot self-upgrade —
@@ -16,6 +20,12 @@ export class OwnerSubscriptionService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly entitlements: EntitlementsService,
+    /**
+     * Optional so the existing unit tests can construct this service without a
+     * store. When absent, invoices simply carry no `documentUrl` — the rest of
+     * the row is unaffected.
+     */
+    @Optional() private readonly storage?: StorageService,
   ) {}
 
   /** Whole days left in the current period, floored at 0 once it has lapsed. */
@@ -87,24 +97,40 @@ export class OwnerSubscriptionService {
       .from(invoices)
       .where(eq(invoices.ownerId, ownerId));
     return {
-      items: rows.map((i) => ({
-        id: i.id,
-        invoiceNumber: i.invoiceNumber,
-        billingPeriodStart: i.billingPeriodStart,
-        billingPeriodEnd: i.billingPeriodEnd,
-        subtotal: i.subtotal,
-        tax: i.tax,
-        discount: i.discount,
-        total: i.total,
-        currency: i.currency,
-        status: i.status,
-        issuedAt: i.issuedAt,
-        dueDate: i.dueDate,
-        paidAt: i.paidAt,
-      })),
+      items: await Promise.all(rows.map((i) => this.serializeInvoice(i))),
       total: total?.count ?? 0,
       limit,
       offset,
+    };
+  }
+
+  /**
+   * One owner-visible invoice row.
+   *
+   * `documentUrl` is a presigned, 15-minute link and appears ONLY when a PDF
+   * has actually been generated. `storageKey` itself never leaves the API — the
+   * owner gets a link, not the internal object layout.
+   */
+  private async serializeInvoice(i: typeof invoices.$inferSelect) {
+    const documentUrl =
+      i.storageKey && this.storage
+        ? await this.storage.getSignedUrl(i.storageKey, INVOICE_URL_TTL_SECONDS)
+        : undefined;
+    return {
+      id: i.id,
+      invoiceNumber: i.invoiceNumber,
+      billingPeriodStart: i.billingPeriodStart,
+      billingPeriodEnd: i.billingPeriodEnd,
+      subtotal: i.subtotal,
+      tax: i.tax,
+      discount: i.discount,
+      total: i.total,
+      currency: i.currency,
+      status: i.status,
+      issuedAt: i.issuedAt,
+      dueDate: i.dueDate,
+      paidAt: i.paidAt,
+      ...(documentUrl ? { documentUrl, documentUrlExpiresInSeconds: INVOICE_URL_TTL_SECONDS } : {}),
     };
   }
 }

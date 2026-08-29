@@ -15,6 +15,7 @@ const PERMISSIONS: { key: string; group: string; description: string }[] = [
   ...groupPerms('Subscription', 'subscription', ['view', 'edit', 'cancel']),
   ...groupPerms('Plan', 'plan', ['view', 'edit']),
   ...groupPerms('Billing', 'billing', ['view', 'refund', 'export']),
+  ...groupPerms('Payment', 'payment', ['record']),
   ...groupPerms('Refund', 'refund', ['view', 'create']),
   ...groupPerms('Invoice', 'invoice', ['view', 'create', 'edit']),
   ...groupPerms('Support', 'support', ['view', 'reply', 'assign', 'resolve']),
@@ -46,6 +47,7 @@ const ROLES = [
     isSystem: true,
     permissions: [
       'billing.view', 'billing.refund', 'billing.export',
+      'payment.record',
       'refund.view', 'refund.create',
       'invoice.view', 'invoice.create', 'invoice.edit',
       'subscription.view', 'subscription.edit',

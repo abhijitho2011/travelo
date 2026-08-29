@@ -30,6 +30,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { SearchModule } from './modules/search/search.module';
+import { ExportModule } from './modules/export/export.module';
 import { WorkersModule } from './modules/workers/workers.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
@@ -94,6 +95,7 @@ import { ConfigService } from '@nestjs/config';
     IntegrationsModule,
     JobsModule,
     SearchModule,
+    ExportModule,
     WorkersModule,
   ],
   providers: [

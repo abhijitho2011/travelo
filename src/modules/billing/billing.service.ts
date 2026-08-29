@@ -1,23 +1,52 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { and, desc, eq, gte, lte, sql, SQL } from 'drizzle-orm';
+import { and, desc, eq, sql, SQL } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import {
   invoices,
   owners,
   payments,
   refunds,
+  subscriptionEvents,
+  subscriptionPlans,
   subscriptions,
   webhookEvents,
 } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { StorageService } from '../storage/storage.service';
 import { InvoiceNumberService } from './invoice-number.service';
-import { PROVIDERS, WebhookInput } from './payment-providers';
+import { InvoicePdfService } from './invoice-pdf.service';
+import { RazorpayClient } from './razorpay.client';
+import { PROVIDERS, SettlementHint, WebhookInput } from './payment-providers';
 import { getRequestContext } from '../../common/context/request-context';
+import { addMonths } from '../../common/date/add-months';
 
 /** Invoice documents are longer-lived than photos but still not permanent. */
 const INVOICE_URL_TTL_SECONDS = 900;
+
+/** The Drizzle handle inside a transaction callback. */
+type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
+
+export const manualPaymentMethods = ['CASH', 'BANK_TRANSFER', 'UPI', 'CHEQUE'] as const;
+export type ManualPaymentMethod = (typeof manualPaymentMethods)[number];
+
+/** Everything the one settlement path needs, whatever produced the money. */
+export interface SettleInput {
+  ownerId: string;
+  subscriptionId?: string | null;
+  amountPaise: number;
+  currency?: string;
+  gateway: 'RAZORPAY' | 'CASHFREE' | 'MANUAL' | 'STRIPE';
+  gatewayRef?: string | null;
+  method?: string | null;
+  raw?: unknown;
+  /** An existing PENDING payment row to resolve instead of inserting a new one. */
+  existingPaymentId?: string | null;
+  /** Audit/event provenance: what triggered this settlement. */
+  source: 'webhook' | 'manual';
+  note?: string;
+  now?: Date;
+}
 
 @Injectable()
 export class BillingService {
@@ -28,7 +57,306 @@ export class BillingService {
     private readonly invNum: InvoiceNumberService,
     private readonly config: ConfigService,
     private readonly storage: StorageService,
+    private readonly pdf: InvoicePdfService,
+    private readonly razorpay: RazorpayClient,
   ) {}
+
+  // ---------- The single settlement path ----------
+
+  /**
+   * The renewal rule, in one pure function so it can be tested without a
+   * database and cannot be re-implemented differently in two places.
+   *
+   * A renewal extends from the LATER of now and the current period end. Paying
+   * early must not shorten what was already bought; paying late must not
+   * back-date the new period into the past.
+   */
+  static computeRenewal(
+    now: Date,
+    currentPeriodEnd: Date,
+    durationMonths: number,
+  ): { periodStart: Date; periodEnd: Date } {
+    if (!Number.isInteger(durationMonths) || durationMonths < 1 || durationMonths > 120) {
+      throw new BadRequestException('Plan durationMonths must be an integer between 1 and 120');
+    }
+    const periodStart = new Date(Math.max(now.getTime(), currentPeriodEnd.getTime()));
+    return { periodStart, periodEnd: addMonths(periodStart, durationMonths) };
+  }
+
+  /**
+   * ONE place where money becomes a renewed subscription and an issued invoice.
+   *
+   * The gateway webhook and the manual-payment endpoint both land here, so the
+   * two can never drift: same renewal maths, same invoice shape, same events,
+   * same audit trail. The only difference between them is what they put in
+   * `gateway` and `gatewayRef`.
+   *
+   * Everything that must be all-or-nothing runs in ONE transaction. The PDF is
+   * generated AFTER the commit, on purpose — a storage failure must not undo a
+   * payment that the gateway has already taken.
+   */
+  async settleSuccessfulPayment(input: SettleInput) {
+    if (!Number.isInteger(input.amountPaise) || input.amountPaise <= 0) {
+      throw new BadRequestException('amountPaise must be a positive integer');
+    }
+    const now = input.now ?? new Date();
+    // Allocated outside the transaction: the sequence is a counter, not part of
+    // the money, and a rollback must not hand the same number to two invoices.
+    const invoiceNumber = await this.invNum.next(now);
+
+    const result = await this.db.transaction(async (tx) =>
+      this.settleInTx(tx, input, now, invoiceNumber),
+    );
+
+    await this.audit.record({
+      action: `billing.payment.settled.${input.source}`,
+      entity: 'payment',
+      entityId: result.payment.id,
+      after: {
+        paymentId: result.payment.id,
+        invoiceId: result.invoice.id,
+        invoiceNumber: result.invoice.invoiceNumber,
+        amount: input.amountPaise,
+        gateway: input.gateway,
+        gatewayRef: input.gatewayRef ?? null,
+        subscriptionId: input.subscriptionId ?? null,
+        previousPeriodEnd: result.previousPeriodEnd,
+        newPeriodEnd: result.newPeriodEnd,
+      },
+      reason: input.note,
+    });
+
+    // Post-commit and best-effort. `generateQuietly` swallows and logs.
+    await this.pdf.generateQuietly(result.invoice.id);
+
+    return result;
+  }
+
+  private async settleInTx(tx: Tx, input: SettleInput, now: Date, invoiceNumber: string) {
+    const currency = input.currency ?? 'INR';
+
+    // ---- 1. Renew the subscription (when the payment is for one) ----
+    let periodStart = now;
+    let periodEnd = now;
+    let previousPeriodEnd: Date | null = null;
+    if (input.subscriptionId) {
+      const [row] = await tx
+        .select({ s: subscriptions, p: subscriptionPlans })
+        .from(subscriptions)
+        .innerJoin(subscriptionPlans, eq(subscriptions.planId, subscriptionPlans.id))
+        .where(eq(subscriptions.id, input.subscriptionId))
+        .limit(1);
+      if (!row) throw new NotFoundException('Subscription not found');
+      if (row.s.ownerId !== input.ownerId) {
+        throw new BadRequestException('Subscription does not belong to this owner');
+      }
+      previousPeriodEnd = row.s.currentPeriodEnd;
+      const renewed = BillingService.computeRenewal(
+        now,
+        row.s.currentPeriodEnd,
+        row.p.durationMonths,
+      );
+      periodStart = renewed.periodStart;
+      periodEnd = renewed.periodEnd;
+
+      await tx
+        .update(subscriptions)
+        .set({
+          currentPeriodStart: periodStart,
+          currentPeriodEnd: periodEnd,
+          status: 'ACTIVE',
+          updatedAt: now,
+        })
+        .where(eq(subscriptions.id, input.subscriptionId));
+    }
+
+    // ---- 2. The invoice for the period just paid for ----
+    const [invoice] = await tx
+      .insert(invoices)
+      .values({
+        invoiceNumber,
+        ownerId: input.ownerId,
+        subscriptionId: input.subscriptionId ?? undefined,
+        billingPeriodStart: periodStart,
+        billingPeriodEnd: periodEnd,
+        // No tax maths is invented here. The amount collected IS the subtotal
+        // and the total; a tax regime, when one exists, must be applied by
+        // whatever builds the charge, not by the settlement path.
+        subtotal: input.amountPaise,
+        tax: 0,
+        discount: 0,
+        total: input.amountPaise,
+        currency,
+        status: 'PAID',
+        issuedAt: now,
+        paidAt: now,
+      })
+      .returning();
+
+    // ---- 3. The payment row: resolve a PENDING order, or insert fresh ----
+    let payment: typeof payments.$inferSelect;
+    if (input.existingPaymentId) {
+      const [updated] = await tx
+        .update(payments)
+        .set({
+          status: 'SUCCESS',
+          invoiceId: invoice.id,
+          gatewayRef: input.gatewayRef ?? undefined,
+          method: input.method ?? undefined,
+          amount: input.amountPaise,
+          capturedAt: now,
+          raw: (input.raw ?? undefined) as never,
+          updatedAt: now,
+        })
+        .where(eq(payments.id, input.existingPaymentId))
+        .returning();
+      payment = updated;
+    } else {
+      const [inserted] = await tx
+        .insert(payments)
+        .values({
+          ownerId: input.ownerId,
+          subscriptionId: input.subscriptionId ?? undefined,
+          invoiceId: invoice.id,
+          gateway: input.gateway,
+          gatewayRef: input.gatewayRef ?? undefined,
+          amount: input.amountPaise,
+          currency,
+          status: 'SUCCESS',
+          method: input.method ?? undefined,
+          capturedAt: now,
+          raw: (input.raw ?? undefined) as never,
+        })
+        .returning();
+      payment = inserted;
+    }
+
+    // ---- 4. The subscription's own history ----
+    if (input.subscriptionId) {
+      await tx.insert(subscriptionEvents).values({
+        subscriptionId: input.subscriptionId,
+        type: 'renewal',
+        actorAdminId: getRequestContext()?.adminId,
+        payload: {
+          source: input.source,
+          gateway: input.gateway,
+          gatewayRef: input.gatewayRef ?? null,
+          paymentId: payment.id,
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          amount: input.amountPaise,
+          previousPeriodEnd,
+          newPeriodStart: periodStart,
+          newPeriodEnd: periodEnd,
+          note: input.note,
+        },
+      });
+    }
+
+    return { payment, invoice, previousPeriodEnd, newPeriodEnd: periodEnd };
+  }
+
+  /**
+   * Money that arrived outside any gateway — cash at the desk, an NEFT, a UPI
+   * transfer, a cheque. This is what makes the platform collectable on day one
+   * with zero gateway credentials, and it settles through exactly the same code
+   * a webhook does.
+   */
+  async recordManualPayment(dto: {
+    ownerId: string;
+    subscriptionId?: string;
+    amountPaise: number;
+    method: ManualPaymentMethod;
+    reference?: string;
+    note?: string;
+  }) {
+    const [owner] = await this.db
+      .select({ id: owners.id })
+      .from(owners)
+      .where(eq(owners.id, dto.ownerId))
+      .limit(1);
+    if (!owner) throw new NotFoundException('Owner not found');
+
+    return this.settleSuccessfulPayment({
+      ownerId: dto.ownerId,
+      subscriptionId: dto.subscriptionId,
+      amountPaise: dto.amountPaise,
+      gateway: 'MANUAL',
+      gatewayRef: dto.reference,
+      method: dto.method,
+      raw: { manual: true, method: dto.method, reference: dto.reference, note: dto.note },
+      source: 'manual',
+      note: dto.note,
+    });
+  }
+
+  // ---------- Gateway order creation ----------
+
+  /**
+   * Creates a Razorpay order for a subscription's next period and parks a
+   * PENDING payment carrying its id. The webhook later finds that row by
+   * `gatewayRef` and settles it — so an order is the only thing this writes.
+   */
+  async createGatewayOrder(dto: { ownerId: string; subscriptionId: string }) {
+    const [row] = await this.db
+      .select({ s: subscriptions, p: subscriptionPlans })
+      .from(subscriptions)
+      .innerJoin(subscriptionPlans, eq(subscriptions.planId, subscriptionPlans.id))
+      .where(eq(subscriptions.id, dto.subscriptionId))
+      .limit(1);
+    if (!row) throw new NotFoundException('Subscription not found');
+    if (row.s.ownerId !== dto.ownerId) {
+      throw new BadRequestException('Subscription does not belong to this owner');
+    }
+
+    const amountPaise = row.s.priceOverride ?? row.p.monthlyPrice * row.p.durationMonths;
+    const currency = row.p.currency;
+
+    if (!this.razorpay.configured) {
+      throw new BadRequestException({
+        error: 'GATEWAY_NOT_CONFIGURED',
+        message:
+          'Razorpay credentials are not configured. Record the payment manually via POST /billing/payments/manual.',
+      });
+    }
+
+    const order = await this.razorpay.createOrder({
+      amountPaise,
+      currency,
+      // Razorpay caps receipts at 40 characters.
+      receipt: `sub-${dto.subscriptionId}`.slice(0, 40),
+      notes: { ownerId: dto.ownerId, subscriptionId: dto.subscriptionId },
+    });
+
+    const [payment] = await this.db
+      .insert(payments)
+      .values({
+        ownerId: dto.ownerId,
+        subscriptionId: dto.subscriptionId,
+        gateway: 'RAZORPAY',
+        gatewayRef: order.id,
+        amount: amountPaise,
+        currency,
+        status: 'PENDING',
+        raw: order as never,
+      })
+      .returning();
+
+    await this.audit.record({
+      action: 'billing.order.created',
+      entity: 'payment',
+      entityId: payment.id,
+      after: { orderId: order.id, amount: amountPaise, currency },
+    });
+
+    return {
+      paymentId: payment.id,
+      orderId: order.id,
+      amount: amountPaise,
+      currency,
+      keyId: this.razorpay.publicKeyId,
+    };
+  }
 
   // ---------- Payments ----------
   async listPayments(params: {
@@ -72,7 +400,60 @@ export class BillingService {
     return { ...row, refunds: rfs };
   }
 
+  /**
+   * Records a refund against a successful payment.
+   *
+   * The LEDGER move is authoritative and happens in a transaction. Calling the
+   * gateway happens after that commit, for the same reason PDF generation does:
+   * a network failure must not silently un-refund a row an admin was told was
+   * refunded. Without gateway credentials — or for a payment that never went
+   * through one — the refund is marked MANUAL, meaning "move the money by hand
+   * and this row is the record of it".
+   */
   async refundPayment(paymentId: string, dto: { amount: number; reason?: string }) {
+    const { refund, pay } = await this.refundInTx(paymentId, dto);
+
+    const canCallGateway =
+      this.razorpay.configured && pay.gateway === 'RAZORPAY' && !!pay.gatewayRef;
+    if (!canCallGateway) {
+      const [manual] = await this.db
+        .update(refunds)
+        .set({ status: 'MANUAL' })
+        .where(eq(refunds.id, refund.id))
+        .returning();
+      return manual;
+    }
+
+    try {
+      const gwRefund = await this.razorpay.createRefund(pay.gatewayRef!, dto.amount);
+      const [processed] = await this.db
+        .update(refunds)
+        .set({ status: 'PROCESSED', gatewayRef: gwRefund.id })
+        .where(eq(refunds.id, refund.id))
+        .returning();
+      await this.audit.record({
+        action: 'billing.refund.gateway.succeeded',
+        entity: 'refund',
+        entityId: refund.id,
+        after: { gatewayRefundId: gwRefund.id, amount: dto.amount },
+      });
+      return processed;
+    } catch (err) {
+      this.logger.error(
+        `Razorpay refund failed for payment ${paymentId}; the refund row stays PENDING for retry`,
+        err as Error,
+      );
+      await this.audit.record({
+        action: 'billing.refund.gateway.failed',
+        entity: 'refund',
+        entityId: refund.id,
+        after: { error: (err as Error).message },
+      });
+      return refund;
+    }
+  }
+
+  private async refundInTx(paymentId: string, dto: { amount: number; reason?: string }) {
     const ctx = getRequestContext();
     return this.db.transaction(async (tx) => {
       const [pay] = await tx.select().from(payments).where(eq(payments.id, paymentId)).limit(1);
@@ -113,7 +494,7 @@ export class BillingService {
         after: refund,
         reason: dto.reason,
       });
-      return refund;
+      return { refund, pay };
     });
   }
 
@@ -260,7 +641,31 @@ export class BillingService {
       before,
       after,
     });
+    // Issuing an invoice is what makes it a document someone can be handed.
+    // Best-effort: a storage outage must not stop the invoice being issued.
+    if (status === 'ISSUED') await this.pdf.generateQuietly(id);
     return after;
+  }
+
+  /**
+   * (Re)generates an invoice document on demand — the retry for every place
+   * that generates one best-effort. Unlike those, this one surfaces failures,
+   * because an admin asked for it and needs to know if it did not work.
+   */
+  async regenerateInvoiceDocument(id: string) {
+    await this.getInvoice(id); // 404s for an unknown invoice
+    const { storageKey } = await this.pdf.generate(id);
+    await this.audit.record({
+      action: 'invoice.document.generated',
+      entity: 'invoice',
+      entityId: id,
+      after: { storageKey },
+    });
+    return {
+      storageKey,
+      url: await this.storage.getSignedUrl(storageKey, INVOICE_URL_TTL_SECONDS),
+      expiresInSeconds: INVOICE_URL_TTL_SECONDS,
+    };
   }
 
   // ---------- Webhooks ----------
@@ -278,8 +683,13 @@ export class BillingService {
     }
     const eventId = provider.extractEventId(input);
     const eventType = provider.extractEventType(input);
+
+    // Idempotency is claimed BEFORE any money moves: the unique index on
+    // (provider, event_id) is what makes a redelivered webhook a no-op rather
+    // than a second renewal. A gateway retrying five times must renew once.
+    let row: typeof webhookEvents.$inferSelect;
     try {
-      const [row] = await this.db
+      [row] = await this.db
         .insert(webhookEvents)
         .values({
           provider: providerKey,
@@ -288,12 +698,6 @@ export class BillingService {
           payload: input.parsedBody,
         })
         .returning();
-      // TODO: gateway call — dispatch to internal handler for eventType
-      await this.db
-        .update(webhookEvents)
-        .set({ processedAt: new Date() })
-        .where(eq(webhookEvents.id, row.id));
-      return { ok: true, id: row.id, replayed: false };
     } catch (err) {
       const msg = (err as { message?: string })?.message ?? String(err);
       if (msg.includes('webhook_events_unique') || msg.includes('duplicate key')) {
@@ -301,5 +705,70 @@ export class BillingService {
       }
       throw err;
     }
+
+    try {
+      const settled = await this.dispatchWebhook(provider.extractSettlement(input), providerKey);
+      await this.db
+        .update(webhookEvents)
+        .set({ processedAt: new Date() })
+        .where(eq(webhookEvents.id, row.id));
+      return { ok: true, id: row.id, replayed: false, settled };
+    } catch (err) {
+      // The event row stays, unprocessed, with the reason on it — the gateway
+      // gets a 2xx (it has no useful retry to make) and the failure is visible.
+      await this.db
+        .update(webhookEvents)
+        .set({ error: (err as Error).message?.slice(0, 2000) ?? 'unknown error' })
+        .where(eq(webhookEvents.id, row.id));
+      this.logger.error(`Webhook ${providerKey}/${eventId} failed to process`, err as Error);
+      return { ok: true, id: row.id, replayed: false, settled: false };
+    }
+  }
+
+  /**
+   * Turns a captured-payment webhook into a settlement, through the SAME
+   * `settleSuccessfulPayment` the manual path uses. Any other event type is
+   * recorded and ignored.
+   */
+  private async dispatchWebhook(
+    hint: SettlementHint | null,
+    providerKey: string,
+  ): Promise<boolean> {
+    if (!hint) return false;
+
+    // Order creation parked a PENDING row carrying the order id. Find it, so
+    // the webhook resolves that row rather than inventing a second payment.
+    let pending: typeof payments.$inferSelect | undefined;
+    for (const ref of [hint.orderRef, hint.paymentRef].filter(Boolean) as string[]) {
+      const [found] = await this.db
+        .select()
+        .from(payments)
+        .where(and(eq(payments.gatewayRef, ref), eq(payments.status, 'PENDING')))
+        .limit(1);
+      if (found) {
+        pending = found;
+        break;
+      }
+    }
+    if (!pending) {
+      this.logger.warn(
+        `No PENDING payment matched webhook refs (${hint.orderRef ?? '-'} / ${hint.paymentRef ?? '-'}); recorded without settling`,
+      );
+      return false;
+    }
+
+    await this.settleSuccessfulPayment({
+      ownerId: pending.ownerId,
+      subscriptionId: pending.subscriptionId,
+      amountPaise: hint.amountPaise ?? pending.amount,
+      currency: hint.currency ?? pending.currency,
+      gateway: providerKey.toUpperCase() as 'RAZORPAY' | 'CASHFREE',
+      gatewayRef: hint.paymentRef ?? hint.orderRef ?? pending.gatewayRef,
+      method: hint.method,
+      raw: hint,
+      existingPaymentId: pending.id,
+      source: 'webhook',
+    });
+    return true;
   }
 }

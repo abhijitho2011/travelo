@@ -1,12 +1,26 @@
 import { Body, Controller, Get, Headers, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { Public } from '../../common/decorators/public.decorator';
-import { BillingService } from './billing.service';
+import { BillingService, ManualPaymentMethod, manualPaymentMethods } from './billing.service';
+
+class ManualPaymentDto {
+  @IsUUID() ownerId!: string;
+  @IsOptional() @IsUUID() subscriptionId?: string;
+  @IsInt() @Min(1) amountPaise!: number;
+  @IsIn(manualPaymentMethods as unknown as string[]) method!: ManualPaymentMethod;
+  @IsOptional() @IsString() reference?: string;
+  @IsOptional() @IsString() note?: string;
+}
+
+class CreateOrderDto {
+  @IsUUID() ownerId!: string;
+  @IsUUID() subscriptionId!: string;
+}
 
 class RefundDto {
   @IsInt() @Min(1) amount!: number;
@@ -52,6 +66,24 @@ export class BillingController {
   @RequirePermissions('billing.view')
   failed(@Query('limit') limit?: string) {
     return this.svc.listPayments({ limit: limit ? Number(limit) : undefined, failedOnly: true });
+  }
+
+  /**
+   * Money that arrived outside any gateway. This is the path that makes the
+   * platform collectable with zero gateway credentials, so it is deliberately
+   * NOT gated on a gateway being configured.
+   */
+  @Post('payments/manual')
+  @RequirePermissions('payment.record')
+  manualPayment(@Body() dto: ManualPaymentDto) {
+    return this.svc.recordManualPayment(dto);
+  }
+
+  /** Creates a Razorpay order; typed GATEWAY_NOT_CONFIGURED without keys. */
+  @Post('payments/orders')
+  @RequirePermissions('payment.record')
+  createOrder(@Body() dto: CreateOrderDto) {
+    return this.svc.createGatewayOrder(dto);
   }
 
   @Get('payments/:id')
@@ -118,6 +150,13 @@ export class BillingController {
       currency: dto.currency,
       dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
     });
+  }
+
+  /** (Re)generates the invoice PDF. The retry for every best-effort path. */
+  @Post('invoices/:id/generate-pdf')
+  @RequirePermissions('invoice.edit')
+  generatePdf(@Param('id') id: string) {
+    return this.svc.regenerateInvoiceDocument(id);
   }
 
   @Post('invoices/:id/issue')

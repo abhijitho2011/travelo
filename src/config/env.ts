@@ -35,6 +35,13 @@ const envSchema = z.object({
   PAYMENT_WEBHOOK_SECRET_RAZORPAY: z.string().optional(),
   PAYMENT_WEBHOOK_SECRET_CASHFREE: z.string().optional(),
 
+  // ---------- Razorpay API credentials (order creation + refunds) ----------
+  // Optional on purpose. Without BOTH halves the gateway endpoints return a
+  // typed GATEWAY_NOT_CONFIGURED and the manual-payment path still collects
+  // money, so an unconfigured deployment is a working one.
+  RAZORPAY_KEY_ID: z.string().optional(),
+  RAZORPAY_KEY_SECRET: z.string().optional(),
+
   // ---------- Owner auth (separate from admin) ----------
   OWNER_JWT_ACCESS_SECRET: z.string().min(16).default('owner-access-secret-change-me-32chars'),
   OWNER_JWT_REFRESH_SECRET: z.string().min(16).default('owner-refresh-secret-change-me-32chars'),
