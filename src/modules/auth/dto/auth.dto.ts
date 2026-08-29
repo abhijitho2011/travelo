@@ -35,3 +35,24 @@ export class AdminGoogleLoginDto {
   @Length(10, 8192)
   idToken!: string;
 }
+
+/** Second-factor exchange: challenge token + a TOTP or a recovery code. */
+export class AdminMfaChallengeDto {
+  @ApiProperty({ description: 'The mfaToken returned by the first-factor sign-in' })
+  @IsString()
+  @Length(10, 8192)
+  mfaToken!: string;
+
+  @ApiProperty({ example: '123456', description: 'A 6-digit TOTP or a recovery code' })
+  @IsString()
+  @Length(6, 32)
+  code!: string;
+}
+
+/** A TOTP (or, for disable, a recovery code) supplied from the Security page. */
+export class AdminMfaCodeDto {
+  @ApiProperty({ example: '123456' })
+  @IsString()
+  @Length(6, 32)
+  code!: string;
+}

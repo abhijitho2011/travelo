@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { SharedAuthModule } from '../shared-auth/shared-auth.module';
 import { EntitlementsModule } from '../entitlements/entitlements.module';
+import { ImpersonationModule } from '../impersonation/impersonation.module';
 import { OwnerAuthController } from './owner-auth.controller';
 import { OwnerPortalController } from './owner-portal.controller';
 import { OwnerAccountController } from './owner-account.controller';
@@ -23,7 +24,9 @@ import { OwnerJwtGuard } from './owner-jwt.guard';
 @Module({
   // EntitlementsModule supplies the shared feature resolver so the owner's
   // subscription page reports exactly what the admin console resolves.
-  imports: [JwtModule.register({}), SharedAuthModule, EntitlementsModule],
+  // ImpersonationModule supplies ImpersonationAccessService: the owner guard
+  // honours a live `tavelo-impersonation` token as the owner it targets.
+  imports: [JwtModule.register({}), SharedAuthModule, EntitlementsModule, ImpersonationModule],
   controllers: [
     OwnerAuthController,
     OwnerPortalController,

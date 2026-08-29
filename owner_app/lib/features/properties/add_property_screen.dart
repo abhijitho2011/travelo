@@ -17,6 +17,7 @@ import '../../core/widgets/auth_scaffold.dart' show ButtonSpinner;
 import '../../core/widgets/cards.dart';
 import '../../core/widgets/primitives.dart';
 import '../../core/widgets/states.dart';
+import '../../core/widgets/impersonation_banner.dart';
 
 class AddPropertyScreen extends ConsumerStatefulWidget {
   const AddPropertyScreen({super.key});
@@ -271,11 +272,13 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
               },
             ),
             const SizedBox(height: 28),
-            FilledButton(
-              onPressed: _busy ? null : _submit,
-              child: _busy
-                  ? const ButtonSpinner()
-                  : const Text('Save property'),
+            ReadOnlyWhenImpersonating(
+              child: FilledButton(
+                onPressed: _busy ? null : _submit,
+                child: _busy
+                    ? const ButtonSpinner()
+                    : const Text('Save property'),
+              ),
             ),
           ],
         ),

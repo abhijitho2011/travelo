@@ -12,6 +12,7 @@ import '../../core/widgets/cards.dart';
 import '../../core/widgets/primitives.dart';
 import '../../core/widgets/states.dart';
 import '../../core/widgets/status_badge.dart';
+import '../../core/widgets/impersonation_banner.dart';
 import 'support_screen.dart' show ticketPriorityChip, ticketStatusChip;
 
 /// One ticket thread. The backend never sends Tavelo's internal notes, so
@@ -248,25 +249,27 @@ class _ReplyBox extends StatelessWidget {
             SizedBox(
               width: 48,
               height: 48,
-              child: FilledButton(
-                onPressed: sending ? null : onSend,
-                style: FilledButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(48, 48),
-                  shape: const CircleBorder(),
-                ),
-                child: sending
-                    ? SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.2,
-                          valueColor: AlwaysStoppedAnimation(
-                            c.primaryForeground,
+              child: ReadOnlyWhenImpersonating(
+                child: FilledButton(
+                  onPressed: sending ? null : onSend,
+                  style: FilledButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(48, 48),
+                    shape: const CircleBorder(),
+                  ),
+                  child: sending
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            valueColor: AlwaysStoppedAnimation(
+                              c.primaryForeground,
+                            ),
                           ),
-                        ),
-                      )
-                    : const Icon(Icons.send_rounded, size: 20),
+                        )
+                      : const Icon(Icons.send_rounded, size: 20),
+                ),
               ),
             ),
           ],

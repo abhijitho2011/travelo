@@ -5,6 +5,7 @@ import '../api/token_store.dart';
 import '../models/owner_models.dart';
 import 'auth_state.dart';
 import 'google_auth_service.dart';
+import 'impersonation.dart';
 
 /// Owner authentication controller.
 ///
@@ -16,10 +17,10 @@ class AuthController extends StateNotifier<AuthState> {
     required ApiClient api,
     required TokenStore tokens,
     required GoogleAuthService google,
-  })  : _api = api,
-        _tokens = tokens,
-        _google = google,
-        super(const AuthState.unknown());
+  }) : _api = api,
+       _tokens = tokens,
+       _google = google,
+       super(const AuthState.unknown());
 
   final ApiClient _api;
   final TokenStore _tokens;
@@ -48,10 +49,12 @@ class AuthController extends StateNotifier<AuthState> {
 
   /// Verify OTP → receive JWT pair → load profile.
   Future<void> verifyOtp({required String mobile, required String otp}) async {
-    final data = await _api.post(
-      '/auth/otp/verify',
-      body: {'mobile': mobile, 'otp': otp},
-    ) as Map;
+    final data =
+        await _api.post(
+              '/auth/otp/verify',
+              body: {'mobile': mobile, 'otp': otp},
+            )
+            as Map;
     await _tokens.save(
       access: data['accessToken'] as String,
       refresh: data['refreshToken'] as String,
@@ -63,10 +66,8 @@ class AuthController extends StateNotifier<AuthState> {
   /// session. The backend only issues tokens for an existing owner account.
   Future<void> signInWithGoogle() async {
     final idToken = await _google.signInAndGetIdToken();
-    final data = await _api.post(
-      '/auth/google',
-      body: {'idToken': idToken},
-    ) as Map;
+    final data =
+        await _api.post('/auth/google', body: {'idToken': idToken}) as Map;
     await _tokens.save(
       access: data['accessToken'] as String,
       refresh: data['refreshToken'] as String,
@@ -76,22 +77,39 @@ class AuthController extends StateNotifier<AuthState> {
 
   Future<void> _loadMe() async {
     final me = await _api.get('/auth/me') as Map;
-    final owner = OwnerProfile.fromJson(
-      (me['owner'] ?? me) as Map,
-    );
+    final owner = OwnerProfile.fromJson((me['owner'] ?? me) as Map);
     final subJson = me['subscription'];
     state = AuthState(
       phase: AuthPhase.authenticated,
       owner: owner,
       subscription: subJson is Map ? SubscriptionInfo.fromJson(subJson) : null,
+      // The server is the only authority on this. It is re-read on every
+      // bootstrap and refresh, so a session terminated from the admin console
+      // stops being reported here too.
+      impersonation: ImpersonationInfo.fromJson(me['impersonation']),
     );
+  }
+
+  /// Leaves a support session from the owner app.
+  ///
+  /// It cannot actually terminate the session: `POST /admin/impersonation/:id/
+  /// terminate` needs an ADMIN token, which this app has never held and must
+  /// not. So this drops the local tokens and returns to the sign-in screen —
+  /// the session itself lapses when the admin ends it or the token expires.
+  Future<void> endImpersonation() async {
+    // No /auth/logout call: it is a POST, and the API refuses writes under
+    // impersonation. Nothing to revoke locally beyond the stored tokens.
+    await _tokens.clear();
+    state = const AuthState.signedOut();
   }
 
   Future<void> refreshMe() async {
     if (!state.isAuthenticated) return;
     try {
       await _loadMe();
-    } catch (_) {/* keep last known state */}
+    } catch (_) {
+      /* keep last known state */
+    }
   }
 
   Future<void> signOut() async {

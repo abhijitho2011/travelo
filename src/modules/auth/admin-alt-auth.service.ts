@@ -8,7 +8,7 @@ import { getRequestContext } from '../../common/context/request-context';
 import { FirebaseService } from '../shared-auth/firebase.service';
 import { SMS_PROVIDER, SmsProvider } from '../shared-auth/sms/sms-provider.interface';
 import { maskMobile, normalizeEmail, normalizeMobile } from '../shared-auth/mobile.util';
-import { AuthService, AdminLoginResult } from './auth.service';
+import { AuthService, AdminSignInResult } from './auth.service';
 import { AdminOtpService } from './admin-otp.service';
 import { AdminAuthErrors } from './admin-auth-errors';
 
@@ -235,7 +235,7 @@ export class AdminAltAuthService implements OnModuleInit {
     };
   }
 
-  async verifyOtp(mobile: string, code: string): Promise<AdminLoginResult> {
+  async verifyOtp(mobile: string, code: string): Promise<AdminSignInResult> {
     try {
       const { adminId } = await this.otp.verify(mobile, code);
       return await this.auth.issueLoginForAdmin(adminId, 'otp');
@@ -245,7 +245,7 @@ export class AdminAltAuthService implements OnModuleInit {
     }
   }
 
-  async google(idToken: string): Promise<AdminLoginResult> {
+  async google(idToken: string): Promise<AdminSignInResult> {
     try {
       return await this.googleInner(idToken);
     } catch (err) {
@@ -253,7 +253,7 @@ export class AdminAltAuthService implements OnModuleInit {
     }
   }
 
-  private async googleInner(idToken: string): Promise<AdminLoginResult> {
+  private async googleInner(idToken: string): Promise<AdminSignInResult> {
     const allowedEmail = normalizeEmail(this.config.get<string>('SUPER_ADMIN_EMAIL'));
     if (!allowedEmail) {
       // Method cleanly disabled rather than crashing boot.

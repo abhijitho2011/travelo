@@ -14,6 +14,7 @@ import '../../core/widgets/cards.dart';
 import '../../core/widgets/primitives.dart';
 import '../../core/widgets/states.dart';
 import 'property_format.dart';
+import '../../core/widgets/impersonation_banner.dart';
 
 /// Edit what one hotel offers.
 ///
@@ -140,9 +141,13 @@ class _AmenitiesEditorState extends ConsumerState<_AmenitiesEditor> {
           children: catalogue.map(_chip).toList(),
         ),
         const SizedBox(height: 28),
-        FilledButton(
-          onPressed: _busy ? null : _save,
-          child: _busy ? const ButtonSpinner() : const Text('Save facilities'),
+        ReadOnlyWhenImpersonating(
+          child: FilledButton(
+            onPressed: _busy ? null : _save,
+            child: _busy
+                ? const ButtonSpinner()
+                : const Text('Save facilities'),
+          ),
         ),
       ],
     );

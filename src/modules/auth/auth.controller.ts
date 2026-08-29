@@ -8,7 +8,9 @@ import {
   RefreshDto,
 } from './dto/auth.dto';
 import { AdminAltAuthService } from './admin-alt-auth.service';
-import { AdminLoginResult } from './auth.service';
+import { AdminSignInResult, isMfaChallenge } from './auth.service';
+import { AdminMfaService } from './admin-mfa.service';
+import { AdminMfaChallengeDto } from './dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentAdmin, AuthenticatedAdmin } from '../../common/decorators/current-admin.decorator';
 import { Public } from '../../common/decorators/public.decorator';
@@ -21,10 +23,25 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly alt: AdminAltAuthService,
     private readonly perms: PermissionsService,
+    private readonly mfa: AdminMfaService,
   ) {}
 
-  /** Single place that shapes a successful sign-in, whatever the method. */
-  private static tokenResponse({ admin, tokens }: AdminLoginResult) {
+  /**
+   * Single place that shapes a sign-in outcome, whatever the method.
+   *
+   * For an MFA-enrolled admin that outcome is a CHALLENGE, not a session: no
+   * accessToken, no refreshToken, nothing the client can use against the API.
+   * The only way past it is POST /auth/mfa.
+   */
+  private static tokenResponse(result: AdminSignInResult) {
+    if (isMfaChallenge(result)) {
+      return {
+        mfaRequired: true as const,
+        mfaToken: result.mfaToken,
+        expiresIn: result.expiresInSeconds,
+      };
+    }
+    const { admin, tokens } = result;
     return {
       admin,
       accessToken: tokens.accessToken,
@@ -62,6 +79,18 @@ export class AuthController {
   @HttpCode(200)
   async google(@Body() dto: AdminGoogleLoginDto) {
     return AuthController.tokenResponse(await this.alt.google(dto.idToken));
+  }
+
+  /**
+   * Second factor. Exchanges the short-lived challenge token for a real
+   * session. Accepts a TOTP or an unused recovery code (which is burned).
+   */
+  @Public()
+  @Post('mfa')
+  @HttpCode(200)
+  async mfaChallenge(@Body() dto: AdminMfaChallengeDto) {
+    const { adminId, method } = await this.mfa.consumeChallenge(dto.mfaToken, dto.code);
+    return AuthController.tokenResponse(await this.auth.completeLoginAfterMfa(adminId, method));
   }
 
   @Public()

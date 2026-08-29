@@ -20,6 +20,13 @@ export interface RecordAuditInput {
 export class AuditService {
   constructor(@Inject(DRIZZLE) private readonly db: Database) {}
 
+  /**
+   * Under impersonation an entry MUST name both identities: `actorId` /
+   * `actorEmail` are the real admin behind the support session, and
+   * `impersonatedUserId` is the customer whose data was touched. Falling back
+   * to `actorAdminId` is what makes that true even on owner-API routes, where
+   * nothing ever sets `ctx.adminId` from an admin JWT.
+   */
   async record(input: RecordAuditInput): Promise<void> {
     const ctx = getRequestContext();
     await this.db.insert(auditLogs).values({
@@ -29,7 +36,7 @@ export class AuditService {
       before: input.before as never,
       after: input.after as never,
       reason: input.reason,
-      actorId: input.actorId ?? ctx?.adminId,
+      actorId: input.actorId ?? ctx?.adminId ?? ctx?.actorAdminId,
       actorEmail: input.actorEmail ?? ctx?.adminEmail,
       actorRole: input.actorRole ?? ctx?.adminRole,
       ip: ctx?.ip,

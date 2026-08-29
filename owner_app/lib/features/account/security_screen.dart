@@ -13,6 +13,7 @@ import '../../core/widgets/cards.dart';
 import '../../core/widgets/primitives.dart';
 import '../../core/widgets/states.dart';
 import '../../core/widgets/status_badge.dart';
+import '../../core/widgets/impersonation_banner.dart';
 
 /// Every device holding a live session, with a way to end any of them.
 class SecurityScreen extends ConsumerWidget {
@@ -101,13 +102,15 @@ class SecurityScreen extends ConsumerWidget {
             onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Cancel'),
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: dialogContext.colors.destructive,
-              foregroundColor: dialogContext.colors.destructiveForeground,
+          ReadOnlyWhenImpersonating(
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: dialogContext.colors.destructive,
+                foregroundColor: dialogContext.colors.destructiveForeground,
+              ),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Sign out others'),
             ),
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Sign out others'),
           ),
         ],
       ),
@@ -231,13 +234,15 @@ class _SessionCard extends ConsumerWidget {
             onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Cancel'),
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: dialogContext.colors.destructive,
-              foregroundColor: dialogContext.colors.destructiveForeground,
+          ReadOnlyWhenImpersonating(
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: dialogContext.colors.destructive,
+                foregroundColor: dialogContext.colors.destructiveForeground,
+              ),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Revoke'),
             ),
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Revoke'),
           ),
         ],
       ),

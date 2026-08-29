@@ -12,6 +12,7 @@ import '../../core/widgets/cards.dart';
 import '../../core/widgets/primitives.dart';
 import '../../core/widgets/states.dart';
 import '../../core/widgets/status_badge.dart';
+import '../../core/widgets/impersonation_banner.dart';
 
 class StaffScreen extends ConsumerWidget {
   const StaffScreen({super.key, required this.propertyId});
@@ -191,13 +192,15 @@ class _StaffCard extends ConsumerWidget {
                 onPressed: () => Navigator.pop(dialogContext, false),
                 child: const Text('Cancel'),
               ),
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: dialogContext.colors.destructive,
-                  foregroundColor: dialogContext.colors.destructiveForeground,
+              ReadOnlyWhenImpersonating(
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: dialogContext.colors.destructive,
+                    foregroundColor: dialogContext.colors.destructiveForeground,
+                  ),
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: const Text('Delete'),
                 ),
-                onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('Delete'),
               ),
             ],
           ),

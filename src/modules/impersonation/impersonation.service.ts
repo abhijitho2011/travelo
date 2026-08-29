@@ -7,6 +7,11 @@ import { DRIZZLE, Database } from '../../database/database.module';
 import { impersonationSessions } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { getRequestContext } from '../../common/context/request-context';
+import {
+  IMPERSONATION_AUDIENCE,
+  IMPERSONATION_ISSUER,
+  IMPERSONATION_TTL_SECONDS,
+} from './impersonation.constants';
 
 export interface StartImpersonationInput {
   actorAdminId: string;
@@ -19,8 +24,9 @@ export interface StartImpersonationInput {
 
 @Injectable()
 export class ImpersonationService {
-  static IMPERSONATION_ISSUER = 'tavelo-impersonation';
-  static IMPERSONATION_TTL_SECONDS = 60 * 60;
+  static IMPERSONATION_ISSUER = IMPERSONATION_ISSUER;
+  static IMPERSONATION_AUDIENCE = IMPERSONATION_AUDIENCE;
+  static IMPERSONATION_TTL_SECONDS = IMPERSONATION_TTL_SECONDS;
 
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
@@ -31,13 +37,20 @@ export class ImpersonationService {
   async start(input: StartImpersonationInput, audit: AuditService) {
     const ctx = getRequestContext();
     const jti = uuid();
+    // For an OWNER session the owner id IS the target user id. Callers pass one
+    // or the other; store both so the owner API can resolve the subject without
+    // having to know which field the console happened to fill in.
+    const targetUserId =
+      input.targetUserId ?? (input.targetUserType === 'OWNER' ? input.targetOwnerId : undefined);
+    const targetOwnerId =
+      input.targetOwnerId ?? (input.targetUserType === 'OWNER' ? input.targetUserId : undefined);
     const [row] = await this.db
       .insert(impersonationSessions)
       .values({
         actorAdminId: input.actorAdminId,
         targetUserType: input.targetUserType,
-        targetUserId: input.targetUserId,
-        targetOwnerId: input.targetOwnerId,
+        targetUserId,
+        targetOwnerId,
         targetPropertyId: input.targetPropertyId,
         reason: input.reason,
         ip: ctx?.ip,
@@ -49,7 +62,7 @@ export class ImpersonationService {
     const token = await this.issueToken({
       sessionId: row.id,
       actorAdminId: input.actorAdminId,
-      targetUserId: input.targetUserId,
+      targetUserId,
       jti,
     });
 
@@ -85,9 +98,10 @@ export class ImpersonationService {
       },
       {
         secret: this.config.getOrThrow<string>('JWT_ACCESS_SECRET'),
-        issuer: ImpersonationService.IMPERSONATION_ISSUER,
+        issuer: IMPERSONATION_ISSUER,
+        audience: IMPERSONATION_AUDIENCE,
         jwtid: payload.jti,
-        expiresIn: `${ImpersonationService.IMPERSONATION_TTL_SECONDS}s`,
+        expiresIn: `${IMPERSONATION_TTL_SECONDS}s`,
       },
     );
   }
