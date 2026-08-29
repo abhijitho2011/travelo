@@ -134,10 +134,13 @@ export class OwnersService {
         });
       }
 
+      // Only a live owner blocks the email. A soft-deleted owner keeps its row
+      // for billing/audit history but must not reserve the address forever, so
+      // the same email can be used to create a fresh owner after deletion.
       const existing = await tx
         .select({ id: owners.id })
         .from(owners)
-        .where(eq(owners.email, email))
+        .where(and(eq(owners.email, email), isNull(owners.deletedAt)))
         .limit(1);
       if (existing.length) throw new ConflictException('Owner email already exists');
 

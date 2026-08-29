@@ -32,7 +32,9 @@ export const owners = pgTable(
       .primaryKey()
       .default(sql`gen_random_uuid()`),
     name: varchar('name', { length: 255 }).notNull(),
-    email: varchar('email', { length: 255 }).notNull().unique(),
+    // Uniqueness is enforced by a PARTIAL unique index (below) that ignores
+    // soft-deleted rows, so an email can be reused after an owner is deleted.
+    email: varchar('email', { length: 255 }).notNull(),
     phone: varchar('phone', { length: 64 }),
     mobile: varchar('mobile', { length: 32 }),
     emailVerified: boolean('email_verified').notNull().default(false),
@@ -58,6 +60,9 @@ export const owners = pgTable(
   (t) => ({
     statusIdx: index('owners_status_idx').on(t.status),
     emailIdx: index('owners_email_idx').on(t.email),
+    emailActiveUniq: uniqueIndex('owners_email_active_unique')
+      .on(t.email)
+      .where(sql`deleted_at IS NULL`),
     stateIdx: index('owners_state_idx').on(t.stateId),
     districtIdx: index('owners_district_idx').on(t.districtId),
     nameTrgm: index('owners_name_trgm_idx').using('gin', sql`${t.name} gin_trgm_ops`),
