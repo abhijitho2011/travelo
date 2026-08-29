@@ -1,0 +1,276 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+  VERSION_NEUTRAL,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { StaffJwtGuard } from '../staff-auth/staff-jwt.guard';
+import {
+  RequireStaffPermissions,
+  StaffPermissionsGuard,
+} from '../staff-auth/staff-permissions.guard';
+import { CurrentStaff, AuthenticatedStaff } from '../staff-auth/current-staff.decorator';
+import { AuditService } from '../audit/audit.service';
+import { AmenitiesService } from './amenities.service';
+import { RoomTypesService } from './room-types.service';
+import { RoomsService } from './rooms.service';
+import {
+  BulkCreateRoomsDto,
+  CreateRoomDto,
+  RoomFilterDto,
+  RoomTypeFilterDto,
+  RoomTypeInputDto,
+  SetRoomStatusDto,
+  UpdateRoomDto,
+  UpdateRoomTypeDto,
+} from './dto';
+
+/**
+ * Room types, per property. GM/AGM own these; nobody else writes them.
+ *
+ * Every route resolves rows by (id, the CALLER'S OWN propertyId) — the property
+ * is never a parameter a client supplies, so there is no cross-property call to
+ * make in the first place, and a foreign id 404s.
+ */
+@ApiTags('Staff Room Types')
+@ApiBearerAuth()
+@UseGuards(StaffJwtGuard, StaffPermissionsGuard)
+@Controller({ path: 'api/v1/staff/room-types', version: VERSION_NEUTRAL })
+export class StaffRoomTypesController {
+  constructor(
+    private readonly roomTypes: RoomTypesService,
+    private readonly audit: AuditService,
+  ) {}
+
+  @Get()
+  @RequireStaffPermissions('roomtype.read')
+  list(@CurrentStaff() me: AuthenticatedStaff, @Query() q: RoomTypeFilterDto) {
+    return this.roomTypes.list(me.propertyId, q);
+  }
+
+  @Get(':id')
+  @RequireStaffPermissions('roomtype.read')
+  get(@CurrentStaff() me: AuthenticatedStaff, @Param('id') id: string) {
+    return this.roomTypes.get(me.propertyId, id);
+  }
+
+  @Post()
+  @RequireStaffPermissions('roomtype.create')
+  async create(@CurrentStaff() me: AuthenticatedStaff, @Body() dto: RoomTypeInputDto) {
+    const row = await this.roomTypes.create(me.propertyId, dto);
+    await this.audit.record({
+      action: 'staff.roomtype.created',
+      entity: 'room_type',
+      entityId: row.id,
+      after: row,
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return row;
+  }
+
+  @Patch(':id')
+  @RequireStaffPermissions('roomtype.update')
+  async update(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @Body() dto: UpdateRoomTypeDto,
+  ) {
+    const { before, after } = await this.roomTypes.update(me.propertyId, id, dto);
+    await this.audit.record({
+      action: 'staff.roomtype.updated',
+      entity: 'room_type',
+      entityId: id,
+      before,
+      after,
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return after;
+  }
+
+  @Delete(':id')
+  @RequireStaffPermissions('roomtype.delete')
+  async remove(@CurrentStaff() me: AuthenticatedStaff, @Param('id') id: string) {
+    const res = await this.roomTypes.remove(me.propertyId, id);
+    await this.audit.record({
+      action: 'staff.roomtype.deleted',
+      entity: 'room_type',
+      entityId: id,
+      before: res.before,
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return { id: res.id, deleted: res.deleted };
+  }
+}
+
+/**
+ * Rooms, per property.
+ *
+ * The permission split is the whole design:
+ *   room.read          — everyone who needs the board (reception, housekeeping,
+ *                        attendants, technicians)
+ *   room.status.update — the people who actually turn rooms over. NARROW: the
+ *                        `:id/status` route below touches only `status`.
+ *   room.create/update/delete — GM and AGM only. Renumbering a floor, moving a
+ *                        room to a pricier type or removing it is a management
+ *                        act, and folding it into the status route would hand
+ *                        it to every room attendant.
+ */
+@ApiTags('Staff Rooms')
+@ApiBearerAuth()
+@UseGuards(StaffJwtGuard, StaffPermissionsGuard)
+@Controller({ path: 'api/v1/staff/rooms', version: VERSION_NEUTRAL })
+export class StaffRoomsController {
+  constructor(
+    private readonly rooms: RoomsService,
+    private readonly audit: AuditService,
+  ) {}
+
+  @Get()
+  @RequireStaffPermissions('room.read')
+  list(@CurrentStaff() me: AuthenticatedStaff, @Query() q: RoomFilterDto) {
+    return this.rooms.list(me.propertyId, q);
+  }
+
+  @Post()
+  @RequireStaffPermissions('room.create')
+  async create(@CurrentStaff() me: AuthenticatedStaff, @Body() dto: CreateRoomDto) {
+    const row = await this.rooms.create(me.propertyId, dto);
+    await this.audit.record({
+      action: 'staff.room.created',
+      entity: 'room',
+      entityId: row.id,
+      after: row,
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return row;
+  }
+
+  /**
+   * Bulk create. Declared BEFORE `:id` so "bulk" is never swallowed as an id.
+   */
+  @Post('bulk')
+  @RequireStaffPermissions('room.create')
+  async bulkCreate(@CurrentStaff() me: AuthenticatedStaff, @Body() dto: BulkCreateRoomsDto) {
+    const res = await this.rooms.bulkCreate(me.propertyId, dto);
+    await this.audit.record({
+      action: 'staff.room.bulk_created',
+      entity: 'room',
+      entityId: dto.roomTypeId,
+      after: {
+        requested: res.requested,
+        created: res.created,
+        skipped: res.skipped,
+        floor: dto.floor,
+      },
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return res;
+  }
+
+  @Get(':id')
+  @RequireStaffPermissions('room.read')
+  get(@CurrentStaff() me: AuthenticatedStaff, @Param('id') id: string) {
+    return this.rooms.get(me.propertyId, id);
+  }
+
+  @Patch(':id')
+  @RequireStaffPermissions('room.update')
+  async update(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @Body() dto: UpdateRoomDto,
+  ) {
+    const { before, after } = await this.rooms.update(me.propertyId, id, dto);
+    await this.audit.record({
+      action: 'staff.room.updated',
+      entity: 'room',
+      entityId: id,
+      before,
+      after,
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return after;
+  }
+
+  /**
+   * The narrow status route. Requires `room.status.update`, NOT `room.update`,
+   * so housekeeping and reception can turn a room over without gaining the
+   * ability to edit it. The DTO's @IsIn already rejects a status outside the
+   * eight-state set, so an invalid transition never reaches the database.
+   */
+  @Post(':id/status')
+  @RequireStaffPermissions('room.status.update')
+  async setStatus(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @Body() dto: SetRoomStatusDto,
+  ) {
+    const res = await this.rooms.setStatus(me.propertyId, id, dto.status, dto.note);
+    await this.audit.record({
+      action: 'staff.room.status_changed',
+      entity: 'room',
+      entityId: id,
+      before: { status: res.previousStatus },
+      after: { status: res.status, number: res.number },
+      reason: dto.note,
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return res;
+  }
+
+  @Delete(':id')
+  @RequireStaffPermissions('room.delete')
+  async remove(@CurrentStaff() me: AuthenticatedStaff, @Param('id') id: string) {
+    const res = await this.rooms.remove(me.propertyId, id);
+    await this.audit.record({
+      action: 'staff.room.deleted',
+      entity: 'room',
+      entityId: id,
+      before: { number: res.number },
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return res;
+  }
+}
+
+/**
+ * The catalogue, read-only, for the room-type form's amenity picker.
+ * ACTIVE only — an archived entry stays attached where it already is but is
+ * never offered again.
+ */
+@ApiTags('Staff Amenities')
+@ApiBearerAuth()
+@UseGuards(StaffJwtGuard, StaffPermissionsGuard)
+@Controller({ path: 'api/v1/staff/amenities', version: VERSION_NEUTRAL })
+export class StaffAmenitiesController {
+  constructor(private readonly amenities: AmenitiesService) {}
+
+  @Get()
+  @RequireStaffPermissions('roomtype.read')
+  list() {
+    return this.amenities.listActive('ROOM');
+  }
+}

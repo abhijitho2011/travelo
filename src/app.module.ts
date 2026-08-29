@@ -17,6 +17,7 @@ import { OwnerAuthModule } from './modules/owner-auth/owner-auth.module';
 import { StaffAuthModule } from './modules/staff-auth/staff-auth.module';
 import { PropertiesModule } from './modules/properties/properties.module';
 import { StaffModule } from './modules/staff/staff.module';
+import { RoomsModule } from './modules/rooms/rooms.module';
 import { EntitlementsModule } from './modules/entitlements/entitlements.module';
 import { PlansModule } from './modules/plans/plans.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
@@ -81,6 +82,7 @@ import { ConfigService } from '@nestjs/config';
     EntitlementsModule,
     PropertiesModule,
     StaffModule,
+    RoomsModule,
     PlansModule,
     SubscriptionsModule,
     BillingModule,

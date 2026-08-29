@@ -255,7 +255,7 @@ class _PropertyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       borderRadius: BorderRadius.circular(AppRadius.lg),
-      onTap: () => context.push('/properties/${property.id}/staff'),
+      onTap: () => context.push('/properties/${property.id}', extra: property),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(

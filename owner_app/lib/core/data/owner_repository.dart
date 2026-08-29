@@ -72,6 +72,47 @@ class OwnerRepository {
   Future<void> deleteStaff(String propertyId, String staffId) =>
       _api.delete('/properties/$propertyId/staff/$staffId');
 
+  // ---------- Inventory: amenities, room types, rooms ----------
+
+  /// What this hotel offers plus the catalogue to pick from, in one call.
+  Future<PropertyAmenities> propertyAmenities(String propertyId) async =>
+      PropertyAmenities.fromJson(
+        await _api.get('/properties/$propertyId/amenities') as Map,
+      );
+
+  /// PUT semantics: [ids] is the COMPLETE desired set, so an amenity left out
+  /// is removed. Returns the hotel's facilities as the server now holds them.
+  Future<List<Amenity>> setPropertyAmenities(
+    String propertyId,
+    List<String> ids,
+  ) async {
+    final d = await _api.put(
+      '/properties/$propertyId/amenities',
+      body: {'amenityIds': ids},
+    );
+    final list = d is Map ? (d['selected'] ?? []) : d;
+    return (list as List).map((e) => Amenity.fromJson(e as Map)).toList();
+  }
+
+  /// Read-only. Owners do not create room types — the GM does, from the staff
+  /// app — so there is no create/update counterpart here.
+  Future<List<RoomType>> propertyRoomTypes(String propertyId) async {
+    final d = await _api.get('/properties/$propertyId/room-types');
+    final list = d is Map ? (d['items'] ?? []) : d;
+    return (list as List).map((e) => RoomType.fromJson(e as Map)).toList();
+  }
+
+  /// Read-only, same reasoning. Asks for the server's maximum page so the
+  /// by-status summary covers a whole hotel rather than the first 100 rooms.
+  Future<List<Room>> propertyRooms(String propertyId) async {
+    final d = await _api.get(
+      '/properties/$propertyId/rooms',
+      query: {'limit': 200},
+    );
+    final list = d is Map ? (d['items'] ?? []) : d;
+    return (list as List).map((e) => Room.fromJson(e as Map)).toList();
+  }
+
   /// Admin-managed state → districts reference. Falls back to a bundled asset
   /// (loaded by the caller) when the endpoint is unavailable.
   Future<Map<String, List<String>>> locations() async {
@@ -166,6 +207,25 @@ final propertiesProvider = FutureProvider.autoDispose<List<Property>>(
 final staffProvider =
     FutureProvider.autoDispose.family<List<StaffMember>, String>(
   (ref, propertyId) => ref.watch(ownerRepositoryProvider).staff(propertyId),
+);
+
+/// All three are keyed on the property id, so opening a second hotel never
+/// shows the first one's inventory while its own request is in flight.
+final propertyAmenitiesProvider =
+    FutureProvider.autoDispose.family<PropertyAmenities, String>(
+  (ref, propertyId) =>
+      ref.watch(ownerRepositoryProvider).propertyAmenities(propertyId),
+);
+
+final propertyRoomTypesProvider =
+    FutureProvider.autoDispose.family<List<RoomType>, String>(
+  (ref, propertyId) =>
+      ref.watch(ownerRepositoryProvider).propertyRoomTypes(propertyId),
+);
+
+final propertyRoomsProvider =
+    FutureProvider.autoDispose.family<List<Room>, String>(
+  (ref, propertyId) => ref.watch(ownerRepositoryProvider).propertyRooms(propertyId),
 );
 
 final ownerAccountProvider = FutureProvider.autoDispose<OwnerAccount>(

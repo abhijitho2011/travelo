@@ -12,6 +12,8 @@ import 'features/auth/login_screen.dart';
 import 'features/dashboard/portfolio_screen.dart';
 import 'features/properties/add_property_screen.dart';
 import 'features/properties/properties_screen.dart';
+import 'features/properties/property_amenities_screen.dart';
+import 'features/properties/property_detail_screen.dart';
 import 'features/staff/add_staff_screen.dart';
 import 'features/staff/edit_staff_screen.dart';
 import 'features/staff/staff_screen.dart';
@@ -51,7 +53,23 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/invite', builder: (_, __) => const InviteScreen()),
       GoRoute(path: '/', builder: (_, __) => const PortfolioScreen()),
       GoRoute(path: '/properties', builder: (_, __) => const PropertiesScreen()),
+      // Declared BEFORE '/properties/:pid', otherwise the parameterised route
+      // matches 'new' as a property id and swallows it.
       GoRoute(path: '/properties/new', builder: (_, __) => const AddPropertyScreen()),
+      GoRoute(
+        // The property travels as `extra` from the portfolio and property
+        // lists; on a cold deep link it is null and the screen looks it up.
+        path: '/properties/:pid',
+        builder: (_, s) => PropertyDetailScreen(
+          propertyId: s.pathParameters['pid']!,
+          property: s.extra is Property ? s.extra as Property : null,
+        ),
+      ),
+      GoRoute(
+        path: '/properties/:pid/amenities',
+        builder: (_, s) =>
+            PropertyAmenitiesScreen(propertyId: s.pathParameters['pid']!),
+      ),
       GoRoute(
         path: '/properties/:pid/staff',
         builder: (_, s) => StaffScreen(propertyId: s.pathParameters['pid']!),

@@ -117,7 +117,9 @@ void main() {
   });
   const hrPermissions = PermissionSet({'staff.read'});
 
-  testWidgets('the tablet rail carries a More destination', (tester) async {
+  testWidgets('the tablet rail lists every destination, with no More entry', (
+    tester,
+  ) async {
     await pumpShell(
       tester,
       config: gm,
@@ -127,47 +129,13 @@ void main() {
 
     expect(find.byType(NavigationRail), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
-    expect(find.text('More'), findsOneWidget);
+    // The rail has room for everything, so More is never rendered on a tablet.
+    expect(find.text('More'), findsNothing);
   });
 
-  testWidgets('selecting More on the rail opens the sheet', (tester) async {
-    await pumpShell(
-      tester,
-      config: gm,
-      permissions: gmPermissions,
-      surface: shortTablet,
-    );
-
-    await tester.tap(find.text('More'));
-    await tester.pumpAndSettle();
-
-    // The sheet is up: its own heading joins the rail's label.
-    expect(find.text('More'), findsNWidgets(2));
-    // …and the role's modules are in it.
-    expect(find.text(gm.moreMenu.first.label), findsOneWidget);
-  });
-
-  testWidgets('a long More list scrolls to its last entry', (tester) async {
-    await pumpShell(
-      tester,
-      config: gm,
-      permissions: gmPermissions,
-      surface: shortTablet,
-    );
-
-    await tester.tap(find.text('More'));
-    await tester.pumpAndSettle();
-
-    // The GM's twelve destinations do not fit the sheet at this height, so the
-    // tail starts off screen…
-    expect(find.text('Help & support'), findsNothing);
-    // …and is reachable only because the sheet scrolls.
-    await tester.drag(find.byType(ListView), const Offset(0, -400));
-    await tester.pumpAndSettle();
-    expect(find.text('Help & support'), findsOneWidget);
-  });
-
-  testWidgets('a More destination navigates', (tester) async {
+  testWidgets('rail destinations that used to live under More navigate', (
+    tester,
+  ) async {
     await pumpShell(
       tester,
       config: hr,
@@ -175,15 +143,17 @@ void main() {
       surface: shortTablet,
     );
 
-    await tester.tap(find.text('More'));
-    await tester.pumpAndSettle();
+    // 'Help & support' is a moreMenu entry — on a tablet it is a rail
+    // destination reachable in one tap rather than two.
+    await tester.scrollUntilVisible(find.text('Help & support'), 200,
+        scrollable: find.byType(Scrollable).first);
     await tester.tap(find.text('Help & support'));
     await tester.pumpAndSettle();
 
     expect(find.text('page ${Routes.support}'), findsOneWidget);
   });
 
-  testWidgets('the rail scrolls, so a long list cannot hide More', (
+  testWidgets('the rail scrolls, so a long list stays reachable', (
     tester,
   ) async {
     await pumpShell(
@@ -220,14 +190,14 @@ void main() {
     expect(find.text(gm.moreMenu.first.label), findsOneWidget);
   });
 
-  testWidgets('HR gets Team, Submitted, Profile and a More sheet', (
+  testWidgets('HR gets Team, Submitted, Profile and a More sheet on a phone', (
     tester,
   ) async {
     await pumpShell(
       tester,
       config: hr,
       permissions: hrPermissions,
-      surface: shortTablet,
+      surface: phone,
     );
 
     expect(find.text('Team'), findsWidgets);

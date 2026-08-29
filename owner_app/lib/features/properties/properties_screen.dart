@@ -36,7 +36,9 @@ class PropertiesScreen extends ConsumerWidget {
             return Card(
               child: ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                onTap: () => context.push('/properties/${p.id}/staff'),
+                // The record travels with the navigation so the detail
+                // screen renders its header without a second fetch.
+                onTap: () => context.push('/properties/${p.id}', extra: p),
                 leading: const CircleAvatar(
                   backgroundColor: AppColors.primarySoft,
                   child: Icon(Icons.location_city, color: AppColors.primaryDark),

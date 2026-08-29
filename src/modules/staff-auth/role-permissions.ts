@@ -57,8 +57,18 @@ const GENERAL_MANAGER: readonly string[] = [
   'guest.read',
   'guest.create',
   'guest.update',
+  // The rooms/room-types foundation. Management owns the inventory: only GM and
+  // AGM create, rename or retire a room or a room type. Operational roles get
+  // `room.read` and, where they actually turn rooms over, `room.status.update`
+  // — never `room.update`, which would let a room attendant renumber a floor.
+  'roomtype.read',
+  'roomtype.create',
+  'roomtype.update',
+  'roomtype.delete',
   'room.read',
+  'room.create',
   'room.update',
+  'room.delete',
   'room.status.update',
   'rate.read',
   'rate.update',
@@ -155,6 +165,10 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
     'guest.read',
     'guest.create',
     'room.read',
+    // Reception flips a room to OCCUPIED on check-in and to DIRTY on check-out.
+    // That is `room.status.update` — the narrow endpoint — and NOT `room.update`,
+    // so the desk can never renumber a room or change its rate.
+    'room.status.update',
     'keycard.issue',
     'payment.collect',
   ],
@@ -211,7 +225,15 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
     'staff.attendance.read',
   ],
 
-  ROOM_ATTENDANT: ['task.read', 'task.start', 'task.complete', 'maintenance.report', 'room.read'],
+  ROOM_ATTENDANT: [
+    'task.read',
+    'task.start',
+    'task.complete',
+    'maintenance.report',
+    'room.read',
+    // Marks a room CLEANING then INSPECTED as they work through it.
+    'room.status.update',
+  ],
 
   CLEANING_STAFF: ['task.read', 'task.start', 'task.complete', 'maintenance.report', 'area.read'],
 

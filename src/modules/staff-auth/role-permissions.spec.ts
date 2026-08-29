@@ -94,6 +94,7 @@ describe('staff role → permission map', () => {
         'guest.read',
         'guest.create',
         'room.read',
+        'room.status.update',
         'keycard.issue',
         'payment.collect',
       ].sort(),
@@ -102,7 +103,14 @@ describe('staff role → permission map', () => {
 
   it('gives the ROOM_ATTENDANT exactly the task set', () => {
     expect(permissionsForRole('ROOM_ATTENDANT').sort()).toEqual(
-      ['task.read', 'task.start', 'task.complete', 'maintenance.report', 'room.read'].sort(),
+      [
+        'task.read',
+        'task.start',
+        'task.complete',
+        'maintenance.report',
+        'room.read',
+        'room.status.update',
+      ].sort(),
     );
   });
 

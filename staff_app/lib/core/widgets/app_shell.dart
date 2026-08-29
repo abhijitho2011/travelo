@@ -32,11 +32,21 @@ class AppShell extends ConsumerWidget {
 
     final location = GoRouterState.of(context).uri.path;
 
+    // Tablets get a side rail instead of a bottom bar: on a 10" screen a bottom
+    // bar strands navigation far from the hands holding the device, and wastes
+    // the horizontal space the rail uses well.
+    final isTablet = MediaQuery.sizeOf(context).shortestSide >= _tabletBreakpoint;
+
+    // "More" only exists because a bottom bar cannot hold a dozen destinations.
+    // The rail can (it scrolls), so on a tablet every destination is listed
+    // directly and there is no More entry to tap through.
+    final items = isTablet ? [...nav, ...more] : nav;
+
     // A role with nothing in More gets no More destination at all — an empty
     // sheet is worse than an absent button.
-    final showMore = more.isNotEmpty;
+    final showMore = !isTablet && more.isNotEmpty;
     final destinations = <NavigationDestination>[
-      for (final item in nav)
+      for (final item in items)
         NavigationDestination(
           icon: Icon(item.icon),
           label: item.label,
@@ -50,8 +60,7 @@ class AppShell extends ConsumerWidget {
         ),
     ];
 
-    // The More destination is always last, in the rail exactly as in the bottom
-    // bar — both call this one function, so neither can drop it.
+    // The More destination, when present, is always last.
     final moreIndex = showMore ? destinations.length - 1 : -1;
 
     void onSelect(int i) {
@@ -59,23 +68,21 @@ class AppShell extends ConsumerWidget {
         _MoreSheet.show(context, more, current: location);
         return;
       }
-      context.go(nav[i].route);
+      context.go(items[i].route);
     }
 
-    // Sitting on a More destination lights "More" rather than leaving the first
-    // tab lit on a screen it does not serve.
-    final navMatch = _selectedIndex(nav.map((n) => n.route).toList(), location);
+    // On a phone, sitting on a More destination lights "More" rather than
+    // leaving the first tab lit on a screen it does not serve. On a tablet the
+    // destination is in the rail itself, so it matches directly.
+    final itemMatch = _selectedIndex(items.map((n) => n.route).toList(), location);
     final moreMatch = _selectedIndex(more.map((n) => n.route).toList(), location);
-    final index = navMatch >= 0
-        ? navMatch
+    final index = itemMatch >= 0
+        ? itemMatch
         : (showMore && moreMatch >= 0 ? moreIndex : 0);
     final hasNav = destinations.length >= 2;
 
-    // Tablets get a side rail instead of a bottom bar: on a 10" screen a bottom
-    // bar strands navigation far from the hands holding the device, and wastes
-    // the horizontal space the rail uses well.
-    final isTablet = MediaQuery.sizeOf(context).shortestSide >= _tabletBreakpoint;
-
+    // The rail branch below reuses everything above, so the two layouts can
+    // never disagree about what is selected or where a tap goes.
     if (isTablet && hasNav) {
       return Scaffold(
         backgroundColor: c.background,
@@ -254,6 +261,11 @@ class _TopBar extends ConsumerWidget implements PreferredSizeWidget {
           ),
         ),
         _BellButton(unread: unread),
+        IconButton(
+          tooltip: 'Sign out',
+          onPressed: () => _confirmSignOut(context, ref),
+          icon: const Icon(Icons.logout_rounded, size: 20),
+        ),
         Padding(
           padding: const EdgeInsets.only(right: Sp.sm),
           child: IconButton(
@@ -280,6 +292,34 @@ class _TopBar extends ConsumerWidget implements PreferredSizeWidget {
       ),
     );
   }
+}
+
+/// Signing out is one tap from every screen, so it asks first — an accidental
+/// press mid-shift would otherwise cost a staff member an OTP round trip.
+Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
+  final c = context.colors;
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Sign out?'),
+      content: const Text(
+        'You will need your mobile number and a new code to sign back in.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: c.destructive),
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: const Text('Sign out'),
+        ),
+      ],
+    ),
+  );
+  if (ok != true) return;
+  await ref.read(authControllerProvider.notifier).signOut();
 }
 
 /// The chip only occupies space when it has something to say.

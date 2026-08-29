@@ -556,3 +556,197 @@ class OwnerSession {
     return browser == null ? platform : '$browser on $platform';
   }
 }
+
+// ---------------------------------------------------------------------------
+// Amenities, room types and rooms
+// ---------------------------------------------------------------------------
+
+/// One entry from the admin-managed amenity catalogue.
+///
+/// [icon] is a Material icon NAME, not a codepoint — the catalogue is edited in
+/// the admin portal and has to stay renderable on web, Android and iOS without
+/// a redeploy. Screens resolve it through a const lookup table (see
+/// `amenityIcon` in the properties feature); constructing `IconData` from a
+/// runtime codepoint would defeat icon tree-shaking.
+class Amenity {
+  final String id;
+  final String key;
+  final String name;
+  final String scope; // PROPERTY / ROOM
+  final String icon;
+  final int sortOrder;
+  final String status;
+
+  const Amenity({
+    required this.id,
+    required this.key,
+    required this.name,
+    required this.scope,
+    required this.icon,
+    required this.sortOrder,
+    required this.status,
+  });
+
+  factory Amenity.fromJson(Map j) => Amenity(
+        id: _asStr(j['id']),
+        key: _asStr(j['key']),
+        name: _asStr(j['name']),
+        scope: _asStr(j['scope'] ?? j['amenityScope']),
+        // Room-type/room payloads carry a trimmed amenity ref with no icon, and
+        // the catalogue column is nullable — both land here as ''.
+        icon: _asStr(j['icon']),
+        sortOrder: _asInt(j['sortOrder'] ?? j['sort_order']),
+        status: _asStr(j['status']),
+      );
+}
+
+/// What one hotel offers, together with the full catalogue to pick from. The
+/// backend returns both in one call because the editor needs both, and a second
+/// round trip to render a checklist is wasted latency.
+class PropertyAmenities {
+  final List<Amenity> selected;
+  final List<String> selectedIds;
+  final List<Amenity> catalogue;
+
+  const PropertyAmenities({
+    required this.selected,
+    required this.selectedIds,
+    required this.catalogue,
+  });
+
+  factory PropertyAmenities.fromJson(Map j) {
+    final selected = _amenityList(j['selected']);
+    final ids = (j['selectedIds'] ?? j['selected_ids']) as List?;
+    return PropertyAmenities(
+      selected: selected,
+      // Fall back to the ids on `selected` so the editor still seeds correctly
+      // if the shorthand list ever goes missing.
+      selectedIds: ids == null
+          ? selected.map((a) => a.id).toList()
+          : ids.map((e) => _asStr(e)).toList(),
+      catalogue: _amenityList(j['catalogue']),
+    );
+  }
+}
+
+List<Amenity> _amenityList(dynamic v) => v is List
+    ? v.whereType<Map>().map(Amenity.fromJson).toList()
+    : const <Amenity>[];
+
+/// A room type as the GM configured it. Read-only for owners: room types are
+/// operational, and a second create button would put two people in charge of
+/// the same numbers.
+class RoomType {
+  final String id;
+  final String propertyId;
+  final String name;
+  final String description;
+  final String bedType;
+  final int bedCount;
+  final int maxOccupancy;
+  final int maxAdults;
+  final int maxChildren;
+  final bool airConditioned;
+  final int baseRate; // paise
+  final String currency;
+  final int sizeSqft; // 0 when unset
+  final String status;
+  final List<Amenity> amenities;
+  final int roomCount;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  const RoomType({
+    required this.id,
+    required this.propertyId,
+    required this.name,
+    required this.description,
+    required this.bedType,
+    required this.bedCount,
+    required this.maxOccupancy,
+    required this.maxAdults,
+    required this.maxChildren,
+    required this.airConditioned,
+    required this.baseRate,
+    required this.currency,
+    required this.sizeSqft,
+    required this.status,
+    required this.amenities,
+    required this.roomCount,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  factory RoomType.fromJson(Map j) => RoomType(
+        id: _asStr(j['id']),
+        propertyId: _asStr(j['propertyId'] ?? j['property_id']),
+        name: _asStr(j['name']),
+        description: _asStr(j['description']),
+        bedType: _asStr(j['bedType'] ?? j['bed_type']),
+        bedCount: _asInt(j['bedCount'] ?? j['bed_count']),
+        maxOccupancy: _asInt(j['maxOccupancy'] ?? j['max_occupancy']),
+        maxAdults: _asInt(j['maxAdults'] ?? j['max_adults']),
+        maxChildren: _asInt(j['maxChildren'] ?? j['max_children']),
+        airConditioned: (j['airConditioned'] ?? j['air_conditioned']) == true,
+        baseRate: _asInt(j['baseRate'] ?? j['base_rate']),
+        currency: _asStr(j['currency']).isEmpty ? 'INR' : _asStr(j['currency']),
+        sizeSqft: _asInt(j['sizeSqft'] ?? j['size_sqft']),
+        status: _asStr(j['status']),
+        amenities: _amenityList(j['amenities']),
+        roomCount: _asInt(j['roomCount'] ?? j['room_count']),
+        createdAt: _asDate(j['createdAt'] ?? j['created_at']),
+        updatedAt: _asDate(j['updatedAt'] ?? j['updated_at']),
+      );
+}
+
+/// One physical room. Also read-only for owners.
+class Room {
+  final String id;
+  final String propertyId;
+  final String roomTypeId;
+  final String roomTypeName;
+  final String bedType;
+  final bool airConditioned;
+  final String number;
+
+  /// A varchar on the backend, not a number — "G", "LG" and "M" are floors in
+  /// plenty of hotels. Empty when the GM has not assigned one.
+  final String floor;
+  final String status;
+  final String notes;
+  final List<Amenity> amenities;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  const Room({
+    required this.id,
+    required this.propertyId,
+    required this.roomTypeId,
+    required this.roomTypeName,
+    required this.bedType,
+    required this.airConditioned,
+    required this.number,
+    required this.floor,
+    required this.status,
+    required this.notes,
+    required this.amenities,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  factory Room.fromJson(Map j) => Room(
+        id: _asStr(j['id']),
+        propertyId: _asStr(j['propertyId'] ?? j['property_id']),
+        roomTypeId: _asStr(j['roomTypeId'] ?? j['room_type_id']),
+        roomTypeName: _asStr(j['roomTypeName'] ?? j['room_type_name']),
+        bedType: _asStr(j['bedType'] ?? j['bed_type']),
+        airConditioned: (j['airConditioned'] ?? j['air_conditioned']) == true,
+        number: _asStr(j['number']),
+        floor: _asStr(j['floor']),
+        status: _asStr(j['status']),
+        notes: _asStr(j['notes']),
+        amenities: _amenityList(j['amenities']),
+        createdAt: _asDate(j['createdAt'] ?? j['created_at']),
+        updatedAt: _asDate(j['updatedAt'] ?? j['updated_at']),
+      );
+}
