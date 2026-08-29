@@ -1,0 +1,131 @@
+import { hotelStaffRoleValues } from '../../database/schema';
+import { STAFF_ROLE_PERMISSIONS, permissionsForRole, roleHasPermission } from './role-permissions';
+
+/** Money, ownership and people-cost namespaces that operational roles must never see. */
+const SENSITIVE = /^(finance|revenue|payroll|payment|procurement|owner)\./;
+
+describe('staff role → permission map', () => {
+  it('covers all 23 roles with a non-empty list', () => {
+    expect(hotelStaffRoleValues).toHaveLength(23);
+    for (const role of hotelStaffRoleValues) {
+      const perms = STAFF_ROLE_PERMISSIONS[role];
+      expect(Array.isArray(perms)).toBe(true);
+      expect(perms.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('maps exactly the declared roles — no extras, none missing', () => {
+    expect(Object.keys(STAFF_ROLE_PERMISSIONS).sort()).toEqual([...hotelStaffRoleValues].sort());
+  });
+
+  it('uses dot-namespaced lower-case keys everywhere, with no duplicates', () => {
+    for (const role of hotelStaffRoleValues) {
+      const perms = permissionsForRole(role);
+      for (const p of perms) {
+        expect(p).toMatch(/^[a-z]+(\.[a-z]+)+$/);
+      }
+      expect(new Set(perms).size).toBe(perms.length);
+    }
+  });
+
+  // The headline negative: a guard on the gate must never be able to see money.
+  it('SECURITY_STAFF holds nothing financial, payroll, procurement or owner-related', () => {
+    const perms = permissionsForRole('SECURITY_STAFF');
+    expect(perms.length).toBeGreaterThan(0);
+    expect(perms.filter((p) => SENSITIVE.test(p))).toEqual([]);
+  });
+
+  it('no security, housekeeping, kitchen, cleaning or driving role sees sensitive namespaces', () => {
+    const operational = [
+      'SECURITY_STAFF',
+      'SECURITY_MANAGER',
+      'HOUSEKEEPING_SUPERVISOR',
+      'ROOM_ATTENDANT',
+      'CLEANING_STAFF',
+      'CLEANER',
+      'CHEF',
+      'WAITER',
+      'TECHNICIAN',
+      'DRIVER',
+      'SPA_STAFF',
+    ];
+    for (const role of operational) {
+      expect({ role, leaks: permissionsForRole(role).filter((p) => SENSITIVE.test(p)) }).toEqual({
+        role,
+        leaks: [],
+      });
+    }
+  });
+
+  it('gives the GM the broad management set', () => {
+    for (const p of [
+      'approval.read',
+      'approval.act',
+      'finance.read',
+      'staff.read',
+      'reports.read',
+    ]) {
+      expect(roleHasPermission('GENERAL_MANAGER', p)).toBe(true);
+    }
+  });
+
+  it('AGM shares the GM portal but is a strict subset of it', () => {
+    const gm = new Set(permissionsForRole('GENERAL_MANAGER'));
+    const agm = permissionsForRole('ASSISTANT_GENERAL_MANAGER');
+    for (const p of agm) expect(gm.has(p)).toBe(true);
+    expect(agm.length).toBeLessThan(gm.size);
+  });
+
+  it('withholds export, payroll, owner data and staff deletion from the AGM', () => {
+    for (const p of ['finance.export', 'staff.delete', 'payroll.read', 'owner.read']) {
+      expect(roleHasPermission('GENERAL_MANAGER', p)).toBe(true);
+      expect(roleHasPermission('ASSISTANT_GENERAL_MANAGER', p)).toBe(false);
+    }
+  });
+
+  it('gives the RECEPTIONIST exactly the front-desk set', () => {
+    expect(permissionsForRole('RECEPTIONIST').sort()).toEqual(
+      [
+        'reservation.read',
+        'reservation.create',
+        'reservation.update',
+        'checkin.perform',
+        'checkout.perform',
+        'guest.read',
+        'guest.create',
+        'room.read',
+        'keycard.issue',
+        'payment.collect',
+      ].sort(),
+    );
+  });
+
+  it('gives the ROOM_ATTENDANT exactly the task set', () => {
+    expect(permissionsForRole('ROOM_ATTENDANT').sort()).toEqual(
+      ['task.read', 'task.start', 'task.complete', 'maintenance.report', 'room.read'].sort(),
+    );
+  });
+
+  it('only GM and AGM may create or approve staff; only GM may delete', () => {
+    for (const role of hotelStaffRoleValues) {
+      const canCreate = roleHasPermission(role, 'staff.create');
+      const canApprove = roleHasPermission(role, 'staff.approve');
+      const canDelete = roleHasPermission(role, 'staff.delete');
+      const isManagement = role === 'GENERAL_MANAGER' || role === 'ASSISTANT_GENERAL_MANAGER';
+      expect(canCreate).toBe(isManagement);
+      expect(canApprove).toBe(isManagement);
+      expect(canDelete).toBe(role === 'GENERAL_MANAGER');
+    }
+  });
+
+  it('resolves an unknown role to no permissions, never to all', () => {
+    expect(permissionsForRole('SUPER_HACKER')).toEqual([]);
+    expect(roleHasPermission('SUPER_HACKER', 'finance.read')).toBe(false);
+  });
+
+  it('hands out a copy, so a caller cannot mutate the source of truth', () => {
+    const perms = permissionsForRole('CHEF');
+    perms.push('finance.export');
+    expect(permissionsForRole('CHEF')).not.toContain('finance.export');
+  });
+});

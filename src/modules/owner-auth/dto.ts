@@ -11,7 +11,10 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { hotelStaffRoleValues, hotelStaffStatusValues } from '../../database/schema/owner';
+import {
+  ownerAssignableStaffStatusValues,
+  ownerCreatableStaffRoleValues,
+} from '../../database/schema/owner';
 
 const MOBILE_REGEX = /^[0-9]{10,15}$/;
 
@@ -52,7 +55,9 @@ export class CreatePropertyDto {
 }
 
 export class CreateStaffDto {
-  @IsIn(hotelStaffRoleValues as unknown as string[]) role!: string;
+  // Owners create hotel MANAGEMENT only. The full 23-role set exists for staff
+  // created later by a GM inside the property — it must not widen this.
+  @IsIn(ownerCreatableStaffRoleValues as unknown as string[]) role!: string;
   @IsString() @Length(1, 128) firstName!: string;
   @IsString() @Length(1, 128) lastName!: string;
   @IsOptional() @IsString() address?: string;
@@ -64,5 +69,5 @@ export class CreateStaffDto {
 }
 
 export class SetStaffStatusDto {
-  @IsIn(hotelStaffStatusValues as unknown as string[]) status!: string;
+  @IsIn(ownerAssignableStaffStatusValues as unknown as string[]) status!: string;
 }

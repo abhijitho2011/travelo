@@ -55,6 +55,12 @@ const joinedRow = (over: Partial<Row> = {}): Row => ({
   ...over,
 });
 
+/** Records what setStatus writes to the audit log. */
+function auditStub() {
+  const calls: Record<string, unknown>[] = [];
+  return { calls, record: async (e: Record<string, unknown>) => void calls.push(e) };
+}
+
 /** Reaches the private builder without loosening the class' public surface. */
 function buildConditions(svc: StaffService, params: StaffListParams): unknown[] {
   return (svc as unknown as { conditions: (p: StaffListParams) => unknown[] }).conditions(params);
@@ -62,7 +68,7 @@ function buildConditions(svc: StaffService, params: StaffListParams): unknown[] 
 
 describe('StaffService.list', () => {
   it('returns owner-created staff joined to owner and property names', async () => {
-    const svc = new StaffService(makeDb([joinedRow()]) as never);
+    const svc = new StaffService(makeDb([joinedRow()]) as never, auditStub() as never);
     const res = await svc.list({});
     expect(res.total).toBe(1);
     expect(res.items[0]).toMatchObject({
@@ -77,14 +83,17 @@ describe('StaffService.list', () => {
   });
 
   it('falls back to the owner contact name when the company is null', async () => {
-    const svc = new StaffService(makeDb([joinedRow({ ownerName: null })]) as never);
+    const svc = new StaffService(
+      makeDb([joinedRow({ ownerName: null })]) as never,
+      auditStub() as never,
+    );
     const res = await svc.list({});
     expect(res.items[0].ownerName).toBe('Ravi Owner');
   });
 });
 
 describe('StaffService — filter conditions', () => {
-  const svc = new StaffService({} as never);
+  const svc = new StaffService({} as never, auditStub() as never);
 
   it('always excludes soft-deleted staff', () => {
     // The only baseline condition is the `deleted_at IS NULL` guard.
@@ -116,5 +125,97 @@ describe('StaffService — filter conditions', () => {
     expect(StaffService.roles).toContain('GENERAL_MANAGER');
     expect(StaffService.roles).toContain('ASSISTANT_GENERAL_MANAGER');
     expect(StaffService.statuses).toEqual(expect.arrayContaining(['ACTIVE', 'BLOCKED']));
+  });
+});
+
+/**
+ * `setStatus` runs one scoped lookup, one update, then one audit write. This
+ * stub captures each so the test can assert the audit entry as well as the
+ * mutation.
+ */
+function statusDb(existing: Row[] = []) {
+  const updates: Row[] = [];
+  const chain = (data: Row[]) => {
+    const c: Record<string, unknown> = {};
+    Object.assign(c, {
+      from: () => c,
+      leftJoin: () => c,
+      where: () => c,
+      orderBy: () => c,
+      limit: async () => data,
+    });
+    return c;
+  };
+  return {
+    updates,
+    select: () => chain(existing),
+    update: () => ({
+      set: (v: Row) => {
+        updates.push(v);
+        return { where: async () => [] };
+      },
+    }),
+  };
+}
+
+describe('StaffService — platform-wide directory covers every role', () => {
+  it('lists GM-created staff of any role, not just the owner-created GM/AGM', async () => {
+    const rows = [
+      joinedRow({ s: { ...(joinedRow().s as Row), id: 's1', role: 'GENERAL_MANAGER' } }),
+      joinedRow({ s: { ...(joinedRow().s as Row), id: 's2', role: 'SECURITY_STAFF' } }),
+      joinedRow({ s: { ...(joinedRow().s as Row), id: 's3', role: 'CHEF' } }),
+    ];
+    const svc = new StaffService(makeDb(rows) as never, auditStub() as never);
+    const res = await svc.list({});
+    expect(res.items.map((i) => i.role)).toEqual(['GENERAL_MANAGER', 'SECURITY_STAFF', 'CHEF']);
+  });
+
+  it('exposes department, employeeId and lastLoginAt on the admin record', async () => {
+    const s = {
+      ...(joinedRow().s as Row),
+      department: 'Security',
+      employeeId: 'EMP-9',
+      lastLoginAt: new Date('2026-02-01'),
+    };
+    const svc = new StaffService(makeDb([joinedRow({ s })]) as never, auditStub() as never);
+    const res = await svc.list({});
+    expect(res.items[0]).toMatchObject({
+      department: 'Security',
+      employeeId: 'EMP-9',
+      ownerName: 'Acme Hospitality',
+      propertyName: 'Sea Breeze Resort',
+    });
+    expect(res.items[0].lastLoginAt).toEqual(new Date('2026-02-01'));
+  });
+});
+
+describe('StaffService.setStatus', () => {
+  it('updates the status and records an audit entry carrying the reason', async () => {
+    const db = statusDb([{ id: 'staff-1', status: 'ACTIVE', propertyId: 'prop-1' }]);
+    const audit = auditStub();
+    const svc = new StaffService(db as never, audit as never);
+
+    const res = await svc.setStatus('staff-1', 'BLOCKED', 'Repeated policy violations');
+
+    expect(res).toEqual({ id: 'staff-1', status: 'BLOCKED', previousStatus: 'ACTIVE' });
+    expect(db.updates[0]).toMatchObject({ status: 'BLOCKED' });
+    expect(audit.calls).toHaveLength(1);
+    expect(audit.calls[0]).toMatchObject({
+      action: 'staff.status.changed',
+      entity: 'hotel_staff',
+      entityId: 'staff-1',
+      before: { status: 'ACTIVE' },
+      after: { status: 'BLOCKED' },
+      reason: 'Repeated policy violations',
+    });
+  });
+
+  it('404s on an unknown or soft-deleted staff id, writing nothing at all', async () => {
+    const db = statusDb([]);
+    const audit = auditStub();
+    const svc = new StaffService(db as never, audit as never);
+    await expect(svc.setStatus('ghost', 'BLOCKED')).rejects.toThrow('Staff member not found');
+    expect(db.updates).toEqual([]);
+    expect(audit.calls).toEqual([]);
   });
 });

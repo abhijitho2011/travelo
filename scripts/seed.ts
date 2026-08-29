@@ -11,7 +11,7 @@ import { normalizeMobile } from '../src/modules/shared-auth/mobile.util';
 const PERMISSIONS: { key: string; group: string; description: string }[] = [
   ...groupPerms('Owner', 'owner', ['view', 'create', 'edit', 'suspend', 'delete']),
   ...groupPerms('Property', 'property', ['view', 'edit', 'suspend']),
-  ...groupPerms('Staff', 'staff', ['read']),
+  ...groupPerms('Staff', 'staff', ['read', 'manage']),
   ...groupPerms('Subscription', 'subscription', ['view', 'edit', 'cancel']),
   ...groupPerms('Plan', 'plan', ['view', 'edit']),
   ...groupPerms('Billing', 'billing', ['view', 'refund', 'export']),
@@ -70,7 +70,7 @@ const ROLES = [
     description: 'Operational view + jobs',
     isSystem: true,
     permissions: [
-      'owner.view', 'subscription.view', 'property.view', 'staff.read',
+      'owner.view', 'subscription.view', 'property.view', 'staff.read', 'staff.manage',
       'integration.view', 'job.view', 'job.retry',
       'analytics.view', 'search.query', 'notification.view',
     ],

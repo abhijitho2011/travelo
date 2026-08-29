@@ -1,10 +1,10 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { StaffService } from './staff.service';
-import { StaffFilterDto } from './dto';
+import { SetStaffStatusAdminDto, StaffFilterDto } from './dto';
 
 @ApiTags('Staff')
 @ApiBearerAuth()
@@ -23,5 +23,16 @@ export class StaffController {
   @RequirePermissions('staff.read')
   get(@Param('id') id: string) {
     return this.svc.get(id);
+  }
+
+  /**
+   * Block / suspend / reactivate any staff member platform-wide. Distinct from
+   * `staff.read` on purpose: viewing the directory must not imply the power to
+   * lock someone out of the staff app.
+   */
+  @Post(':id/status')
+  @RequirePermissions('staff.manage')
+  setStatus(@Param('id') id: string, @Body() dto: SetStaffStatusAdminDto) {
+    return this.svc.setStatus(id, dto.status, dto.reason);
   }
 }

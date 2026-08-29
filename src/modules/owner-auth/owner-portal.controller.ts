@@ -109,6 +109,12 @@ export class OwnerPortalController {
     return this.photos.remove(owner.id, id, photoId);
   }
 
+  /** Every staff member across every property this owner holds. */
+  @Get('staff')
+  listAllStaff(@CurrentOwner() owner: AuthenticatedOwner) {
+    return this.portal.listAllStaff(owner.id);
+  }
+
   @Get('properties/:id/staff')
   listStaff(@CurrentOwner() owner: AuthenticatedOwner, @Param('id') id: string) {
     return this.portal.listStaff(owner.id, id);

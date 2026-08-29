@@ -41,6 +41,14 @@ const envSchema = z.object({
   OWNER_JWT_ACCESS_TTL: z.string().default('15m'),
   OWNER_JWT_REFRESH_TTL: z.string().default('30d'),
 
+  // ---------- Staff auth (a THIRD token family: not admin, not owner) ----------
+  // Separate secrets are what make the isolation real — a staff access token
+  // must never verify under the admin or owner secret, and vice versa.
+  STAFF_JWT_ACCESS_SECRET: z.string().min(16).default('staff-access-secret-change-me-32chars'),
+  STAFF_JWT_REFRESH_SECRET: z.string().min(16).default('staff-refresh-secret-change-me-32chars'),
+  STAFF_JWT_ACCESS_TTL: z.string().default('15m'),
+  STAFF_JWT_REFRESH_TTL: z.string().default('30d'),
+
   // ---------- Firebase (Google sign-in for owners) ----------
   FIREBASE_PROJECT_ID: z.string().default('tavelo-c4669'),
   FIREBASE_SERVICE_ACCOUNT: z.string().optional(),

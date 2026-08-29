@@ -96,3 +96,69 @@ least one and redeploy.
 ## Audit hooks
 - `admin.login.google`, `admin.login.otp` (success) and `admin.login.failed` (failure) are recorded via `AuditService.record` on every attempt, carrying the sign-in `method` and `ip`.
 - `auth.logout` is recorded on sign-out.
+
+---
+
+# Staff auth (unified staff mobile app)
+
+A **third** token family, fully isolated from admin and owner. Mounted at its
+literal `/api/v1/staff/*` paths (excluded from the admin global prefix in
+`main.ts`, exactly like the owner surface).
+
+## Endpoints
+| Method | Path | Notes |
+| --- | --- | --- |
+| POST | `/api/v1/staff/auth/otp/request` | body `{ mobile }`; **always** `{ message, expiresAt }`. An SMS goes out only when the mobile matches a live `hotel_staff` row — the response never differs. |
+| POST | `/api/v1/staff/auth/otp/verify` | body `{ mobile, otp }` → `{ accessToken, refreshToken }`, ACTIVE only. |
+| POST | `/api/v1/staff/auth/google` | body `{ idToken }`; matches the verified email to a live staff row. **Never auto-creates an account.** |
+| POST | `/api/v1/staff/auth/refresh` | body `{ refreshToken }`; rotates. |
+| POST | `/api/v1/staff/auth/logout` | Bearer staff token. |
+| GET | `/api/v1/staff/auth/me` | `{ user, hotel, organization, role, permissions }`. |
+| GET | `/api/v1/staff/team` | list staff at MY property. `staff.read`. Filters: `role`, `status`, `q`, `department`. |
+| POST | `/api/v1/staff/team` | create at MY property. `staff.create` (GM/AGM only). |
+| POST | `/api/v1/staff/team/:id/approve` | `PENDING_APPROVAL` → `ACTIVE`. `staff.approve` (GM/AGM). |
+| POST | `/api/v1/staff/team/:id/status` | `ACTIVE\|BLOCKED\|SUSPENDED\|DEACTIVATED`. `staff.update`. |
+| DELETE | `/api/v1/staff/team/:id` | soft delete. `staff.delete` (GM only). |
+
+## Account-status gating
+A staff row that exists but is not ACTIVE yields a typed code the app branches
+on: `ACCOUNT_INVITED`, `ACCOUNT_PENDING_APPROVAL` (also used for `APPROVED` —
+approved but not yet activated), `ACCOUNT_BLOCKED`, `ACCOUNT_SUSPENDED`,
+`ACCOUNT_DEACTIVATED`. A number belonging to **nobody** still gets the generic
+success on request and a generic `INVALID_OTP` on verify: the specific status is
+disclosed only once possession of the number is proved.
+
+## Tokens
+- `STAFF_JWT_ACCESS_SECRET` / `STAFF_JWT_REFRESH_SECRET`, TTLs
+  `STAFF_JWT_ACCESS_TTL` (15m) / `STAFF_JWT_REFRESH_TTL` (30d), issuer and
+  audience `tavelo-staff`. Refresh tokens are argon2-hashed in `staff_sessions`.
+- `StaffJwtGuard` re-reads the DB per request: the row must be live and ACTIVE
+  and the session unrevoked, so blocking someone bites immediately. The role —
+  and therefore the permission list — comes from the row, never from the token.
+- Three-way isolation is enforced by three independent facts (distinct secret,
+  distinct issuer/audience, distinct session table) and covered by
+  `owner-token-isolation.spec.ts`.
+
+## Roles and permissions
+`src/modules/staff-auth/role-permissions.ts` is the server-side source of truth
+mapping all 23 roles to dot-namespaced permissions. Security, housekeeping,
+kitchen, cleaning, attendant and driving roles hold **no** `finance.*`,
+`revenue.*`, `payroll.*`, `payment.*`, `procurement.*` or `owner.*` permission.
+`/auth/me` returns the resolved list; `StaffPermissionsGuard` re-checks it
+server-side on every protected route.
+
+## Tenant isolation
+Every `/staff/team` route resolves its target by
+`(id, propertyId = the caller's own, deleted_at IS NULL)`. A row at another
+property returns **404**, not 403, so property membership never leaks. Nobody
+may approve, re-status or delete their own row, and role is not editable through
+this surface at all — the only place a role is chosen is on creation, from a
+whitelist that excludes GM and AGM (hotel management is appointed by the owner).
+
+## The chain
+Super Admin → Owner → Property + GM/AGM → GM-created staff → staff app. All
+three surfaces read the same `hotel_staff` table: `GET /api/v1/owner/staff` and
+`GET /api/v1/owner/properties/:id/staff` show the owner everything, and
+`GET /api/v1/admin/staff` / `POST /api/v1/admin/staff/:id/status`
+(`staff.manage`, audited as `staff.status.changed`) give the super admin
+platform-wide reach.

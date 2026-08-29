@@ -10,6 +10,15 @@ import {
   HotelStaffRole,
   HotelStaffStatus,
 } from '../../database/schema';
+import { AuditService } from '../audit/audit.service';
+
+/** Statuses the super-admin may set on any staff row, platform-wide. */
+export const adminAssignableStaffStatusValues = [
+  'ACTIVE',
+  'BLOCKED',
+  'SUSPENDED',
+  'DEACTIVATED',
+] as const;
 
 export interface StaffListParams {
   limit?: number;
@@ -25,14 +34,17 @@ export interface StaffListParams {
 }
 
 /**
- * Cross-tenant directory of owner-created hotel staff (General Managers and
- * Assistant GMs). Staff rows live under each owner in `hotel_staff`; this
- * service reads across every owner for the admin monitoring view. Soft-deleted
- * rows (`deleted_at IS NOT NULL`) are always excluded.
+ * Cross-tenant directory of ALL hotel staff — the GM/AGM an owner created and
+ * everyone a GM went on to hire, across all 23 roles. Every surface (admin,
+ * owner portal, staff app) reads the same `hotel_staff` table; this service is
+ * the platform-wide view of it. Soft-deleted rows are always excluded.
  */
 @Injectable()
 export class StaffService {
-  constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Database,
+    private readonly audit: AuditService,
+  ) {}
 
   private conditions(params: StaffListParams): SQL[] {
     const conds: SQL[] = [isNull(hotelStaff.deletedAt)];
@@ -130,6 +142,9 @@ export class StaffService {
       district: s.district,
       address: s.address,
       pinCode: s.pinCode,
+      department: s.department,
+      employeeId: s.employeeId,
+      lastLoginAt: s.lastLoginAt,
       ownerId: s.ownerId,
       ownerName: r.ownerName ?? r.ownerContact ?? null,
       propertyId: s.propertyId,
@@ -137,6 +152,37 @@ export class StaffService {
       createdAt: s.createdAt,
       updatedAt: s.updatedAt,
     };
+  }
+
+  /**
+   * Platform-wide staff status change (block / suspend / reactivate). Reserved
+   * for `staff.manage`; every call is written to the audit log with the acting
+   * admin (resolved from the request context), the before/after status and the
+   * operator's reason.
+   */
+  async setStatus(id: string, status: string, reason?: string) {
+    const [existing] = await this.db
+      .select({ id: hotelStaff.id, status: hotelStaff.status, propertyId: hotelStaff.propertyId })
+      .from(hotelStaff)
+      .where(and(eq(hotelStaff.id, id), isNull(hotelStaff.deletedAt)))
+      .limit(1);
+    if (!existing) throw new NotFoundException('Staff member not found');
+
+    await this.db
+      .update(hotelStaff)
+      .set({ status: status as HotelStaffStatus, updatedAt: new Date() })
+      .where(eq(hotelStaff.id, id));
+
+    await this.audit.record({
+      action: 'staff.status.changed',
+      entity: 'hotel_staff',
+      entityId: id,
+      before: { status: existing.status },
+      after: { status },
+      reason,
+    });
+
+    return { id, status, previousStatus: existing.status };
   }
 
   /** Exposed for reuse/testing — the values a filter may legitimately carry. */

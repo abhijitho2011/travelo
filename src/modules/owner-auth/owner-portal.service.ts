@@ -155,6 +155,12 @@ export class OwnerPortalService {
     if (!row) throw OwnerErrors.ownerNotFound();
   }
 
+  /**
+   * EVERY live staff member at the property — not just the GM/AGM the owner
+   * created. Staff a GM went on to hire (all 23 roles) live in the same
+   * `hotel_staff` table, so they appear here automatically, and the owner's
+   * existing status/delete actions keep working across all of them.
+   */
   async listStaff(ownerId: string, propertyId: string) {
     await this.assertOwnedProperty(ownerId, propertyId);
     const rows = await this.db
@@ -168,10 +174,40 @@ export class OwnerPortalService {
         ),
       )
       .orderBy(desc(hotelStaff.createdAt));
-    return rows.map((s) => ({
+    return rows.map((s) => OwnerPortalService.staffDto(s));
+  }
+
+  /**
+   * Portfolio-wide staff directory: every live staff member across every
+   * property this owner holds, carrying the property name so the app can group
+   * by hotel without an N+1.
+   */
+  async listAllStaff(ownerId: string) {
+    const rows = await this.db
+      .select({ s: hotelStaff, propertyName: properties.name })
+      .from(hotelStaff)
+      .innerJoin(properties, eq(hotelStaff.propertyId, properties.id))
+      .where(
+        and(
+          eq(hotelStaff.ownerId, ownerId),
+          isNull(hotelStaff.deletedAt),
+          isNull(properties.deletedAt),
+        ),
+      )
+      .orderBy(desc(hotelStaff.createdAt));
+    return rows.map((r) => ({
+      ...OwnerPortalService.staffDto(r.s),
+      propertyId: r.s.propertyId,
+      propertyName: r.propertyName,
+    }));
+  }
+
+  private static staffDto(s: typeof hotelStaff.$inferSelect) {
+    return {
       id: s.id,
       firstName: s.firstName,
       lastName: s.lastName,
+      fullName: `${s.firstName} ${s.lastName}`.trim(),
       email: s.email,
       mobile: s.mobile,
       state: s.state,
@@ -179,7 +215,10 @@ export class OwnerPortalService {
       pinCode: s.pinCode,
       role: s.role,
       status: s.status,
-    }));
+      department: s.department,
+      employeeId: s.employeeId,
+      lastLoginAt: s.lastLoginAt,
+    };
   }
 
   async createStaff(ownerId: string, propertyId: string, dto: CreateStaffDto) {

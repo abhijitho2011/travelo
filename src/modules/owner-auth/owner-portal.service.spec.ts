@@ -180,3 +180,116 @@ describe('OwnerPortalService.createProperty stores the new field set', () => {
     expect(written!.address).toMatchObject({ district: 'Ernakulam', country: 'India' });
   });
 });
+
+/**
+ * The chain Super Admin → Owner → Property + GM/AGM → GM-created staff means
+ * the owner must see EVERY staff member at their property, not only the GM/AGM
+ * they created themselves. All three surfaces read the same `hotel_staff`
+ * table, so a GM's hire shows up here with no extra plumbing.
+ */
+function staffListDb(rows: Record<string, unknown>[]) {
+  const wheres: unknown[] = [];
+  const chain = () => {
+    const c: Record<string, unknown> = {};
+    Object.assign(c, {
+      from: () => c,
+      innerJoin: () => c,
+      leftJoin: () => c,
+      where: (w: unknown) => {
+        wheres.push(w);
+        return c;
+      },
+      limit: async () => rows,
+      orderBy: async () => rows,
+    });
+    return c;
+  };
+  return { wheres, select: () => chain() };
+}
+
+function staffRow(over: Record<string, unknown> = {}) {
+  return {
+    id: 'staff-1',
+    firstName: 'Asha',
+    lastName: 'Menon',
+    email: 'asha@hotel.test',
+    mobile: '9000000001',
+    state: 'Kerala',
+    district: 'Ernakulam',
+    pinCode: '682031',
+    role: 'RECEPTIONIST',
+    status: 'ACTIVE',
+    department: 'Front Office',
+    employeeId: 'EMP-7',
+    lastLoginAt: null,
+    propertyId: 'prop1',
+    ...over,
+  };
+}
+
+describe('OwnerPortalService.listStaff — every role, not just GM/AGM', () => {
+  it('returns GM-created staff of any role alongside the owner-created GM', async () => {
+    const rows = [
+      staffRow({ id: 's1', role: 'GENERAL_MANAGER' }),
+      staffRow({ id: 's2', role: 'RECEPTIONIST', department: 'Front Office' }),
+      staffRow({ id: 's3', role: 'SECURITY_STAFF', department: 'Security' }),
+      staffRow({ id: 's4', role: 'CHEF', department: 'Kitchen' }),
+    ];
+    // First select resolves assertOwnedProperty, second is the staff list.
+    let call = 0;
+    const inner = staffListDb(rows);
+    const db = {
+      select: () => (call++ === 0 ? staffListDb([{ id: 'prop1' }]).select() : inner.select()),
+    };
+    const svc = new OwnerPortalService(db as never, photosStub as never);
+    const res = await svc.listStaff('own1', 'prop1');
+    expect(res.map((s) => s.role)).toEqual([
+      'GENERAL_MANAGER',
+      'RECEPTIONIST',
+      'SECURITY_STAFF',
+      'CHEF',
+    ]);
+  });
+
+  it('carries department, employeeId and lastLoginAt for the owner view', async () => {
+    let call = 0;
+    const inner = staffListDb([staffRow()]);
+    const db = {
+      select: () => (call++ === 0 ? staffListDb([{ id: 'prop1' }]).select() : inner.select()),
+    };
+    const svc = new OwnerPortalService(db as never, photosStub as never);
+    const [s] = await svc.listStaff('own1', 'prop1');
+    expect(s).toMatchObject({
+      fullName: 'Asha Menon',
+      department: 'Front Office',
+      employeeId: 'EMP-7',
+      lastLoginAt: null,
+    });
+  });
+});
+
+describe('OwnerPortalService.listAllStaff — portfolio-wide directory', () => {
+  it('returns staff from every property with the property name attached', async () => {
+    const db = staffListDb([
+      { s: staffRow({ id: 's1', propertyId: 'prop1' }), propertyName: 'Sea Breeze Resort' },
+      {
+        s: staffRow({ id: 's2', propertyId: 'prop2', role: 'CHEF' }),
+        propertyName: 'Hilltop Retreat',
+      },
+    ]);
+    const svc = new OwnerPortalService(db as never, photosStub as never);
+    const res = await svc.listAllStaff('own1');
+    expect(res).toHaveLength(2);
+    expect(res[0]).toMatchObject({
+      id: 's1',
+      propertyId: 'prop1',
+      propertyName: 'Sea Breeze Resort',
+    });
+    expect(res[1]).toMatchObject({
+      id: 's2',
+      propertyId: 'prop2',
+      propertyName: 'Hilltop Retreat',
+      role: 'CHEF',
+    });
+  });
+});

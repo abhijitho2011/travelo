@@ -49,6 +49,8 @@ async function bootstrap(): Promise<void> {
       // Owner-app surface is mounted at its literal /api/v1/owner/* paths and
       // must NOT receive the admin global prefix.
       { path: 'api/v1/owner/(.*)', method: RequestMethod.ALL },
+      // Same for the unified staff app at its literal /api/v1/staff/* paths.
+      { path: 'api/v1/staff/(.*)', method: RequestMethod.ALL },
     ],
   });
 

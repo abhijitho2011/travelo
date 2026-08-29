@@ -1,5 +1,6 @@
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Min } from 'class-validator';
 import { hotelStaffRoleValues, hotelStaffStatusValues } from '../../database/schema';
+import { adminAssignableStaffStatusValues } from './staff.service';
 
 /**
  * The global ValidationPipe runs with `transform` + `enableImplicitConversion`,
@@ -16,4 +17,10 @@ export class StaffFilterDto {
   @IsOptional() @IsUUID() ownerId?: string;
   @IsOptional() @IsIn(hotelStaffRoleValues as unknown as string[]) role?: string;
   @IsOptional() @IsIn(hotelStaffStatusValues as unknown as string[]) status?: string;
+}
+
+export class SetStaffStatusAdminDto {
+  @IsIn(adminAssignableStaffStatusValues as unknown as string[]) status!: string;
+  /** Recorded verbatim on the audit entry so the change is explainable later. */
+  @IsOptional() @IsString() @Length(1, 512) reason?: string;
 }
