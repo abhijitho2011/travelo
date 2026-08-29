@@ -10,3 +10,6 @@ coverage
 .vscode
 tsconfig.tsbuildinfo
 *.apk
+
+# Agent worktrees and local Claude state — never part of the repo
+.claude/
