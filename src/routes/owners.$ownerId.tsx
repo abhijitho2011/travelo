@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { ExtendSubscriptionDialog } from "@/components/admin/extend-subscription";
+import { OwnerEditDialog } from "@/components/admin/owner-edit-dialog";
 import {
   AsyncSection,
   DetailGrid,
@@ -270,6 +271,14 @@ function OwnerDetailPage() {
         actions={
           owner ? (
             <div className="flex flex-wrap items-center gap-2">
+              <OwnerEditDialog
+                owner={owner}
+                trigger={
+                  <Button size="sm" variant="outline" className="h-8">
+                    Edit
+                  </Button>
+                }
+              />
               <StatusActions ownerId={ownerId} status={owner.status} label={label} />
               {activeSubscription && <ExtendSubscriptionDialog subscription={activeSubscription} />}
             </div>

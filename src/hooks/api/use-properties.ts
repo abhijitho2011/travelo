@@ -10,6 +10,9 @@ export type PropertyListParams = {
   q?: string | undefined;
   status?: string | undefined;
   ownerId?: string | undefined;
+  /** Properties store location as text names, so filtering is by name. */
+  state?: string | undefined;
+  district?: string | undefined;
 };
 
 export function useProperties(params: PropertyListParams) {

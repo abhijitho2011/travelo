@@ -9,6 +9,9 @@ export type OwnerListParams = {
   offset?: number | undefined;
   q?: string | undefined;
   status?: string | undefined;
+  /** Owners store location as ids, so filtering is by id. */
+  stateId?: string | undefined;
+  districtId?: string | undefined;
 };
 
 export function useOwners(params: OwnerListParams) {
@@ -87,13 +90,26 @@ export function useCreateOwner() {
   });
 }
 
+/**
+ * Editable owner fields. `state`/`district` are `location_*.id`s (the backend
+ * validates the pair); `address` is the street line. `planId`/`startsAt` belong
+ * to creation only and are intentionally excluded.
+ */
+export type UpdateOwnerInput = Partial<
+  Pick<
+    CreateOwnerInput,
+    "name" | "company" | "phone" | "gstNumber" | "address" | "pinCode" | "state" | "district"
+  >
+> & { status?: string };
+
 export function useUpdateOwner(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: Partial<CreateOwnerInput>) =>
+    mutationFn: (input: UpdateOwnerInput) =>
       apiFetch<Owner>(`/owners/${id}`, { method: "PATCH", body: input }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.owners.all });
+      qc.invalidateQueries({ queryKey: qk.dashboard });
     },
   });
 }

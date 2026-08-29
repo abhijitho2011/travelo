@@ -2,10 +2,21 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 
+import { useState } from "react";
+
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { DataTable, type Column } from "@/components/admin/data-table";
-import { SearchBox, StatusFilter, ToolbarActions } from "@/components/admin/list-toolbar";
+import {
+  ClearFiltersButton,
+  EMPTY_LOCATION,
+  LocationFilter,
+  type LocationFilterValue,
+  SearchBox,
+  StatusFilter,
+  ToolbarActions,
+} from "@/components/admin/list-toolbar";
 import { PageHeader, StatusBadge } from "@/components/admin/primitives";
+import { OwnerEditDialog } from "@/components/admin/owner-edit-dialog";
 import { Button } from "@/components/ui/button";
 import {
   useDeleteOwner,
@@ -58,6 +69,14 @@ function OwnerRowActions({ owner }: { owner: Owner }) {
 
   return (
     <div className="flex items-center justify-end gap-1">
+      <OwnerEditDialog
+        owner={owner}
+        trigger={
+          <Button variant="ghost" size="sm" className="h-7 text-xs">
+            Edit
+          </Button>
+        }
+      />
       {owner.status !== "ACTIVE" && (
         <ConfirmDialog
           destructive={false}
@@ -137,12 +156,29 @@ function OwnerRowActions({ owner }: { owner: Owner }) {
 function OwnersPage() {
   const navigate = useNavigate();
   const list = useListParams();
+  const [location, setLocation] = useState<LocationFilterValue>(EMPTY_LOCATION);
   const query = useOwners({
     limit: list.limit,
     offset: list.offset,
     q: list.q,
     status: list.statusParam,
+    // Owners store their location as ids — send the ids.
+    stateId: location.stateId || undefined,
+    districtId: location.districtId || undefined,
   });
+
+  const changeLocation = (next: LocationFilterValue) => {
+    setLocation(next);
+    list.setOffset(0);
+  };
+
+  const filtersActive =
+    !!list.search || !!list.status || !!location.stateId || !!location.districtId;
+  const clearFilters = () => {
+    list.setSearch("");
+    list.setStatus("");
+    changeLocation(EMPTY_LOCATION);
+  };
 
   const columns: Column<Owner>[] = [
     {
@@ -219,6 +255,8 @@ function OwnersPage() {
                 onChange={list.setStatus}
                 options={OWNER_STATUSES}
               />
+              <LocationFilter value={location} onChange={changeLocation} />
+              <ClearFiltersButton show={filtersActive} onClear={clearFilters} />
               <ToolbarActions>
                 <span className="tnum text-xs text-muted-foreground">
                   {query.data?.total ?? 0} total

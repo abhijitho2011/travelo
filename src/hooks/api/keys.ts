@@ -23,6 +23,11 @@ export const qk = {
     overview: (id: string) => ["properties", "overview", id] as const,
     integrations: (id: string) => ["properties", "integrations", id] as const,
   },
+  staff: {
+    all: ["staff"] as const,
+    list: (params: unknown) => ["staff", "list", params] as const,
+    detail: (id: string) => ["staff", "detail", id] as const,
+  },
   plans: {
     all: ["plans"] as const,
     list: ["plans", "list"] as const,

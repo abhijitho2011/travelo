@@ -9,7 +9,8 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { Loader2 } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { AdminShell } from "@/components/admin/admin-shell";
 import { Toaster } from "@/components/ui/sonner";
@@ -138,20 +139,52 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+/** Minimal splash shown while the client resolves the session — never the app. */
+function AuthSplash() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <Loader2 aria-label="Loading" className="size-6 animate-spin text-muted-foreground" />
+    </div>
+  );
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const router = useRouter();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const chromeless = PUBLIC_PATHS.includes(pathname);
+
+  /**
+   * Client-side auth gate. Tokens live in localStorage, which does not exist
+   * during SSR, so the server (and the very first hydration render) cannot know
+   * whether the visitor is signed in. Rather than optimistically painting the
+   * authed shell and redirecting after the fact — the "flash" — we hold every
+   * protected route on a splash until the browser confirms a token. The effect
+   * then either reveals the shell (authenticated) or redirects to /login. An
+   * unauthenticated visitor therefore never sees the populated dashboard.
+   */
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (chromeless) return;
+    if (isAuthenticated()) {
+      setReady(true);
+    } else {
+      setReady(false);
+      void router.navigate({ to: "/login", search: { next: window.location.href } });
+    }
+  }, [chromeless, pathname, router]);
 
   return (
     <QueryClientProvider client={queryClient}>
       {chromeless ? (
         /* Required: nested routes render here. */
         <Outlet />
-      ) : (
+      ) : ready ? (
         <AdminShell>
           <Outlet />
         </AdminShell>
+      ) : (
+        <AuthSplash />
       )}
       <Toaster position="top-right" />
     </QueryClientProvider>

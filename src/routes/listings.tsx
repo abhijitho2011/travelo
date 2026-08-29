@@ -1,7 +1,16 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 
 import { DataTable, type Column } from "@/components/admin/data-table";
-import { SearchBox, StatusFilter, ToolbarActions } from "@/components/admin/list-toolbar";
+import {
+  ClearFiltersButton,
+  EMPTY_LOCATION,
+  LocationFilter,
+  type LocationFilterValue,
+  SearchBox,
+  StatusFilter,
+  ToolbarActions,
+} from "@/components/admin/list-toolbar";
 import { PageHeader, ScoreBar, StatusBadge } from "@/components/admin/primitives";
 import type { Property } from "@/hooks/api/types";
 import { useProperties } from "@/hooks/api/use-properties";
@@ -44,12 +53,28 @@ function completeness(p: Property) {
 function ListingsPage() {
   const navigate = useNavigate();
   const list = useListParams();
+  const [location, setLocation] = useState<LocationFilterValue>(EMPTY_LOCATION);
   const query = useProperties({
     limit: list.limit,
     offset: list.offset,
     q: list.q,
     status: list.statusParam,
+    // Properties store their location as text names — send the resolved names.
+    state: location.stateName || undefined,
+    district: location.districtName || undefined,
   });
+
+  const changeLocation = (next: LocationFilterValue) => {
+    setLocation(next);
+    list.setOffset(0);
+  };
+  const filtersActive =
+    !!list.search || !!list.status || !!location.stateId || !!location.districtId;
+  const clearFilters = () => {
+    list.setSearch("");
+    list.setStatus("");
+    changeLocation(EMPTY_LOCATION);
+  };
 
   const columns: Column<Property>[] = [
     {
@@ -122,6 +147,8 @@ function ListingsPage() {
                 onChange={list.setStatus}
                 options={PROPERTY_STATUSES}
               />
+              <LocationFilter value={location} onChange={changeLocation} />
+              <ClearFiltersButton show={filtersActive} onClear={clearFilters} />
               <ToolbarActions>
                 <span className="tnum text-xs text-muted-foreground">
                   {query.data?.total ?? 0} total

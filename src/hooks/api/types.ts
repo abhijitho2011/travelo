@@ -392,5 +392,26 @@ export type HealthReport = {
   details?: Record<string, { status: string; [k: string]: unknown }> | undefined;
 };
 
+export type StaffMember = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  email: string;
+  mobile: string;
+  role: string;
+  status: string;
+  state: string | null;
+  district: string | null;
+  address: string | null;
+  pinCode: string | null;
+  ownerId: string;
+  ownerName: string | null;
+  propertyId: string;
+  propertyName: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type LocationState = { id: string; name: string; createdAt?: string };
 export type LocationDistrict = { id: string; stateId: string; name: string; createdAt?: string };
