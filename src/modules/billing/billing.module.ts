@@ -4,8 +4,14 @@ import { BillingController, WebhookController } from './billing.controller';
 import { InvoiceNumberService } from './invoice-number.service';
 import { InvoicePdfService } from './invoice-pdf.service';
 import { RazorpayClient } from './razorpay.client';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
+  // BillingService notifies the owner on payment success/failure. Without this
+  // import Nest cannot resolve NotificationDeliveryService and the whole app
+  // fails to boot — tsc cannot see DI wiring and unit tests mock it away, so
+  // only starting the app catches it.
+  imports: [NotificationsModule],
   providers: [
     BillingService,
     InvoiceNumberService,
