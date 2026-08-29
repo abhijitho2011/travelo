@@ -160,6 +160,11 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
     'reservation.read',
     'reservation.create',
     'reservation.update',
+    // Cancelling is the one front-office act that destroys revenue, so it is
+    // named separately from `reservation.update`. Reception genuinely needs it
+    // — a guest who rings to cancel cannot be told to wait for the GM — but
+    // sales and the travel desk, who can raise bookings, deliberately cannot.
+    'reservation.cancel',
     'checkin.perform',
     'checkout.perform',
     'guest.read',

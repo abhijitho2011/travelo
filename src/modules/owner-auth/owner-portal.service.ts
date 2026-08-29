@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, isNull, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, lt, ne, sql } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import {
   hotelStaff,
@@ -9,6 +9,8 @@ import {
   locationStates,
   owners,
   properties,
+  reservations,
+  rooms,
   subscriptions,
   subscriptionPlans,
 } from '../../database/schema';
@@ -62,6 +64,24 @@ export class OwnerPortalService {
     return OwnerPortalService.effectivePropertyLimit(sub.planLimit, sub.override);
   }
 
+  /**
+   * The owner's portfolio tiles. Real numbers, across every hotel they own.
+   *
+   * `occupancy` is OCCUPIED rooms over every live room that is not
+   * OUT_OF_ORDER — a wing that has been taken off the board cannot be sold, so
+   * counting it as an empty room would report a hotel as failing to fill rooms
+   * it is not offering. MAINTENANCE stays in the denominator: it is a same-day
+   * state, not a withdrawal from inventory.
+   *
+   * `revenue` is paise for the CURRENT CALENDAR MONTH, summing `total_paise`
+   * for every CHECKED_IN or CHECKED_OUT reservation whose stay TOUCHES the
+   * month. That is an APPROXIMATION — a stay straddling month end is counted
+   * whole in both months rather than apportioned per night — and it matches the
+   * staff dashboard's figure exactly, deliberately: an owner and their GM
+   * comparing screens must see the same number. It is a dashboard figure, not
+   * an accounting one; night-level apportionment needs a folio/ledger table
+   * that does not exist yet.
+   */
   async portfolioSummary(ownerId: string) {
     const [row] = await this.db
       .select({
@@ -70,11 +90,53 @@ export class OwnerPortalService {
       })
       .from(properties)
       .where(and(eq(properties.ownerId, ownerId), isNull(properties.deletedAt)));
+
+    const propertyRows = await this.db
+      .select({ id: properties.id })
+      .from(properties)
+      .where(and(eq(properties.ownerId, ownerId), isNull(properties.deletedAt)));
+    const propertyIds = propertyRows.map((p) => p.id);
+    if (propertyIds.length === 0) {
+      return { hotels: row?.hotels ?? 0, rooms: row?.rooms ?? 0, revenue: 0, occupancy: 0 };
+    }
+
+    const [roomRow] = await this.db
+      .select({
+        sellable: sql<number>`count(*) filter (where ${rooms.status} <> 'OUT_OF_ORDER')::int`,
+        occupied: sql<number>`count(*) filter (where ${rooms.status} = 'OCCUPIED')::int`,
+      })
+      .from(rooms)
+      .where(and(inArray(rooms.propertyId, propertyIds), isNull(rooms.deletedAt)));
+
+    const now = new Date();
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+      .toISOString()
+      .slice(0, 10);
+    const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
+      .toISOString()
+      .slice(0, 10);
+
+    const [revenueRow] = await this.db
+      .select({ total: sql<number>`coalesce(sum(${reservations.totalPaise}), 0)::bigint` })
+      .from(reservations)
+      .where(
+        and(
+          inArray(reservations.propertyId, propertyIds),
+          isNull(reservations.deletedAt),
+          inArray(reservations.status, ['CHECKED_IN', 'CHECKED_OUT']),
+          // Strict inequalities: check_out is exclusive, so a stay ending on
+          // the 1st does not belong to the month that starts on the 1st.
+          lt(reservations.checkIn, monthEnd),
+          gt(reservations.checkOut, monthStart),
+        ),
+      );
+
+    const sellable = roomRow?.sellable ?? 0;
     return {
       hotels: row?.hotels ?? 0,
       rooms: row?.rooms ?? 0,
-      revenue: 0,
-      occupancy: 0,
+      revenue: Number(revenueRow?.total ?? 0),
+      occupancy: sellable === 0 ? 0 : Math.round(((roomRow?.occupied ?? 0) / sellable) * 1000) / 10,
     };
   }
 

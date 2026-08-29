@@ -6,3 +6,4 @@ export * from './audit';
 export * from './phase2';
 export * from './owner';
 export * from './rooms';
+export * from './reservations';
