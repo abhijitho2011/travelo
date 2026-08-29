@@ -170,23 +170,39 @@ class SoftCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final content = Container(
+    // The accent used to be a thicker, differently-coloured left BorderSide.
+    // Flutter asserts when a non-uniform Border is combined with a
+    // borderRadius, so every accented card — a high-priority task, a critical
+    // work order — threw at paint. The stripe is drawn as a clipped overlay
+    // instead, which looks the same and cannot assert.
+    Widget content = Container(
       padding: padding,
       decoration: BoxDecoration(
         color: c.card,
         borderRadius: R.rLg,
-        border: Border(
-          top: BorderSide(color: c.border),
-          right: BorderSide(color: c.border),
-          bottom: BorderSide(color: c.border),
-          left: accent != null
-              ? BorderSide(color: accent!, width: 4)
-              : BorderSide(color: c.border),
-        ),
+        border: Border.all(color: c.border),
         boxShadow: raised ? c.elevation2 : c.elevation1,
       ),
       child: child,
     );
+    if (accent != null) {
+      content = Stack(
+        children: [
+          content,
+          Positioned.fill(
+            child: IgnorePointer(
+              child: ClipRRect(
+                borderRadius: R.rLg,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: SizedBox(width: 4, child: ColoredBox(color: accent!)),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
     if (onTap == null) return content;
     return Material(
       color: Colors.transparent,
