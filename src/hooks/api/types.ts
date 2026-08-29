@@ -415,3 +415,46 @@ export type StaffMember = {
 
 export type LocationState = { id: string; name: string; createdAt?: string };
 export type LocationDistrict = { id: string; stateId: string; name: string; createdAt?: string };
+
+/* ------------------------------------------------------------- amenities */
+
+/**
+ * Where an amenity can be attached. A ROOM amenity hangs off a room type (and
+ * optionally off one specific room as an extra); a PROPERTY amenity hangs off
+ * the hotel itself. The scope is what stops "Swimming pool" appearing as a
+ * per-room tick box.
+ */
+export type AmenityScope = "ROOM" | "PROPERTY";
+
+/** ARCHIVED entries stay attached where they already are; they just leave the pickers. */
+export type AmenityStatus = "ACTIVE" | "ARCHIVED";
+
+export type Amenity = {
+  id: string;
+  /** Stable slug — what clients and seeds match on, never the display name. */
+  key: string;
+  name: string;
+  scope: AmenityScope;
+  /** Icon NAME (e.g. "wifi"), resolved by each client to its own icon set. */
+  icon: string | null;
+  sortOrder: number;
+  status: AmenityStatus;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type NewAmenity = {
+  key: string;
+  name: string;
+  scope: AmenityScope;
+  icon?: string | undefined;
+  sortOrder?: number | undefined;
+};
+
+export type AmenityPatch = {
+  name?: string | undefined;
+  scope?: AmenityScope | undefined;
+  icon?: string | undefined;
+  sortOrder?: number | undefined;
+  status?: AmenityStatus | undefined;
+};

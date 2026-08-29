@@ -102,4 +102,8 @@ export const qk = {
     states: ["locations", "states"] as const,
     districts: (stateId: string) => ["locations", "districts", stateId] as const,
   },
+  amenities: {
+    all: ["amenities"] as const,
+    list: (scope: string) => ["amenities", "list", scope] as const,
+  },
 } as const;
