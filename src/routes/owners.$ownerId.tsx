@@ -3,6 +3,7 @@ import { Building2, UserSearch } from "lucide-react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { ImpersonateDialog } from "@/components/admin/impersonate-dialog";
 import { ExtendSubscriptionDialog } from "@/components/admin/extend-subscription";
 import { OwnerEditDialog } from "@/components/admin/owner-edit-dialog";
 import {
@@ -32,6 +33,7 @@ import { useFeatureCatalog } from "@/hooks/api/use-plans";
 import { useSubscriptions } from "@/hooks/api/use-subscriptions";
 import { useTickets } from "@/hooks/api/use-support";
 import { errorMessage } from "@/lib/api";
+import { hasPermission, useCurrentAdmin } from "@/lib/auth";
 import { compactInr, formatDate, humanise, num, relativeTime } from "@/lib/format";
 
 export const Route = createFileRoute("/owners/$ownerId")({
@@ -448,19 +450,42 @@ function OwnerDetailPage() {
 
         <EntitlementsPanel ownerId={ownerId} />
 
-        <Section title="Support tooling">
-          <div className="flex flex-wrap items-center gap-2 p-4">
-            <Button asChild variant="outline" size="sm" className="h-8">
-              <Link to="/impersonation">
-                <UserSearch aria-hidden className="mr-1.5 size-3.5" /> Start impersonation
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm" className="h-8">
-              <Link to="/audit">View audit trail</Link>
-            </Button>
-          </div>
-        </Section>
+        <SupportTooling ownerId={ownerId} ownerLabel={label} />
       </div>
     </>
+  );
+}
+
+/**
+ * Impersonation is permission-gated on the server too (`impersonation.start`);
+ * hiding the button when the admin lacks it keeps the UI from offering an
+ * action that would only ever 403.
+ */
+function SupportTooling({ ownerId, ownerLabel }: { ownerId: string; ownerLabel: string }) {
+  const me = useCurrentAdmin();
+  const mayImpersonate = hasPermission(me.data, "impersonation.start");
+  const mayViewSessions = hasPermission(me.data, "impersonation.view");
+
+  return (
+    <Section title="Support tooling">
+      <div className="flex flex-wrap items-center gap-2 p-4">
+        {mayImpersonate ? (
+          <ImpersonateDialog ownerId={ownerId} ownerLabel={ownerLabel} />
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            <UserSearch aria-hidden className="mr-1.5 inline size-3.5" />
+            You do not have permission to start a support session.
+          </p>
+        )}
+        {mayViewSessions && (
+          <Button asChild variant="outline" size="sm" className="h-8">
+            <Link to="/impersonation">Session history</Link>
+          </Button>
+        )}
+        <Button asChild variant="outline" size="sm" className="h-8">
+          <Link to="/audit">View audit trail</Link>
+        </Button>
+      </div>
+    </Section>
   );
 }

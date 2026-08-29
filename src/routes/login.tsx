@@ -1,12 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { KeyRound, Loader2, Smartphone } from "lucide-react";
+import { KeyRound, Loader2, ShieldCheck, Smartphone } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError, errorMessage } from "@/lib/api";
-import { loginWithGoogle, loginWithOtp, requestLoginOtp } from "@/lib/auth";
+import {
+  completeMfaChallenge,
+  isMfaChallenge,
+  loginWithGoogle,
+  loginWithOtp,
+  requestLoginOtp,
+} from "@/lib/auth";
 import { signInWithGoogleIdToken } from "@/lib/firebase";
 
 type LoginSearch = { next?: string | undefined };
@@ -57,6 +63,12 @@ function authErrorCopy(err: unknown): string {
       return "This account is not active. Contact platform support.";
     case "GOOGLE_SIGNIN_DISABLED":
       return "Google sign-in is not available on this deployment.";
+    case "MFA_INVALID_CODE":
+      return "That code is not valid. Try the current one from your authenticator, or a recovery code.";
+    case "MFA_CHALLENGE_INVALID":
+      return "This sign-in attempt has expired. Start again.";
+    case "MFA_LOCKED":
+      return errorMessage(err);
     default:
       return errorMessage(err);
   }
@@ -96,7 +108,13 @@ function LoginPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [resendIn, setResendIn] = useState(0);
 
-  const [busy, setBusy] = useState<null | "google" | "otp-send" | "otp-verify">(null);
+  // Set only when the first factor succeeded but the admin has TOTP enabled.
+  // While this is non-null NO tokens exist yet — the server issues none until
+  // the challenge is answered.
+  const [mfaToken, setMfaToken] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
+
+  const [busy, setBusy] = useState<null | "google" | "otp-send" | "otp-verify" | "mfa">(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -114,7 +132,12 @@ function LoginPage() {
     setNotice(null);
     try {
       const idToken = await signInWithGoogleIdToken();
-      await loginWithGoogle(idToken);
+      const result = await loginWithGoogle(idToken);
+      if (isMfaChallenge(result)) {
+        setMfaToken(result.mfaToken);
+        setBusy(null);
+        return;
+      }
       finish();
     } catch (err) {
       const code = (err as { code?: string } | null)?.code ?? "";
@@ -150,9 +173,35 @@ function LoginPage() {
     setBusy("otp-verify");
     setError(null);
     try {
-      await loginWithOtp(mobile.trim(), otp.trim());
+      const result = await loginWithOtp(mobile.trim(), otp.trim());
+      if (isMfaChallenge(result)) {
+        setMfaToken(result.mfaToken);
+        setBusy(null);
+        return;
+      }
       finish();
     } catch (err) {
+      setError(authErrorCopy(err));
+      setBusy(null);
+    }
+  };
+
+  const submitMfa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mfaToken) return;
+    setBusy("mfa");
+    setError(null);
+    try {
+      await completeMfaChallenge(mfaToken, mfaCode.trim());
+      finish();
+    } catch (err) {
+      // An expired or spent challenge cannot be retried — send them back to
+      // the start rather than leaving them typing into a dead form.
+      if (err instanceof ApiError && err.code === "MFA_CHALLENGE_INVALID") {
+        setMfaToken(null);
+        setMfaCode("");
+        setOtpSent(false);
+      }
       setError(authErrorCopy(err));
       setBusy(null);
     }
@@ -196,9 +245,11 @@ function LoginPage() {
           <p className="eyebrow">Super Admin</p>
           <h1 className="mt-1 text-2xl font-bold">Sign in to continue</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            {otpSent
-              ? "Enter the 6-digit code we sent to your mobile."
-              : "Continue with your Tavelo Google account, or a code sent to your registered mobile."}
+            {mfaToken
+              ? "One more step: the 6-digit code from your authenticator app."
+              : otpSent
+                ? "Enter the 6-digit code we sent to your mobile."
+                : "Continue with your Tavelo Google account, or a code sent to your registered mobile."}
           </p>
 
           {error && (
@@ -218,7 +269,59 @@ function LoginPage() {
             </div>
           )}
 
-          {otpSent ? (
+          {mfaToken ? (
+            <form onSubmit={submitMfa} className="mt-6 space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="mfa-code">Authenticator code</Label>
+                <Input
+                  id="mfa-code"
+                  inputMode="text"
+                  autoComplete="one-time-code"
+                  maxLength={32}
+                  placeholder="123456"
+                  className="tnum text-center text-lg tracking-[0.3em]"
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value)}
+                  required
+                  autoFocus
+                />
+                <p className="text-xs text-muted-foreground">
+                  Lost your authenticator? Enter one of your recovery codes instead — each works
+                  once.
+                </p>
+              </div>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={busy !== null || mfaCode.trim().length < 6}
+              >
+                {busy === "mfa" ? (
+                  <>
+                    <Loader2 aria-hidden className="mr-2 size-4 animate-spin" /> Checking…
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck aria-hidden className="mr-2 size-4" /> Verify and sign in
+                  </>
+                )}
+              </Button>
+              <button
+                type="button"
+                className="w-full text-xs text-muted-foreground underline-offset-4 hover:underline"
+                onClick={() => {
+                  setMfaToken(null);
+                  setMfaCode("");
+                  setOtp("");
+                  setOtpSent(false);
+                  setError(null);
+                  setNotice(null);
+                }}
+                disabled={busy !== null}
+              >
+                Start over
+              </button>
+            </form>
+          ) : otpSent ? (
             <form onSubmit={submitOtp} className="mt-6 space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="signin-otp">6-digit code</Label>

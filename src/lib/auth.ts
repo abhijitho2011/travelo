@@ -17,6 +17,24 @@ export type CurrentAdmin = {
   permissions: string[];
 };
 
+/**
+ * What the first factor returns when the admin has TOTP enabled: a
+ * short-lived, single-purpose token and NO session. `completeMfaChallenge` is
+ * the only way past it.
+ */
+export type MfaChallengeResponse = {
+  mfaRequired: true;
+  mfaToken: string;
+  /** Seconds. */
+  expiresIn: number;
+};
+
+export type SignInResult = LoginResponse | MfaChallengeResponse;
+
+export function isMfaChallenge(result: SignInResult): result is MfaChallengeResponse {
+  return (result as MfaChallengeResponse).mfaRequired === true;
+}
+
 export type LoginResponse = {
   admin: {
     id: string;
@@ -47,13 +65,14 @@ export function isAuthenticated(): boolean {
  * the token and checks the email against its own allowlist — the browser never
  * decides who is allowed in.
  */
-export async function loginWithGoogle(idToken: string) {
-  const data = await apiFetch<LoginResponse>("/auth/google", {
+export async function loginWithGoogle(idToken: string): Promise<SignInResult> {
+  const data = await apiFetch<SignInResult>("/auth/google", {
     method: "POST",
     auth: false,
     body: { idToken },
   });
-  storeTokens(data.accessToken, data.refreshToken);
+  // Nothing to store yet when a second factor is owed.
+  if (!isMfaChallenge(data)) storeTokens(data.accessToken, data.refreshToken);
   return data;
 }
 
@@ -69,11 +88,25 @@ export async function requestLoginOtp(mobile: string) {
   });
 }
 
-export async function loginWithOtp(mobile: string, otp: string) {
-  const data = await apiFetch<LoginResponse>("/auth/otp/verify", {
+export async function loginWithOtp(mobile: string, otp: string): Promise<SignInResult> {
+  const data = await apiFetch<SignInResult>("/auth/otp/verify", {
     method: "POST",
     auth: false,
     body: { mobile, otp },
+  });
+  if (!isMfaChallenge(data)) storeTokens(data.accessToken, data.refreshToken);
+  return data;
+}
+
+/**
+ * Second factor. Exchanges the challenge token for a real session; the code is
+ * either a 6-digit TOTP or one of the recovery codes issued at enrolment.
+ */
+export async function completeMfaChallenge(mfaToken: string, code: string) {
+  const data = await apiFetch<LoginResponse>("/auth/mfa", {
+    method: "POST",
+    auth: false,
+    body: { mfaToken, code },
   });
   storeTokens(data.accessToken, data.refreshToken);
   return data;

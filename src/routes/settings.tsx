@@ -3,6 +3,7 @@ import { Archive, Loader2, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { MfaSettings } from "@/components/admin/mfa-settings";
 import { AsyncSection, PageHeader, Section, StatusBadge } from "@/components/admin/primitives";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,8 +45,9 @@ function SettingsPage() {
     <div className="space-y-5">
       <PageHeader
         title="Settings"
-        description="Platform configuration. Reference data here is consumed by the owner apps."
+        description="Your account security, and the reference data the owner apps consume."
       />
+      <MfaSettings />
       <LocationSettings />
       <AmenitySettings />
     </div>
