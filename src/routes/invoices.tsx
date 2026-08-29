@@ -1,12 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { FileText } from "lucide-react";
 import { toast } from "sonner";
 
 import { DataTable, type Column } from "@/components/admin/data-table";
+import { ExportButton } from "@/components/admin/export-button";
 import { StatusFilter, ToolbarActions } from "@/components/admin/list-toolbar";
 import { PageHeader, StatusBadge } from "@/components/admin/primitives";
 import { Button } from "@/components/ui/button";
 import type { Invoice } from "@/hooks/api/types";
-import { useInvoiceAction, useInvoices, type InvoiceAction } from "@/hooks/api/use-billing";
+import {
+  useGenerateInvoicePdf,
+  useInvoiceAction,
+  useInvoiceDocumentUrl,
+  useInvoices,
+  type InvoiceAction,
+} from "@/hooks/api/use-billing";
 import { useListParams } from "@/hooks/use-list-params";
 import { errorMessage } from "@/lib/api";
 import { formatDate, inr } from "@/lib/format";
@@ -23,6 +31,54 @@ export const Route = createFileRoute("/invoices")({
 
 const INVOICE_STATUSES = ["DRAFT", "ISSUED", "PAID", "CANCELLED", "OVERDUE"];
 
+/**
+ * Download the invoice PDF, or generate it if none exists yet.
+ *
+ * PDFs are produced best-effort after a payment settles, so an invoice can
+ * legitimately have none — a storage hiccup must never have rolled back the
+ * money. "Generate PDF" is that retry, and it is always available so a
+ * document can be rebuilt after the invoice details change.
+ */
+function InvoiceDocumentButton({ invoice }: { invoice: Invoice }) {
+  const link = useInvoiceDocumentUrl();
+  const generate = useGenerateInvoicePdf();
+  const busy = link.isPending || generate.isPending;
+
+  const open = (url: string) => window.open(url, "_blank", "noopener,noreferrer");
+
+  const download = async () => {
+    try {
+      open((await link.mutateAsync(invoice.id)).url);
+    } catch {
+      // No document yet (or the link expired) — build one and open that.
+      await regenerate();
+    }
+  };
+
+  const regenerate = async () => {
+    try {
+      const result = await generate.mutateAsync(invoice.id);
+      toast.success("Invoice PDF ready", { description: invoice.invoiceNumber });
+      open(result.url);
+    } catch (error) {
+      toast.error("Could not generate the invoice PDF", { description: errorMessage(error) });
+    }
+  };
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="h-7 text-xs"
+      disabled={busy}
+      onClick={() => void (invoice.hasDocument ? download() : regenerate())}
+    >
+      <FileText aria-hidden className="mr-1 size-3.5" />
+      {invoice.hasDocument ? "Download" : "Generate PDF"}
+    </Button>
+  );
+}
+
 function InvoiceActions({ invoice }: { invoice: Invoice }) {
   const action = useInvoiceAction();
 
@@ -37,6 +93,7 @@ function InvoiceActions({ invoice }: { invoice: Invoice }) {
 
   return (
     <div className="flex items-center justify-end gap-1">
+      <InvoiceDocumentButton invoice={invoice} />
       {invoice.status === "DRAFT" && (
         <Button
           variant="ghost"
@@ -148,6 +205,7 @@ function InvoicesPage() {
                 <span className="tnum text-xs text-muted-foreground">
                   {query.data?.total ?? 0} total
                 </span>
+                <ExportButton entity="invoices" filters={{ status: list.statusParam }} />
               </ToolbarActions>
             </>
           }

@@ -57,6 +57,61 @@ export function useRefundPayment() {
   });
 }
 
+/** Methods the backend accepts for money that arrived outside a gateway. */
+export const MANUAL_PAYMENT_METHODS = ["CASH", "BANK_TRANSFER", "UPI", "CHEQUE"] as const;
+export type ManualPaymentMethod = (typeof MANUAL_PAYMENT_METHODS)[number];
+
+export type ManualPaymentInput = {
+  ownerId: string;
+  subscriptionId?: string | undefined;
+  /** Minor units. The dialog collects rupees and multiplies by 100. */
+  amountPaise: number;
+  method: ManualPaymentMethod;
+  reference?: string | undefined;
+  note?: string | undefined;
+};
+
+/**
+ * Records cash, an NEFT, a UPI transfer or a cheque. The backend settles it
+ * through the same path a gateway webhook uses — the subscription is renewed
+ * and an invoice is issued — so this invalidates subscriptions too.
+ */
+export function useRecordManualPayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ManualPaymentInput) =>
+      apiFetch<{ payment: Payment; invoice: Invoice }>("/billing/payments/manual", {
+        method: "POST",
+        body: input,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.billing.all });
+      qc.invalidateQueries({ queryKey: qk.subscriptions.all });
+      qc.invalidateQueries({ queryKey: qk.audit.all });
+    },
+  });
+}
+
+/** Presigned, short-lived URL for an invoice document; 404s until one exists. */
+export function useInvoiceDocumentUrl() {
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ url: string; expiresInSeconds: number }>(`/billing/invoices/${id}/document`),
+  });
+}
+
+/** (Re)generates the invoice PDF and returns a link to it. */
+export function useGenerateInvoicePdf() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ storageKey: string; url: string }>(`/billing/invoices/${id}/generate-pdf`, {
+        method: "POST",
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.billing.all }),
+  });
+}
+
 export function useInvoices(params: BillingListParams) {
   return useQuery({
     queryKey: qk.billing.invoices(params),

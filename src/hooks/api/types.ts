@@ -183,6 +183,8 @@ export type Invoice = {
   paidAt: string | null;
   dueDate: string | null;
   createdAt: string;
+  /** True once a PDF has been generated and stored for this invoice. */
+  hasDocument?: boolean;
 };
 
 export type SupportMessage = {

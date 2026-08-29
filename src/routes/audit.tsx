@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { DataTable, type Column } from "@/components/admin/data-table";
+import { ExportButton } from "@/components/admin/export-button";
+import { ToolbarActions } from "@/components/admin/list-toolbar";
 import { PageHeader } from "@/components/admin/primitives";
 import { Input } from "@/components/ui/input";
 import type { AuditLog } from "@/hooks/api/types";
@@ -84,15 +86,20 @@ function AuditPage() {
         emptyTitle="No audit records"
         emptyDescription="Privileged actions are recorded here as they happen."
         toolbar={
-          <Input
-            value={entity}
-            onChange={(event) => {
-              setEntity(event.target.value);
-              setOffset(0);
-            }}
-            placeholder="Filter by entity, e.g. owner"
-            className="h-8 max-w-xs"
-          />
+          <>
+            <Input
+              value={entity}
+              onChange={(event) => {
+                setEntity(event.target.value);
+                setOffset(0);
+              }}
+              placeholder="Filter by entity, e.g. owner"
+              className="h-8 max-w-xs"
+            />
+            <ToolbarActions>
+              <ExportButton entity="audit-logs" filters={{ entity: entity.trim() || undefined }} />
+            </ToolbarActions>
+          </>
         }
         pagination={{ total: page?.total ?? 0, limit: LIMIT, offset, onOffsetChange: setOffset }}
       />

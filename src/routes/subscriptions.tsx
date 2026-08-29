@@ -3,6 +3,7 @@ import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { DataTable, type Column } from "@/components/admin/data-table";
+import { ExportButton } from "@/components/admin/export-button";
 import { ExtendSubscriptionDialog } from "@/components/admin/extend-subscription";
 import { StatusFilter, ToolbarActions } from "@/components/admin/list-toolbar";
 import { PageHeader, StatusBadge } from "@/components/admin/primitives";
@@ -167,6 +168,7 @@ function SubscriptionsPage() {
                 <span className="tnum text-xs text-muted-foreground">
                   {query.data?.total ?? 0} total
                 </span>
+                <ExportButton entity="subscriptions" filters={{ status: list.statusParam }} />
               </ToolbarActions>
             </>
           }

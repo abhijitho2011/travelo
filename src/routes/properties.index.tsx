@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { DataTable, type Column } from "@/components/admin/data-table";
+import { ExportButton } from "@/components/admin/export-button";
 import {
   ClearFiltersButton,
   EMPTY_LOCATION,
@@ -146,6 +147,15 @@ function PropertiesPage() {
                 <span className="tnum text-xs text-muted-foreground">
                   {query.data?.total ?? 0} total
                 </span>
+                <ExportButton
+                  entity="properties"
+                  filters={{
+                    q: list.q,
+                    status: list.statusParam,
+                    state: location.stateName,
+                    district: location.districtName,
+                  }}
+                />
               </ToolbarActions>
             </>
           }

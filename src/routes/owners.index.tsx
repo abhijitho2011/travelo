@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { DataTable, type Column } from "@/components/admin/data-table";
+import { ExportButton } from "@/components/admin/export-button";
 import {
   ClearFiltersButton,
   EMPTY_LOCATION,
@@ -261,6 +262,15 @@ function OwnersPage() {
                 <span className="tnum text-xs text-muted-foreground">
                   {query.data?.total ?? 0} total
                 </span>
+                <ExportButton
+                  entity="owners"
+                  filters={{
+                    q: list.q,
+                    status: list.statusParam,
+                    stateId: location.stateId,
+                    districtId: location.districtId,
+                  }}
+                />
               </ToolbarActions>
             </>
           }
