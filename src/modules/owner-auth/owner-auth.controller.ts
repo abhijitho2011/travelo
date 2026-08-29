@@ -44,8 +44,13 @@ export class OwnerAuthController {
 
   @ApiBearerAuth()
   @UseGuards(OwnerJwtGuard)
+  /**
+   * Also the client's only signal that it is inside a Tavelo support session:
+   * when `impersonation.active` is present the app must show its banner and
+   * disable every write control (the API refuses those writes regardless).
+   */
   @Get('me')
   me(@CurrentOwner() owner: AuthenticatedOwner) {
-    return this.svc.me(owner.id);
+    return this.svc.me(owner.id, owner.impersonation);
   }
 }

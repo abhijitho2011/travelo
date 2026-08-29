@@ -7,6 +7,7 @@ import { OwnerTokenService, OwnerTokenPair } from './owner-token.service';
 import { FirebaseService } from '../shared-auth/firebase.service';
 import { SMS_PROVIDER, SmsProvider } from '../shared-auth/sms/sms-provider.interface';
 import { OwnerErrors } from './owner-errors';
+import { OwnerImpersonationContext } from './current-owner.decorator';
 
 @Injectable()
 export class OwnerAuthService {
@@ -74,7 +75,7 @@ export class OwnerAuthService {
     return { message: 'Logged out' };
   }
 
-  async me(ownerId: string) {
+  async me(ownerId: string, impersonation?: OwnerImpersonationContext) {
     const [owner] = await this.db.select().from(owners).where(eq(owners.id, ownerId)).limit(1);
     if (!owner) throw OwnerErrors.ownerNotFound();
 
@@ -107,6 +108,20 @@ export class OwnerAuthService {
             currentPeriodEnd: sub.currentPeriodEnd,
           }
         : null,
+      // Present ONLY under a live support session — the owner app keys its
+      // read-only banner off this block.
+      ...(impersonation
+        ? {
+            impersonation: {
+              active: true as const,
+              byAdmin: impersonation.byAdmin,
+              byAdminEmail: impersonation.byAdminEmail,
+              sessionId: impersonation.sessionId,
+              startedAt: impersonation.startedAt,
+              readOnly: true as const,
+            },
+          }
+        : {}),
     };
   }
 }

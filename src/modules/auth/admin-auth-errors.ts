@@ -36,6 +36,48 @@ export const AdminAuthErrors = {
     adminAuthError('ACCOUNT_BLOCKED', 'Account is blocked', HttpStatus.FORBIDDEN),
   accountSuspended: () =>
     adminAuthError('ACCOUNT_SUSPENDED', 'Account is suspended', HttpStatus.FORBIDDEN),
+  // ---------- TOTP MFA ----------
+  /** MFA_SECRET_KEY is absent or unusable: refuse to enrol rather than store a plaintext secret. */
+  mfaNotConfigured: () =>
+    adminAuthError(
+      'MFA_NOT_CONFIGURED',
+      'Two-factor authentication is not available on this deployment (no encryption key is configured). Contact your platform operator.',
+      HttpStatus.SERVICE_UNAVAILABLE,
+    ),
+  mfaNotEnrolled: () =>
+    adminAuthError(
+      'MFA_NOT_ENROLLED',
+      'Start enrolment before verifying a code',
+      HttpStatus.BAD_REQUEST,
+    ),
+  mfaAlreadyEnabled: () =>
+    adminAuthError(
+      'MFA_ALREADY_ENABLED',
+      'Two-factor authentication is already enabled',
+      HttpStatus.CONFLICT,
+    ),
+  mfaNotEnabled: () =>
+    adminAuthError(
+      'MFA_NOT_ENABLED',
+      'Two-factor authentication is not enabled',
+      HttpStatus.BAD_REQUEST,
+    ),
+  /** Same message for a wrong TOTP and a wrong recovery code — nothing to probe. */
+  mfaInvalidCode: () =>
+    adminAuthError('MFA_INVALID_CODE', 'Invalid or expired code', HttpStatus.UNAUTHORIZED),
+  mfaChallengeInvalid: () =>
+    adminAuthError(
+      'MFA_CHALLENGE_INVALID',
+      'This sign-in attempt has expired. Start again.',
+      HttpStatus.UNAUTHORIZED,
+    ),
+  mfaLocked: (seconds: number) =>
+    adminAuthError(
+      'MFA_LOCKED',
+      `Too many incorrect codes. Try again in ${Math.ceil(seconds / 60)} minute(s).`,
+      HttpStatus.TOO_MANY_REQUESTS,
+    ),
+
   googleDisabled: () =>
     adminAuthError(
       'GOOGLE_SIGNIN_DISABLED',

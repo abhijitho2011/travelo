@@ -20,6 +20,18 @@ const envSchema = z.object({
   JWT_ACCESS_TTL: z.string().default('15m'),
   JWT_REFRESH_TTL: z.string().default('30d'),
 
+  // ---------- Admin TOTP MFA ----------
+  // 32 raw bytes, base64-encoded, used to encrypt `admins.mfa_secret` at rest
+  // (AES-256-GCM). Optional on purpose: without it MFA ENROLMENT is refused
+  // with a typed MFA_NOT_CONFIGURED rather than storing a shared secret in
+  // plaintext. MFA is opt-in per admin either way, so an unconfigured
+  // deployment is still a working one.
+  MFA_SECRET_KEY: z.string().optional(),
+  /** Failed challenge attempts before the admin's MFA step locks. */
+  MFA_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
+  /** How long that lock lasts, in seconds. */
+  MFA_LOCK_SECONDS: z.coerce.number().int().positive().default(900),
+
   THROTTLE_TTL: z.coerce.number().int().positive().default(60),
   THROTTLE_LIMIT: z.coerce.number().int().positive().default(120),
 

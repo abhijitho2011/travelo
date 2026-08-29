@@ -54,6 +54,32 @@ export const adminOtps = pgTable(
   }),
 );
 
+/**
+ * One-time recovery codes for admin TOTP MFA.
+ *
+ * Ten are minted at enrolment and shown exactly once. Only the argon2id hash is
+ * stored, so a database read cannot recover a usable code, and `used_at` makes
+ * each one strictly single-use — a replayed code is dead on arrival.
+ */
+export const adminMfaRecoveryCodes = pgTable(
+  'admin_mfa_recovery_codes',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    adminId: uuid('admin_id')
+      .notNull()
+      .references(() => admins.id, { onDelete: 'cascade' }),
+    codeHash: varchar('code_hash', { length: 512 }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    adminIdx: index('admin_mfa_recovery_admin_idx').on(t.adminId),
+  }),
+);
+
 export type Admin = typeof admins.$inferSelect;
+export type AdminMfaRecoveryCode = typeof adminMfaRecoveryCodes.$inferSelect;
 export type NewAdmin = typeof admins.$inferInsert;
 export type AdminOtp = typeof adminOtps.$inferSelect;
