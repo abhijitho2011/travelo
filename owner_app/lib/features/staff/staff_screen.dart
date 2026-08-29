@@ -101,6 +101,7 @@ class _StaffCard extends ConsumerWidget {
             PopupMenuButton<String>(
               onSelected: (v) => _action(context, ref, v),
               itemBuilder: (_) => [
+                const PopupMenuItem(value: 'edit', child: Text('Edit')),
                 PopupMenuItem(value: 'toggle', child: Text(blocked ? 'Unblock' : 'Block')),
                 const PopupMenuItem(value: 'delete', child: Text('Delete')),
               ],
@@ -113,6 +114,16 @@ class _StaffCard extends ConsumerWidget {
 
   Future<void> _action(BuildContext context, WidgetRef ref, String v) async {
     final repo = ref.read(ownerRepositoryProvider);
+    if (v == 'edit') {
+      // The record travels with the navigation so the form opens pre-filled
+      // without a second fetch.
+      await context.push(
+        '/properties/$propertyId/staff/${member.id}/edit',
+        extra: member,
+      );
+      ref.invalidate(staffProvider(propertyId));
+      return;
+    }
     try {
       if (v == 'toggle') {
         final next = member.status.toUpperCase() == 'BLOCKED' ? 'ACTIVE' : 'BLOCKED';

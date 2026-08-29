@@ -7,22 +7,40 @@ import { locationDistricts, locationStates } from '../../database/schema';
 export class LocationsService {
   constructor(@Inject(DRIZZLE) private readonly db: Database) {}
 
-  /** Owner-facing: { states: { "<State>": ["<District>", ...] } } */
-  async asStatesMap(): Promise<{ states: Record<string, string[]> }> {
+  /**
+   * Owner-facing reference data, in two shapes from one pair of queries:
+   *
+   *   states    — { "<State>": ["<District>", ...] }, the by-NAME map the
+   *               property and staff forms post back (those rows store names);
+   *   catalogue — the same tree carrying ids, for the owner PROFILE form, which
+   *               posts `location_states.id` / `location_districts.id`.
+   *
+   * `states` is kept exactly as it was so existing clients are unaffected.
+   */
+  async asStatesMap(): Promise<{
+    states: Record<string, string[]>;
+    catalogue: { id: string; name: string; districts: { id: string; name: string }[] }[];
+  }> {
     const states = await this.db.select().from(locationStates).orderBy(asc(locationStates.name));
     const districts = await this.db
       .select()
       .from(locationDistricts)
       .orderBy(asc(locationDistricts.name));
-    const byState = new Map<string, string[]>();
+    const byState = new Map<string, { id: string; name: string }[]>();
     for (const s of states) byState.set(s.id, []);
     for (const d of districts) {
-      const arr = byState.get(d.stateId);
-      if (arr) arr.push(d.name);
+      byState.get(d.stateId)?.push({ id: d.id, name: d.name });
     }
     const out: Record<string, string[]> = {};
-    for (const s of states) out[s.name] = byState.get(s.id) ?? [];
-    return { states: out };
+    for (const s of states) out[s.name] = (byState.get(s.id) ?? []).map((d) => d.name);
+    return {
+      states: out,
+      catalogue: states.map((s) => ({
+        id: s.id,
+        name: s.name,
+        districts: byState.get(s.id) ?? [],
+      })),
+    };
   }
 
   // ---------- Admin management ----------

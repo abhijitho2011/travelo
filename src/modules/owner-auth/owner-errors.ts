@@ -27,4 +27,60 @@ export const OwnerErrors = {
       'Too many OTP requests, try again later',
       HttpStatus.TOO_MANY_REQUESTS,
     ),
+
+  // ---------- Staff ----------
+  /**
+   * 404 rather than 403 for a staff row the owner does not hold: a 403 would
+   * confirm the row exists at some other property.
+   */
+  staffNotFound: () => ownerError('STAFF_NOT_FOUND', 'Team member not found', HttpStatus.NOT_FOUND),
+  /** Surfaces the partial unique (property_id, email) as a typed conflict. */
+  staffEmailTaken: () =>
+    ownerError(
+      'STAFF_EMAIL_TAKEN',
+      'Another team member at this hotel already uses that email address',
+      HttpStatus.CONFLICT,
+    ),
+  propertyNotFound: () => ownerError('PROPERTY_NOT_FOUND', 'Hotel not found', HttpStatus.NOT_FOUND),
+
+  // ---------- Shared input validation ----------
+  invalidLocation: (message: string) =>
+    ownerError('INVALID_LOCATION', message, HttpStatus.BAD_REQUEST),
+  invalidPhone: (field = 'mobile') =>
+    ownerError(
+      'INVALID_PHONE',
+      `${field} must be a valid 10-digit Indian mobile number`,
+      HttpStatus.BAD_REQUEST,
+    ),
+  invalidGstin: () =>
+    ownerError(
+      'INVALID_GSTIN',
+      'gstNumber must be a valid 15-character GSTIN',
+      HttpStatus.BAD_REQUEST,
+    ),
+  nothingToUpdate: () =>
+    ownerError('NOTHING_TO_UPDATE', 'No editable fields were supplied', HttpStatus.BAD_REQUEST),
+
+  // ---------- Profile ----------
+  emailNotEditable: () =>
+    ownerError(
+      'EMAIL_NOT_EDITABLE',
+      'Your email address identifies your account at sign-in and cannot be changed here. Contact Tavelo support to update it.',
+      HttpStatus.BAD_REQUEST,
+    ),
+
+  // ---------- Subscription ----------
+  subscriptionNotFound: () =>
+    ownerError(
+      'SUBSCRIPTION_NOT_FOUND',
+      'No subscription is on file for this account',
+      HttpStatus.NOT_FOUND,
+    ),
+
+  // ---------- Support ----------
+  ticketNotFound: () =>
+    ownerError('TICKET_NOT_FOUND', 'Support ticket not found', HttpStatus.NOT_FOUND),
+
+  // ---------- Sessions ----------
+  sessionNotFound: () => ownerError('SESSION_NOT_FOUND', 'Session not found', HttpStatus.NOT_FOUND),
 };

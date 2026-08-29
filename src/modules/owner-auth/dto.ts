@@ -4,6 +4,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Length,
   Matches,
   Max,
@@ -15,6 +16,7 @@ import {
   ownerAssignableStaffStatusValues,
   ownerCreatableStaffRoleValues,
 } from '../../database/schema/owner';
+import { ticketPriorityValues, ticketStatusValues } from '../../database/schema/phase2';
 
 const MOBILE_REGEX = /^[0-9]{10,15}$/;
 
@@ -70,4 +72,73 @@ export class CreateStaffDto {
 
 export class SetStaffStatusDto {
   @IsIn(ownerAssignableStaffStatusValues as unknown as string[]) status!: string;
+}
+
+/**
+ * Partial edit of an existing GM/AGM. Every field is optional, but whatever is
+ * supplied is validated exactly as it is on create — including the role, which
+ * can only ever move between the two management roles an owner may assign.
+ */
+export class UpdateStaffDto {
+  @IsOptional() @IsIn(ownerCreatableStaffRoleValues as unknown as string[]) role?: string;
+  @IsOptional() @IsString() @Length(1, 128) firstName?: string;
+  @IsOptional() @IsString() @Length(1, 128) lastName?: string;
+  @IsOptional() @IsString() @Length(0, 500) address?: string;
+  @IsOptional()
+  @Matches(/^\d{6}$/, { message: 'pinCode must be exactly 6 digits' })
+  pinCode?: string;
+  @IsOptional() @IsString() @Length(1, 128) state?: string;
+  @IsOptional() @IsString() @Length(1, 128) district?: string;
+  // Normalised and range-checked by the service (10-digit Indian mobile).
+  @IsOptional() @IsString() @Length(6, 20) mobile?: string;
+  @IsOptional() @IsEmail() email?: string;
+  @IsOptional() @IsString() @Length(0, 64) department?: string;
+  @IsOptional() @IsString() @Length(0, 64) employeeId?: string;
+}
+
+/**
+ * Self-service profile edit. `email` is declared ONLY so an attempt to change
+ * it fails with the typed EMAIL_NOT_EDITABLE error rather than the global
+ * whitelist pipe's generic "property should not exist" dump.
+ */
+export class UpdateOwnerProfileDto {
+  @IsOptional() @IsString() @Length(2, 255) name?: string;
+  @IsOptional() @IsString() @Length(0, 255) company?: string;
+  @IsOptional() @IsString() @Length(6, 20) phone?: string;
+  @IsOptional() @IsString() @Length(0, 32) gstNumber?: string;
+  @IsOptional() @IsString() @Length(0, 500) address?: string;
+  @IsOptional()
+  @Matches(/^\d{6}$/, { message: 'pinCode must be exactly 6 digits' })
+  pinCode?: string;
+  /** `location_states.id` — validated against the admin catalogue when changed. */
+  @IsOptional() @IsUUID() state?: string;
+  /** `location_districts.id` — must belong to `state`. */
+  @IsOptional() @IsUUID() district?: string;
+  /** Never applied. Present so the rejection carries a readable reason. */
+  @IsOptional() @IsString() email?: string;
+}
+
+// ---------- Support ----------
+
+export class CreateTicketDto {
+  @IsString() @Length(3, 255) subject!: string;
+  @IsString() @Length(1, 5000) message!: string;
+  @IsOptional() @IsIn(ticketPriorityValues as unknown as string[]) priority?: string;
+  @IsOptional() @IsUUID() propertyId?: string;
+}
+
+export class TicketMessageDto {
+  @IsString() @Length(1, 5000) body!: string;
+}
+
+export class TicketFilterDto {
+  @IsOptional() @IsIn(ticketStatusValues as unknown as string[]) status?: string;
+  @IsOptional() @IsString() @Length(1, 128) q?: string;
+  @IsOptional() @IsInt() @Min(1) @Max(100) limit?: number;
+  @IsOptional() @IsInt() @Min(0) offset?: number;
+}
+
+export class PaginationDto {
+  @IsOptional() @IsInt() @Min(1) @Max(100) limit?: number;
+  @IsOptional() @IsInt() @Min(0) offset?: number;
 }

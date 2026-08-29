@@ -1,16 +1,21 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, ne, sql } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import {
   hotelStaff,
+  HotelStaffRole,
   HotelStaffStatus,
+  locationDistricts,
+  locationStates,
   owners,
   properties,
   subscriptions,
   subscriptionPlans,
 } from '../../database/schema';
-import { CreatePropertyDto, CreateStaffDto } from './dto';
+import { AuditService } from '../audit/audit.service';
+import { CreatePropertyDto, CreateStaffDto, UpdateStaffDto } from './dto';
 import { OwnerErrors } from './owner-errors';
+import { normalizeIndianMobile, trimToNull } from './owner-input';
 import { PropertyPhotosService } from './property-photos.service';
 
 // Subscription statuses that grant the plan's property allowance.
@@ -21,6 +26,7 @@ export class OwnerPortalService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly photos: PropertyPhotosService,
+    private readonly audit: AuditService,
   ) {}
 
   private coverPhotoUrls(propertyIds: string[]): Promise<Map<string, string>> {
@@ -210,6 +216,9 @@ export class OwnerPortalService {
       fullName: `${s.firstName} ${s.lastName}`.trim(),
       email: s.email,
       mobile: s.mobile,
+      // Carried so the owner app can pre-fill the edit form without a second
+      // round trip.
+      address: s.address,
       state: s.state,
       district: s.district,
       pinCode: s.pinCode,
@@ -252,6 +261,134 @@ export class OwnerPortalService {
       role: row.role,
       status: row.status,
     };
+  }
+
+  /**
+   * The state/district pair on a staff row is stored as TEXT names (unlike an
+   * owner, which stores catalogue ids), so the pair is validated by name: the
+   * state must exist in the admin catalogue and the district must sit under it.
+   */
+  private async assertLocationNames(stateName: string, districtName: string): Promise<void> {
+    const [state] = await this.db
+      .select({ id: locationStates.id, name: locationStates.name })
+      .from(locationStates)
+      .where(eq(locationStates.name, stateName))
+      .limit(1);
+    if (!state) {
+      throw OwnerErrors.invalidLocation(`Unknown state "${stateName}"`);
+    }
+    const [district] = await this.db
+      .select({ id: locationDistricts.id })
+      .from(locationDistricts)
+      .where(and(eq(locationDistricts.stateId, state.id), eq(locationDistricts.name, districtName)))
+      .limit(1);
+    if (!district) {
+      throw OwnerErrors.invalidLocation(`District does not belong to ${state.name}`);
+    }
+  }
+
+  /** The one live staff row at this property, or 404 — never 403. */
+  private async loadOwnedStaff(ownerId: string, propertyId: string, staffId: string) {
+    const [row] = await this.db
+      .select()
+      .from(hotelStaff)
+      .where(
+        and(
+          eq(hotelStaff.id, staffId),
+          eq(hotelStaff.propertyId, propertyId),
+          eq(hotelStaff.ownerId, ownerId),
+          isNull(hotelStaff.deletedAt),
+        ),
+      )
+      .limit(1);
+    if (!row) throw OwnerErrors.staffNotFound();
+    return row;
+  }
+
+  /**
+   * Edit an existing GM/AGM. Everything supplied is validated exactly as it is
+   * on create; anything omitted is left untouched. Scoping is strict — a
+   * property this owner does not hold, or a soft-deleted row, is a 404.
+   */
+  async updateStaff(ownerId: string, propertyId: string, staffId: string, dto: UpdateStaffDto) {
+    await this.assertOwnedProperty(ownerId, propertyId);
+    const before = await this.loadOwnedStaff(ownerId, propertyId, staffId);
+
+    const patch: Partial<typeof hotelStaff.$inferInsert> = {};
+    if (dto.role !== undefined) patch.role = dto.role as HotelStaffRole;
+    if (dto.firstName !== undefined) patch.firstName = dto.firstName.trim();
+    if (dto.lastName !== undefined) patch.lastName = dto.lastName.trim();
+    if (dto.address !== undefined) patch.address = trimToNull(dto.address);
+    if (dto.pinCode !== undefined) patch.pinCode = dto.pinCode;
+    if (dto.department !== undefined) patch.department = trimToNull(dto.department);
+    if (dto.employeeId !== undefined) patch.employeeId = trimToNull(dto.employeeId);
+    if (dto.mobile !== undefined) patch.mobile = normalizeIndianMobile(dto.mobile);
+
+    // State and district travel together so the pair can never drift apart.
+    const changingLocation = dto.state !== undefined || dto.district !== undefined;
+    if (changingLocation) {
+      const stateName = dto.state ?? before.state;
+      const districtName = dto.district ?? before.district;
+      if (!stateName || !districtName) {
+        throw OwnerErrors.invalidLocation(
+          'Both state and district are required when changing the location',
+        );
+      }
+      await this.assertLocationNames(stateName, districtName);
+      patch.state = stateName;
+      patch.district = districtName;
+    }
+
+    // The partial unique index is (property_id, email) WHERE deleted_at IS NULL.
+    // Checking it here turns a raw 23505 into a typed, readable conflict; the
+    // insert below still catches the race.
+    let nextEmail: string | undefined;
+    if (dto.email !== undefined) {
+      nextEmail = dto.email.trim().toLowerCase();
+      if (nextEmail !== before.email) {
+        const clash = await this.db
+          .select({ id: hotelStaff.id })
+          .from(hotelStaff)
+          .where(
+            and(
+              eq(hotelStaff.propertyId, propertyId),
+              eq(hotelStaff.email, nextEmail),
+              ne(hotelStaff.id, staffId),
+              isNull(hotelStaff.deletedAt),
+            ),
+          )
+          .limit(1);
+        if (clash.length) throw OwnerErrors.staffEmailTaken();
+      }
+      patch.email = nextEmail;
+    }
+
+    if (Object.keys(patch).length === 0) throw OwnerErrors.nothingToUpdate();
+    patch.updatedAt = new Date();
+
+    let after: typeof hotelStaff.$inferSelect;
+    try {
+      [after] = await this.db
+        .update(hotelStaff)
+        .set(patch)
+        .where(eq(hotelStaff.id, staffId))
+        .returning();
+    } catch (err) {
+      // Lost the race against a concurrent write to the same (property, email).
+      if ((err as { code?: string }).code === '23505') throw OwnerErrors.staffEmailTaken();
+      throw err;
+    }
+
+    await this.audit.record({
+      action: 'owner.staff.updated',
+      entity: 'hotel_staff',
+      entityId: staffId,
+      before,
+      after,
+      actorId: ownerId,
+      actorRole: 'OWNER',
+    });
+    return OwnerPortalService.staffDto(after);
   }
 
   async setStaffStatus(ownerId: string, propertyId: string, staffId: string, status: string) {

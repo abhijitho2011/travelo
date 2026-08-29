@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Res,
   UploadedFiles,
@@ -24,7 +25,7 @@ import {
   PropertyPhotosService,
   type UploadedPhoto,
 } from './property-photos.service';
-import { CreatePropertyDto, CreateStaffDto, SetStaffStatusDto } from './dto';
+import { CreatePropertyDto, CreateStaffDto, SetStaffStatusDto, UpdateStaffDto } from './dto';
 
 @ApiTags('Owner Portal')
 @ApiBearerAuth()
@@ -127,6 +128,16 @@ export class OwnerPortalController {
     @Body() dto: CreateStaffDto,
   ) {
     return this.portal.createStaff(owner.id, id, dto);
+  }
+
+  @Patch('properties/:id/staff/:sid')
+  updateStaff(
+    @CurrentOwner() owner: AuthenticatedOwner,
+    @Param('id') id: string,
+    @Param('sid') sid: string,
+    @Body() dto: UpdateStaffDto,
+  ) {
+    return this.portal.updateStaff(owner.id, id, sid, dto);
   }
 
   @Post('properties/:id/staff/:sid/status')

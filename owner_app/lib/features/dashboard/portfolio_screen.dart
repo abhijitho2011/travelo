@@ -40,8 +40,17 @@ class PortfolioScreen extends ConsumerWidget {
           PopupMenuButton<String>(
             offset: const Offset(0, 48),
             onSelected: (v) {
-              if (v == 'signout') {
-                ref.read(authControllerProvider.notifier).signOut();
+              switch (v) {
+                case 'profile':
+                  context.push('/profile');
+                case 'security':
+                  context.push('/security');
+                case 'subscription':
+                  context.push('/subscription');
+                case 'support':
+                  context.push('/support');
+                case 'signout':
+                  ref.read(authControllerProvider.notifier).signOut();
               }
             },
             itemBuilder: (_) => [
@@ -341,8 +350,8 @@ class _SubscriptionNotice extends StatelessWidget {
               minimumSize: const Size(0, 40),
               padding: const EdgeInsets.symmetric(horizontal: 14),
             ),
-            onPressed: () {},
-            child: const Text('Renew'),
+            onPressed: () => context.push('/subscription'),
+            child: const Text('View plan'),
           ),
         ),
       );
@@ -354,7 +363,10 @@ class _SubscriptionNotice extends StatelessWidget {
           tone: BannerTone.warning,
           icon: Icons.schedule,
           text: 'Your subscription expires in ${sub.daysToExpiry} days.',
-          action: TextButton(onPressed: () {}, child: const Text('View')),
+          action: TextButton(
+            onPressed: () => context.push('/subscription'),
+            child: const Text('View'),
+          ),
         ),
       );
     }

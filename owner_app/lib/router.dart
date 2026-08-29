@@ -4,13 +4,21 @@ import 'package:go_router/go_router.dart';
 
 import 'core/auth/auth_state.dart';
 import 'core/providers.dart';
+import 'core/models/owner_models.dart';
+import 'features/account/profile_screen.dart';
+import 'features/account/security_screen.dart';
 import 'features/auth/invite_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/dashboard/portfolio_screen.dart';
 import 'features/properties/add_property_screen.dart';
 import 'features/properties/properties_screen.dart';
 import 'features/staff/add_staff_screen.dart';
+import 'features/staff/edit_staff_screen.dart';
 import 'features/staff/staff_screen.dart';
+import 'features/subscription/subscription_screen.dart';
+import 'features/support/new_ticket_screen.dart';
+import 'features/support/support_screen.dart';
+import 'features/support/support_ticket_screen.dart';
 import 'theme/app_theme.dart';
 
 /// Bridges Riverpod auth state into go_router's refresh mechanism.
@@ -51,6 +59,26 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/properties/:pid/staff/new',
         builder: (_, s) => AddStaffScreen(propertyId: s.pathParameters['pid']!),
+      ),
+      GoRoute(
+        // The member travels as `extra` from the staff list; on a cold deep
+        // link it is null and the screen looks the record up instead.
+        path: '/properties/:pid/staff/:sid/edit',
+        builder: (_, s) => EditStaffScreen(
+          propertyId: s.pathParameters['pid']!,
+          staffId: s.pathParameters['sid']!,
+          member: s.extra is StaffMember ? s.extra as StaffMember : null,
+        ),
+      ),
+      // Account, billing and support — all behind the same auth redirect above.
+      GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
+      GoRoute(path: '/security', builder: (_, __) => const SecurityScreen()),
+      GoRoute(path: '/subscription', builder: (_, __) => const SubscriptionScreen()),
+      GoRoute(path: '/support', builder: (_, __) => const SupportScreen()),
+      GoRoute(path: '/support/new', builder: (_, __) => const NewTicketScreen()),
+      GoRoute(
+        path: '/support/:id',
+        builder: (_, s) => SupportTicketScreen(ticketId: s.pathParameters['id']!),
       ),
     ],
   );

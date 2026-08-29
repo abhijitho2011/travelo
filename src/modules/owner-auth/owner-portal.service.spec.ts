@@ -19,6 +19,9 @@ describe('OwnerPortalService.effectivePropertyLimit', () => {
 /** createProperty never touches the photo store; list/cover lookups do. */
 const photosStub = { coverUrls: async () => new Map<string, string>() };
 
+/** Reads/creates are unaudited; the stub keeps the constructor honest. */
+const auditStub = { record: async () => undefined };
+
 /**
  * Chainable Drizzle mock that returns queued result sets in order.
  * createProperty issues: (1) subscription+plan select, (2) count select.
@@ -94,7 +97,7 @@ describe('OwnerPortalService.createProperty enforcement', () => {
       [{ status: 'ACTIVE', planLimit: 1, override: null }], // subscription
       [{ count: 1 }], // existing property count == limit
     ]);
-    const svc = new OwnerPortalService(db as never, photosStub as never);
+    const svc = new OwnerPortalService(db as never, photosStub as never, auditStub as never);
     await expect(svc.createProperty('own1', dto)).rejects.toMatchObject({
       response: { error: 'PROPERTY_LIMIT_REACHED' },
     });
@@ -105,7 +108,7 @@ describe('OwnerPortalService.createProperty enforcement', () => {
     const db = mkDb([[{ status: 'ACTIVE', planLimit: 3, override: null }], [{ count: 1 }]], () => {
       inserted = true;
     });
-    const svc = new OwnerPortalService(db as never, photosStub as never);
+    const svc = new OwnerPortalService(db as never, photosStub as never, auditStub as never);
     const res = await svc.createProperty('own1', dto);
     expect(inserted).toBe(true);
     expect(res.id).toBe('prop1');
@@ -113,7 +116,7 @@ describe('OwnerPortalService.createProperty enforcement', () => {
 
   it('rejects when the owner has no usable subscription', async () => {
     const db = mkDb([[{ status: 'EXPIRED', planLimit: 3, override: null }], [{ count: 0 }]]);
-    const svc = new OwnerPortalService(db as never, photosStub as never);
+    const svc = new OwnerPortalService(db as never, photosStub as never, auditStub as never);
     await expect(svc.createProperty('own1', dto)).rejects.toMatchObject({
       response: { error: 'PROPERTY_LIMIT_REACHED' },
     });
@@ -159,7 +162,7 @@ describe('OwnerPortalService.createProperty stores the new field set', () => {
       return c;
     }
 
-    const svc = new OwnerPortalService(db as never, photosStub as never);
+    const svc = new OwnerPortalService(db as never, photosStub as never, auditStub as never);
     await svc.createProperty('own1', {
       name: 'Seaside Inn',
       city: 'Kochi',
@@ -241,7 +244,7 @@ describe('OwnerPortalService.listStaff — every role, not just GM/AGM', () => {
     const db = {
       select: () => (call++ === 0 ? staffListDb([{ id: 'prop1' }]).select() : inner.select()),
     };
-    const svc = new OwnerPortalService(db as never, photosStub as never);
+    const svc = new OwnerPortalService(db as never, photosStub as never, auditStub as never);
     const res = await svc.listStaff('own1', 'prop1');
     expect(res.map((s) => s.role)).toEqual([
       'GENERAL_MANAGER',
@@ -257,7 +260,7 @@ describe('OwnerPortalService.listStaff — every role, not just GM/AGM', () => {
     const db = {
       select: () => (call++ === 0 ? staffListDb([{ id: 'prop1' }]).select() : inner.select()),
     };
-    const svc = new OwnerPortalService(db as never, photosStub as never);
+    const svc = new OwnerPortalService(db as never, photosStub as never, auditStub as never);
     const [s] = await svc.listStaff('own1', 'prop1');
     expect(s).toMatchObject({
       fullName: 'Asha Menon',
@@ -277,7 +280,7 @@ describe('OwnerPortalService.listAllStaff — portfolio-wide directory', () => {
         propertyName: 'Hilltop Retreat',
       },
     ]);
-    const svc = new OwnerPortalService(db as never, photosStub as never);
+    const svc = new OwnerPortalService(db as never, photosStub as never, auditStub as never);
     const res = await svc.listAllStaff('own1');
     expect(res).toHaveLength(2);
     expect(res[0]).toMatchObject({
