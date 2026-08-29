@@ -12,16 +12,15 @@ import { HousekeepingErrors } from './housekeeping-errors';
  * new order rather than reopened, so a completed order's resolution and parts
  * list stay a true record of what closed it.
  */
-export const WORK_ORDER_TRANSITIONS: Readonly<
-  Record<WorkOrderStatus, readonly WorkOrderStatus[]>
-> = {
-  OPEN: ['ACCEPTED', 'CANCELLED'],
-  ACCEPTED: ['IN_PROGRESS', 'CANCELLED'],
-  IN_PROGRESS: ['PAUSED', 'COMPLETED', 'CANCELLED'],
-  PAUSED: ['IN_PROGRESS', 'CANCELLED'],
-  COMPLETED: [],
-  CANCELLED: [],
-};
+export const WORK_ORDER_TRANSITIONS: Readonly<Record<WorkOrderStatus, readonly WorkOrderStatus[]>> =
+  {
+    OPEN: ['ACCEPTED', 'CANCELLED'],
+    ACCEPTED: ['IN_PROGRESS', 'CANCELLED'],
+    IN_PROGRESS: ['PAUSED', 'COMPLETED', 'CANCELLED'],
+    PAUSED: ['IN_PROGRESS', 'CANCELLED'],
+    COMPLETED: [],
+    CANCELLED: [],
+  };
 
 export function canWorkOrderTransition(from: WorkOrderStatus, to: WorkOrderStatus): boolean {
   return WORK_ORDER_TRANSITIONS[from]?.includes(to) ?? false;

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, inArray, isNull, or, sql, SQL } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, or, sql, SQL } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import {
   hotelStaff,
@@ -10,10 +10,7 @@ import {
   type WorkOrderStatus,
 } from '../../database/schema';
 import { HousekeepingErrors } from './housekeeping-errors';
-import {
-  assertWorkOrderTransition,
-  formatWorkOrderNumber,
-} from './work-order-transitions';
+import { assertWorkOrderTransition, formatWorkOrderNumber } from './work-order-transitions';
 import {
   CancelWorkOrderDto,
   CompleteWorkOrderDto,
@@ -143,15 +140,17 @@ export class WorkOrdersService {
 
     const staffIds = [
       ...new Set(
-        rows
-          .flatMap((r) => [r.assignedStaffId, r.reportedBy])
-          .filter((x): x is string => !!x),
+        rows.flatMap((r) => [r.assignedStaffId, r.reportedBy]).filter((x): x is string => !!x),
       ),
     ];
     const staffById = new Map<string, { id: string; firstName: string; lastName: string }>();
     if (staffIds.length) {
       const staffRows = await this.db
-        .select({ id: hotelStaff.id, firstName: hotelStaff.firstName, lastName: hotelStaff.lastName })
+        .select({
+          id: hotelStaff.id,
+          firstName: hotelStaff.firstName,
+          lastName: hotelStaff.lastName,
+        })
         .from(hotelStaff)
         .where(inArray(hotelStaff.id, staffIds));
       for (const s of staffRows) staffById.set(s.id, s);
@@ -333,12 +332,7 @@ export class WorkOrdersService {
    * Any non-terminal state → CANCELLED, with a reason. If the order had taken
    * the room out of service, the room is returned to DIRTY.
    */
-  async cancel(
-    propertyId: string,
-    id: string,
-    dto: CancelWorkOrderDto,
-    now: Date = new Date(),
-  ) {
+  async cancel(propertyId: string, id: string, dto: CancelWorkOrderDto, now: Date = new Date()) {
     const before = await this.requireWorkOrder(propertyId, id);
     if (!dto.reason || dto.reason.trim().length === 0) {
       throw HousekeepingErrors.cancelReasonRequired();

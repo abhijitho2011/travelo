@@ -11,7 +11,13 @@ import {
 } from '../../database/schema';
 import { HousekeepingErrors } from './housekeeping-errors';
 import { assertTaskTransition, ROOM_STATUS_FOR_TASK } from './task-transitions';
-import { AssignTaskDto, CompleteTaskDto, CreateTaskDto, InspectTaskDto, TaskFilterDto } from './dto';
+import {
+  AssignTaskDto,
+  CompleteTaskDto,
+  CreateTaskDto,
+  InspectTaskDto,
+  TaskFilterDto,
+} from './dto';
 
 const MAX_LIMIT = 200;
 
@@ -93,7 +99,13 @@ export class HousekeepingService {
     const [row] = await this.db
       .select()
       .from(hotelStaff)
-      .where(and(eq(hotelStaff.id, id), eq(hotelStaff.propertyId, propertyId), isNull(hotelStaff.deletedAt)))
+      .where(
+        and(
+          eq(hotelStaff.id, id),
+          eq(hotelStaff.propertyId, propertyId),
+          isNull(hotelStaff.deletedAt),
+        ),
+      )
       .limit(1);
     if (!row) throw HousekeepingErrors.staffNotFound();
     return row;
@@ -148,7 +160,10 @@ export class HousekeepingService {
   async hydrate(rows: HousekeepingTask[]) {
     if (rows.length === 0) return [];
     const roomIds = [...new Set(rows.map((r) => r.roomId).filter((x): x is string => !!x))];
-    const roomById = new Map<string, { id: string; number: string; floor: string | null; status: string }>();
+    const roomById = new Map<
+      string,
+      { id: string; number: string; floor: string | null; status: string }
+    >();
     if (roomIds.length) {
       const roomRows = await this.db
         .select({ id: rooms.id, number: rooms.number, floor: rooms.floor, status: rooms.status })
@@ -157,11 +172,17 @@ export class HousekeepingService {
       for (const r of roomRows) roomById.set(r.id, r);
     }
 
-    const staffIds = [...new Set(rows.map((r) => r.assignedStaffId).filter((x): x is string => !!x))];
+    const staffIds = [
+      ...new Set(rows.map((r) => r.assignedStaffId).filter((x): x is string => !!x)),
+    ];
     const staffById = new Map<string, { id: string; firstName: string; lastName: string }>();
     if (staffIds.length) {
       const staffRows = await this.db
-        .select({ id: hotelStaff.id, firstName: hotelStaff.firstName, lastName: hotelStaff.lastName })
+        .select({
+          id: hotelStaff.id,
+          firstName: hotelStaff.firstName,
+          lastName: hotelStaff.lastName,
+        })
         .from(hotelStaff)
         .where(inArray(hotelStaff.id, staffIds));
       for (const s of staffRows) staffById.set(s.id, s);
@@ -344,7 +365,12 @@ export class HousekeepingService {
         .where(eq(housekeepingTasks.id, id))
         .returning();
       if (before.roomId) {
-        await HousekeepingService.setRoomStatus(handle, before.roomId, ROOM_STATUS_FOR_TASK.START, now);
+        await HousekeepingService.setRoomStatus(
+          handle,
+          before.roomId,
+          ROOM_STATUS_FOR_TASK.START,
+          now,
+        );
       }
       return updated;
     });
@@ -377,7 +403,12 @@ export class HousekeepingService {
         .where(eq(housekeepingTasks.id, id))
         .returning();
       if (before.roomId) {
-        await HousekeepingService.setRoomStatus(handle, before.roomId, ROOM_STATUS_FOR_TASK.COMPLETE, now);
+        await HousekeepingService.setRoomStatus(
+          handle,
+          before.roomId,
+          ROOM_STATUS_FOR_TASK.COMPLETE,
+          now,
+        );
       }
       return updated;
     });
@@ -418,11 +449,21 @@ export class HousekeepingService {
       let redo: HousekeepingTask | null = null;
       if (dto.pass) {
         if (before.roomId) {
-          await HousekeepingService.setRoomStatus(handle, before.roomId, ROOM_STATUS_FOR_TASK.INSPECT_PASS, now);
+          await HousekeepingService.setRoomStatus(
+            handle,
+            before.roomId,
+            ROOM_STATUS_FOR_TASK.INSPECT_PASS,
+            now,
+          );
         }
       } else {
         if (before.roomId) {
-          await HousekeepingService.setRoomStatus(handle, before.roomId, ROOM_STATUS_FOR_TASK.INSPECT_FAIL, now);
+          await HousekeepingService.setRoomStatus(
+            handle,
+            before.roomId,
+            ROOM_STATUS_FOR_TASK.INSPECT_FAIL,
+            now,
+          );
         }
         const reason = dto.notes ? ` — ${dto.notes}` : '';
         [redo] = await handle

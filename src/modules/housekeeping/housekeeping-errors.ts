@@ -7,7 +7,11 @@ import type { HousekeepingTaskStatus, WorkOrderStatus } from '../../database/sch
  * strings are the contract the staff app branches on — same rule as
  * `RoomErrors` and `ReservationErrors`.
  */
-export function housekeepingError(code: string, message: string, status: HttpStatus): HttpException {
+export function housekeepingError(
+  code: string,
+  message: string,
+  status: HttpStatus,
+): HttpException {
   return new HttpException({ message, error: code }, status);
 }
 
