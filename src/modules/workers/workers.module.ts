@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, Module, OnModuleInit } from '@nestjs/common';
-import { and, eq, isNull, lte, sql } from 'drizzle-orm';
+import { and, eq, isNull, lte, sql, type SQL } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import {
   announcements,
@@ -9,11 +9,23 @@ import {
   subscriptionPlans,
   subscriptions,
 } from '../../database/schema';
+import { NotificationsModule } from '../notifications/notifications.module';
+import {
+  NotificationDeliveryService,
+  type NotifyTarget,
+} from '../notifications/notification-delivery.service';
+import { inAppRecipient } from '../notifications/channels/channel.interface';
 
 @Injectable()
 export class SubscriptionLifecycleWorker {
   private readonly logger = new Logger(SubscriptionLifecycleWorker.name);
-  constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+  /** Days before expiry at which an owner is warned. */
+  static readonly EXPIRY_WARNING_DAYS = [30, 7, 3] as const;
+
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Database,
+    private readonly notifications: NotificationDeliveryService,
+  ) {}
 
   /**
    * Marks:
@@ -44,8 +56,117 @@ export class SubscriptionLifecycleWorker {
       SET status='SUSPENDED', updated_at=now()
       WHERE status='GRACE_PERIOD' AND current_period_end <= ${new Date(now.getTime() - 14 * 86400_000)}::timestamptz
     `);
+
+    // Telling the owner is strictly downstream of the state machine above:
+    // it runs after every UPDATE has landed and can only log on failure.
+    await this.announce(now);
     return { ok: true };
   }
+
+  /**
+   * Emits the lifecycle notifications. Deliberately re-derives its audience
+   * from the CURRENT state rather than from the UPDATE results, so a run that
+   * crashed halfway through last night still catches up — `notifyOnceQuietly`
+   * is what stops that from becoming a daily repeat.
+   */
+  private async announce(now: Date): Promise<void> {
+    try {
+      for (const days of SubscriptionLifecycleWorker.EXPIRY_WARNING_DAYS) {
+        const from = new Date(now.getTime() + (days - 1) * 86400_000);
+        const to = new Date(now.getTime() + days * 86400_000);
+        const rows = await this.audience(
+          sql`s.status IN ('ACTIVE','EXPIRING')
+              AND s.current_period_end > ${from}::timestamptz
+              AND s.current_period_end <= ${to}::timestamptz`,
+        );
+        for (const r of rows) {
+          await this.notifications.notifyOnceQuietly({
+            key: 'subscription.expiring',
+            relatedType: `subscription.expiring.${days}`,
+            relatedId: r.subscriptionId,
+            targets: this.ownerTargets(r),
+            vars: { ...this.ownerVars(r), days },
+          });
+        }
+      }
+
+      const transitions: Array<{ status: string; key: string }> = [
+        { status: 'EXPIRED', key: 'subscription.expired' },
+        { status: 'GRACE_PERIOD', key: 'subscription.grace_started' },
+        { status: 'SUSPENDED', key: 'subscription.suspended' },
+      ];
+      for (const t of transitions) {
+        const rows = await this.audience(sql`s.status = ${t.status}`);
+        for (const r of rows) {
+          await this.notifications.notifyOnceQuietly({
+            key: t.key,
+            relatedType: t.key,
+            relatedId: r.subscriptionId,
+            targets: this.ownerTargets(r),
+            vars: this.ownerVars(r),
+          });
+        }
+      }
+    } catch (err) {
+      // A notification problem must never make the lifecycle run look failed.
+      this.logger.error(`Lifecycle notifications failed: ${(err as Error).message}`);
+    }
+  }
+
+  private async audience(predicate: SQL): Promise<LifecycleRecipient[]> {
+    const res = await this.db.execute(sql`
+      SELECT s.id            AS subscription_id,
+             s.owner_id      AS owner_id,
+             s.current_period_end AS period_end,
+             o.name          AS owner_name,
+             o.email         AS owner_email,
+             p.name          AS plan_name,
+             (SELECT pr.name FROM properties pr
+               WHERE pr.owner_id = s.owner_id AND pr.deleted_at IS NULL
+               ORDER BY pr.created_at LIMIT 1) AS property_name
+        FROM subscriptions s
+        JOIN owners o ON o.id = s.owner_id
+        JOIN subscription_plans p ON p.id = s.plan_id
+       WHERE o.deleted_at IS NULL AND ${predicate}
+    `);
+    return ((res as unknown as { rows?: Record<string, unknown>[] }).rows ?? []).map((r) => ({
+      subscriptionId: String(r.subscription_id),
+      ownerId: String(r.owner_id),
+      ownerName: (r.owner_name as string) ?? 'there',
+      ownerEmail: (r.owner_email as string) ?? '',
+      planName: (r.plan_name as string) ?? 'Tavelo',
+      propertyName: (r.property_name as string) ?? 'your property',
+      periodEnd: r.period_end ? new Date(r.period_end as string) : null,
+    }));
+  }
+
+  private ownerTargets(r: LifecycleRecipient): NotifyTarget[] {
+    return [
+      { channel: 'EMAIL' as const, to: r.ownerEmail },
+      { channel: 'IN_APP' as const, to: inAppRecipient('owner', r.ownerId) },
+    ].filter((t) => t.to);
+  }
+
+  private ownerVars(r: LifecycleRecipient): Record<string, unknown> {
+    const end = r.periodEnd;
+    return {
+      ownerName: r.ownerName,
+      planName: r.planName,
+      propertyName: r.propertyName,
+      expiryDate: end ? end.toISOString().slice(0, 10) : null,
+      graceEndsOn: end ? new Date(end.getTime() + 14 * 86400_000).toISOString().slice(0, 10) : null,
+    };
+  }
+}
+
+interface LifecycleRecipient {
+  subscriptionId: string;
+  ownerId: string;
+  ownerName: string;
+  ownerEmail: string;
+  planName: string;
+  propertyName: string;
+  periodEnd: Date | null;
 }
 
 @Injectable()
@@ -123,23 +244,46 @@ export class AnnouncementPublisherWorker {
 @Injectable()
 export class NotificationDispatchWorker implements OnModuleInit {
   private readonly logger = new Logger(NotificationDispatchWorker.name);
-  constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Database,
+    private readonly deliveries: NotificationDeliveryService,
+  ) {}
   onModuleInit(): void {
     this.logger.log('Notification dispatch worker initialized');
   }
-  async run() {
-    // Pull pending outbound notifications and dispatch via providers.
-    // TODO: gateway call — wire actual notification channels.
-    await this.db.insert(backgroundJobs).values({
-      name: 'notification.dispatch',
-      queue: 'notifications',
-      state: 'Completed',
-    });
-    return { ok: true };
+
+  /**
+   * Drains the due PENDING deliveries. `drain` is per-row try/catch, so a
+   * provider outage costs those rows an attempt and nothing else — and the
+   * outer catch here means even a database hiccup cannot kill the worker loop.
+   */
+  async run(limit = 100) {
+    let stats = { processed: 0, sent: 0, failed: 0, skipped: 0, retried: 0 };
+    let state = 'Completed';
+    let error: string | null = null;
+    try {
+      stats = await this.deliveries.drain(limit);
+    } catch (err) {
+      state = 'Failed';
+      error = ((err as Error)?.message ?? String(err)).slice(0, 2000);
+      this.logger.error(`Notification dispatch run failed: ${error}`);
+    }
+    try {
+      await this.db.insert(backgroundJobs).values({
+        name: 'notification.dispatch',
+        queue: 'notifications',
+        state,
+        error,
+      });
+    } catch (err) {
+      this.logger.warn(`Could not record notification.dispatch job row: ${(err as Error).message}`);
+    }
+    return { ok: state === 'Completed', ...stats };
   }
 }
 
 @Module({
+  imports: [NotificationsModule],
   providers: [
     SubscriptionLifecycleWorker,
     DailyMetricsAggregator,

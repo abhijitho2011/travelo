@@ -6,6 +6,7 @@ import {
   invoices,
   owners,
   payments,
+  properties,
   refunds,
   subscriptionEvents,
   subscriptionPlans,
@@ -19,6 +20,8 @@ import { InvoicePdfService } from './invoice-pdf.service';
 import { RazorpayClient } from './razorpay.client';
 import { PROVIDERS, SettlementHint, WebhookInput } from './payment-providers';
 import { getRequestContext } from '../../common/context/request-context';
+import { NotificationDeliveryService } from '../notifications/notification-delivery.service';
+import { inAppRecipient } from '../notifications/channels/channel.interface';
 import { addMonths } from '../../common/date/add-months';
 
 /** Invoice documents are longer-lived than photos but still not permanent. */
@@ -59,6 +62,7 @@ export class BillingService {
     private readonly storage: StorageService,
     private readonly pdf: InvoicePdfService,
     private readonly razorpay: RazorpayClient,
+    private readonly notifications: NotificationDeliveryService,
   ) {}
 
   // ---------- The single settlement path ----------
@@ -128,6 +132,10 @@ export class BillingService {
 
     // Post-commit and best-effort. `generateQuietly` swallows and logs.
     await this.pdf.generateQuietly(result.invoice.id);
+
+    // Same discipline, one line later: the money is already committed, so
+    // telling the owner about it can only ever log on failure.
+    await this.notifyPaymentSuccess(input, result);
 
     return result;
   }
@@ -254,6 +262,88 @@ export class BillingService {
     }
 
     return { payment, invoice, previousPeriodEnd, newPeriodEnd: periodEnd };
+  }
+
+  /** Formats paise as rupees for human-facing copy. */
+  static formatAmount(paise: number, currency = 'INR'): string {
+    const major = (paise / 100).toFixed(2);
+    return currency === 'INR' ? `₹${major}` : `${currency} ${major}`;
+  }
+
+  /** Post-commit, best-effort. Enqueue only — nothing here can throw upward. */
+  private async notifyPaymentSuccess(
+    input: SettleInput,
+    result: { invoice: { id: string; invoiceNumber: string }; newPeriodEnd: Date },
+  ): Promise<void> {
+    try {
+      const [owner] = await this.db
+        .select({ id: owners.id, name: owners.name, email: owners.email })
+        .from(owners)
+        .where(eq(owners.id, input.ownerId))
+        .limit(1);
+      if (!owner) return;
+      await this.notifications.notifyQuietly({
+        key: 'payment.success',
+        relatedType: 'invoice',
+        relatedId: result.invoice.id,
+        targets: [
+          { channel: 'EMAIL', to: owner.email ?? '' },
+          { channel: 'IN_APP', to: inAppRecipient('owner', owner.id) },
+        ],
+        vars: {
+          ownerName: owner.name,
+          amount: BillingService.formatAmount(input.amountPaise, input.currency ?? 'INR'),
+          invoiceNumber: result.invoice.invoiceNumber,
+          planName: 'your plan',
+          periodEnd: result.newPeriodEnd.toISOString().slice(0, 10),
+        },
+      });
+    } catch (err) {
+      this.logger.error(
+        `payment.success notification failed for owner ${input.ownerId} — the payment is unaffected`,
+        err as Error,
+      );
+    }
+  }
+
+  /** The other half of the money path: a gateway told us the payment failed. */
+  private async notifyPaymentFailed(
+    ownerId: string,
+    amountPaise: number,
+    currency: string,
+    reason: string,
+    relatedId?: string,
+  ): Promise<void> {
+    try {
+      const [owner] = await this.db
+        .select({ id: owners.id, name: owners.name, email: owners.email })
+        .from(owners)
+        .where(eq(owners.id, ownerId))
+        .limit(1);
+      if (!owner) return;
+      const [property] = await this.db
+        .select({ name: properties.name })
+        .from(properties)
+        .where(eq(properties.ownerId, ownerId))
+        .limit(1);
+      await this.notifications.notifyQuietly({
+        key: 'payment.failed',
+        relatedType: 'payment',
+        relatedId,
+        targets: [
+          { channel: 'EMAIL', to: owner.email ?? '' },
+          { channel: 'IN_APP', to: inAppRecipient('owner', owner.id) },
+        ],
+        vars: {
+          ownerName: owner.name,
+          propertyName: property?.name ?? 'your property',
+          amount: BillingService.formatAmount(amountPaise, currency),
+          reason,
+        },
+      });
+    } catch (err) {
+      this.logger.error(`payment.failed notification failed for owner ${ownerId}`, err as Error);
+    }
   }
 
   /**
@@ -708,6 +798,11 @@ export class BillingService {
 
     try {
       const settled = await this.dispatchWebhook(provider.extractSettlement(input), providerKey);
+      // A gateway "payment failed" event settles nothing but is the ONLY
+      // moment the owner learns the charge did not go through.
+      if (!settled && /fail/i.test(eventType)) {
+        await this.notifyWebhookFailure(input, eventType);
+      }
       await this.db
         .update(webhookEvents)
         .set({ processedAt: new Date() })
@@ -721,7 +816,49 @@ export class BillingService {
         .set({ error: (err as Error).message?.slice(0, 2000) ?? 'unknown error' })
         .where(eq(webhookEvents.id, row.id));
       this.logger.error(`Webhook ${providerKey}/${eventId} failed to process`, err as Error);
+      await this.notifyWebhookFailure(input, eventType, (err as Error).message);
       return { ok: true, id: row.id, replayed: false, settled: false };
+    }
+  }
+
+  /**
+   * Resolves the PENDING payment a failed webhook refers to and tells its
+   * owner. Best-effort throughout: a webhook that could not be processed must
+   * not also 500 because the notification lookup failed.
+   */
+  private async notifyWebhookFailure(
+    input: WebhookInput,
+    eventType: string,
+    reason?: string,
+  ): Promise<void> {
+    try {
+      const body = input.parsedBody ?? {};
+      const refs = [
+        body?.payload?.payment?.entity?.order_id,
+        body?.payload?.payment?.entity?.id,
+        body?.data?.order?.order_id,
+        body?.data?.payment?.cf_payment_id,
+      ]
+        .filter((r) => typeof r === 'string' && r.length > 0)
+        .map(String);
+      for (const ref of refs) {
+        const [pending] = await this.db
+          .select()
+          .from(payments)
+          .where(and(eq(payments.gatewayRef, ref), eq(payments.status, 'PENDING')))
+          .limit(1);
+        if (!pending) continue;
+        await this.notifyPaymentFailed(
+          pending.ownerId,
+          pending.amount,
+          pending.currency,
+          reason ?? eventType,
+          pending.id,
+        );
+        return;
+      }
+    } catch (err) {
+      this.logger.error('payment.failed notification lookup failed', err as Error);
     }
   }
 

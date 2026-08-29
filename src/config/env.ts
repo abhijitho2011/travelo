@@ -82,6 +82,23 @@ const envSchema = z.object({
     .string()
     .default('false')
     .transform((v) => v === 'true'),
+  // A SECOND DLT content template, for non-OTP notification SMS. Unset means
+  // notification SMS is skipped — the OTP template must not carry other copy.
+  BSNL_NOTIFY_TEMPLATE_ID: z.string().optional(),
+  BSNL_NOTIFY_VAR_KEY: z.string().default('message'),
+
+  // ---------- Outbound email (notifications) ----------
+  // All optional. Without SMTP_HOST + MAIL_FROM the EMAIL channel degrades to
+  // a console provider that logs the message — one boot warning, never a crash.
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+  SMTP_SECURE: z
+    .string()
+    .default('false')
+    .transform((v) => v === 'true'),
+  MAIL_FROM: z.string().optional(),
   // ---------- Object storage (property photos, invoice documents) ----------
   // `local` writes to the mounted volume; `s3` uses the Railway bucket. The
   // credentials are supplied by Railway reference variables — never committed.
