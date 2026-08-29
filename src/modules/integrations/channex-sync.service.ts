@@ -10,14 +10,18 @@ import {
   type RoomStatus,
 } from '../../database/schema';
 import { ReservationsService } from '../reservations/reservations.service';
+import { addDays, coversDate, today, type IsoDate } from '../reservations/reservation-rules';
 import {
-  addDays,
-  coversDate,
-  today,
-  type IsoDate,
-} from '../reservations/reservation-rules';
-import { ChannexClient, type ChannexAvailabilityUpdate, type ChannexBooking, type ChannexRateUpdate } from './channex.client';
-import { readChannexConfig, invertRoomTypeMap, type ChannexConnectionConfig } from './channex.config';
+  ChannexClient,
+  type ChannexAvailabilityUpdate,
+  type ChannexBooking,
+  type ChannexRateUpdate,
+} from './channex.client';
+import {
+  readChannexConfig,
+  invertRoomTypeMap,
+  type ChannexConnectionConfig,
+} from './channex.config';
 import { ChannexApiError, ChannexErrors } from './channex.errors';
 import {
   channexSyncLog,
@@ -647,10 +651,7 @@ export class ChannexSyncService {
       rowId = row.id;
     } catch (err) {
       const msg = (err as { message?: string })?.message ?? String(err);
-      if (
-        msg.includes('channex_webhook_events_event_id_unique') ||
-        msg.includes('duplicate key')
-      ) {
+      if (msg.includes('channex_webhook_events_event_id_unique') || msg.includes('duplicate key')) {
         return { ok: true, replayed: true, processed: false };
       }
       throw err;
