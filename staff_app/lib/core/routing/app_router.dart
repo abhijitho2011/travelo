@@ -34,6 +34,11 @@ import '../../features/restaurant/presentation/my_tables_screen.dart';
 import '../../features/restaurant/presentation/pos_screen.dart';
 import '../../features/restaurant/presentation/restaurant_cleaning_screen.dart';
 import '../../features/restaurant/presentation/restaurant_screen.dart';
+import '../../features/rooms/presentation/bulk_rooms_screen.dart';
+import '../../features/rooms/presentation/room_form_screen.dart';
+import '../../features/rooms/presentation/room_type_form_screen.dart';
+import '../../features/rooms/presentation/room_types_screen.dart';
+import '../../features/rooms/presentation/rooms_screen.dart';
 import '../../features/sales/presentation/sales_screen.dart';
 import '../../features/security/presentation/gate_log_screen.dart';
 import '../../features/security/presentation/gate_screen.dart';
@@ -150,6 +155,39 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, state) => CheckInScreen(
               reservationId: state.uri.queryParameters['reservationId'],
             ),
+          ),
+
+          // Rooms & room types (built)
+          //
+          // `/rooms/new` and `/rooms/bulk` are declared before `/rooms/:id` so
+          // the literal paths win — go_router matches in declaration order,
+          // and the pattern would otherwise swallow both.
+          GoRoute(path: Routes.rooms, builder: (_, _) => const RoomsScreen()),
+          GoRoute(
+            path: Routes.roomNew,
+            builder: (_, _) => const RoomFormScreen(),
+          ),
+          GoRoute(
+            path: Routes.roomBulk,
+            builder: (_, _) => const BulkRoomsScreen(),
+          ),
+          GoRoute(
+            path: Routes.roomPattern,
+            builder: (_, state) =>
+                RoomFormScreen(roomId: state.pathParameters['id']),
+          ),
+          GoRoute(
+            path: Routes.roomTypes,
+            builder: (_, _) => const RoomTypesScreen(),
+          ),
+          GoRoute(
+            path: Routes.roomTypeNew,
+            builder: (_, _) => const RoomTypeFormScreen(),
+          ),
+          GoRoute(
+            path: Routes.roomTypePattern,
+            builder: (_, state) =>
+                RoomTypeFormScreen(roomTypeId: state.pathParameters['id']),
           ),
 
           // Room attendant / cleaning staff (built)

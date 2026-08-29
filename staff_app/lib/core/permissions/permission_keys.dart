@@ -47,6 +47,18 @@ class P {
   static const guestCreate = 'guest.create';
   static const roomRead = 'room.read';
   static const roomStatusUpdate = 'room.status.update';
+
+  // --------------------------------------------------------------- rooms --
+  // The inventory itself, as opposed to the front-office view of it. The
+  // server grants the write half to GM and AGM only; every other role that can
+  // see a room holds `room.read` and, at most, `room.status.update`.
+  static const roomCreate = 'room.create';
+  static const roomUpdate = 'room.update';
+  static const roomDelete = 'room.delete';
+  static const roomTypeRead = 'roomtype.read';
+  static const roomTypeCreate = 'roomtype.create';
+  static const roomTypeUpdate = 'roomtype.update';
+  static const roomTypeDelete = 'roomtype.delete';
   static const keyCardIssue = 'keycard.issue';
   static const rateRead = 'rate.read';
 

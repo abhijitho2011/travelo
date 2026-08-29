@@ -268,6 +268,23 @@ class RoleConfig {
     route: Routes.reservations,
     requires: [P.reservationRead],
   );
+  /// The room inventory. Every role the server grants `room.read` carries this
+  /// entry; the gate on the item, not a role list, is what decides who sees it.
+  static const _roomsMore = NavItem(
+    label: 'Rooms',
+    icon: Icons.meeting_room_outlined,
+    route: Routes.rooms,
+    requires: [P.roomRead],
+  );
+
+  /// The catalogue behind the rooms. Only GM and AGM hold `roomtype.read`, so
+  /// only they ever see it — no role check needed to arrange that.
+  static const _roomTypesMore = NavItem(
+    label: 'Room types',
+    icon: Icons.bed_outlined,
+    route: Routes.roomTypes,
+    requires: [P.roomTypeRead],
+  );
   static const _myTasksMore = NavItem(
     label: 'My tasks',
     icon: Icons.checklist_outlined,
@@ -373,6 +390,8 @@ class RoleConfig {
           route: Routes.reservations,
           requires: [P.reservationRead],
         ),
+        _roomsMore,
+        _roomTypesMore,
         NavItem(
           label: 'Housekeeping',
           icon: Icons.cleaning_services_outlined,
@@ -466,6 +485,8 @@ class RoleConfig {
           route: Routes.reservations,
           requires: [P.reservationRead],
         ),
+        _roomsMore,
+        _roomTypesMore,
         NavItem(
           label: 'Housekeeping',
           icon: Icons.cleaning_services_outlined,
@@ -571,7 +592,10 @@ class RoleConfig {
           requires: [P.checkInPerform],
         ),
       ],
-      moreMenu: _commonMore,
+      // The desk sees the board and may move a room's status; it holds none of
+      // room.create/update/delete, so every other control on that screen gates
+      // itself away without this config saying a word about it.
+      moreMenu: const [_roomsMore, ..._commonMore],
     ),
 
     // ======================= Room attendant (BUILT) =======================
@@ -595,7 +619,7 @@ class RoleConfig {
           route: Routes.profile,
         ),
       ],
-      moreMenu: _commonMoreNoProfile,
+      moreMenu: const [_roomsMore, ..._commonMoreNoProfile],
     ),
 
     // Same permission shape as the attendant (`task.read/start/complete`), so
@@ -720,12 +744,16 @@ class RoleConfig {
         ),
       ],
       moreMenu: const [
+        _roomsMore,
         _maintenanceMore,
         _inventoryMore,
         _lostFoundMore,
         ..._commonMore,
       ],
     ),
+    // A technician holds `room.read` and nothing else on the inventory: the
+    // board tells them which room is out of order, and every control on it —
+    // status included — gates itself away.
     StaffRole.technician: _simple(
       StaffRole.technician,
       Routes.myWorkOrders,
@@ -733,7 +761,7 @@ class RoleConfig {
       'My work',
       Icons.handyman_outlined,
       requires: [P.maintenanceRead],
-      more: const [_maintenanceMore, _myTasksMore],
+      more: const [_roomsMore, _maintenanceMore, _myTasksMore],
     ),
     StaffRole.spaManager: _simple(
       StaffRole.spaManager,

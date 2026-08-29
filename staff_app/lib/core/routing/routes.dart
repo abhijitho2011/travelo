@@ -42,6 +42,25 @@ class Routes {
   static const reservationPattern = '/reception/reservations/:id';
   static const checkIn = '/reception/check-in';
 
+  // --- rooms & room types — built ---
+  //
+  // Both live at the top level rather than under `/management` or
+  // `/reception`, because four different roles reach them and none of them
+  // owns the inventory. The guard canonicalises by longest matching nav route,
+  // so `/rooms/new` and `/rooms/:id` inherit `/rooms`, and `/room-types/...`
+  // inherits `/room-types` — the two never collide because `/room-types` does
+  // not start with `/rooms`.
+  static const rooms = '/rooms';
+  static const roomNew = '/rooms/new';
+  static const roomBulk = '/rooms/bulk';
+  static const roomPattern = '/rooms/:id';
+  static String room(String id) => '/rooms/$id';
+
+  static const roomTypes = '/room-types';
+  static const roomTypeNew = '/room-types/new';
+  static const roomTypePattern = '/room-types/:id';
+  static String roomType(String id) => '/room-types/$id';
+
   // --- room attendant — built ---
   static const myTasks = '/my-tasks';
   static String task(String id) => '/my-tasks/$id';
