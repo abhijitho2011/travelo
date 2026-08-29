@@ -223,12 +223,16 @@ export interface Harness {
  * Boots the application over HTTP. `main.ts` is the contract being mirrored
  * here — if the prefix or its exclusions drift, these tests hit 404s and say so.
  */
-export async function bootSecurityApp(routes: Routes = {}): Promise<Harness> {
+export async function bootSecurityApp(
+  routes: Routes = {},
+  /** Extra provider overrides, e.g. a capturing SMS provider. */
+  overrides: { token: unknown; value: unknown }[] = [],
+): Promise<Harness> {
   const { AppModule } = await import('../app.module');
   const { DRIZZLE, PG_POOL } = await import('../database/database.module');
 
   const db = scriptDb(routes);
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+  let builder = Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(DRIZZLE)
     .useValue(db)
     // Overridden so no socket is ever opened; the pool is only reached by raw
@@ -238,8 +242,11 @@ export async function bootSecurityApp(routes: Routes = {}): Promise<Harness> {
       query: async () => ({ rows: [] }),
       end: async () => undefined,
       on: () => undefined,
-    })
-    .compile();
+    });
+  for (const o of overrides) {
+    builder = builder.overrideProvider(o.token).useValue(o.value);
+  }
+  const moduleRef = await builder.compile();
 
   const app = moduleRef.createNestApplication({ logger: false });
   app.setGlobalPrefix(process.env.API_PREFIX ?? '/api/v1/admin', {
@@ -253,4 +260,34 @@ export async function bootSecurityApp(routes: Routes = {}): Promise<Harness> {
   });
   await app.init();
   return { app, db, close: () => app.close() };
+}
+
+/** One registered HTTP route, as Express knows it. */
+export interface MountedRoute {
+  method: string;
+  path: string;
+}
+
+/**
+ * Every route the application actually serves, read back out of the Express
+ * router.
+ *
+ * Asserting on this is how a test can say "no such endpoint exists" — a claim
+ * that cannot be made by probing a handful of URLs and getting 404s, because
+ * the next 404 might be the one that isn't.
+ */
+export function mountedRoutes(app: INestApplication): MountedRoute[] {
+  const server = app.getHttpAdapter().getInstance() as {
+    _router?: { stack: unknown[] };
+    router?: { stack: unknown[] };
+  };
+  const stack = (server._router ?? server.router)?.stack ?? [];
+  const out: MountedRoute[] = [];
+  for (const layer of stack as { route?: { path: string; methods: Record<string, boolean> } }[]) {
+    if (!layer.route) continue;
+    for (const [method, on] of Object.entries(layer.route.methods)) {
+      if (on) out.push({ method: method.toUpperCase(), path: layer.route.path });
+    }
+  }
+  return out;
 }
