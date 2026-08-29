@@ -18,12 +18,22 @@ class Routes {
   // --- common ---
   static const notifications = '/notifications';
   static const profile = '/profile';
+  static const support = '/support';
 
   // --- management (GM / AGM) — built ---
   static const management = '/management';
   static const approvals = '/management/approvals';
   static const team = '/management/team';
   static const teamNew = '/management/team/new';
+
+  /// Read-only queue of colleagues still waiting on a manager's decision. HR's
+  /// second tab: it may raise an account but never sign one off, so this is
+  /// where it watches what it submitted.
+  ///
+  /// Deliberately NOT a nav destination for GM/AGM — they act on the same rows
+  /// from `approvals`, and adding a route to any role's config also adds it to
+  /// the guard's canonicalisation set.
+  static const teamPending = '/management/team/pending';
 
   // --- reception — built ---
   static const reception = '/reception';

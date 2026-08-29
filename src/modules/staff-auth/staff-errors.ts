@@ -60,10 +60,37 @@ export const StaffErrors = {
       'You cannot change your own role, status or membership',
       HttpStatus.FORBIDDEN,
     ),
+  /**
+   * The role is off-limits to EVERY staff member: GM and AGM are appointed by
+   * the owner, never from inside the property.
+   */
   roleNotAssignable: () =>
     staffError(
       'ROLE_NOT_ASSIGNABLE',
       'You may not create a staff member with this role',
+      HttpStatus.FORBIDDEN,
+    ),
+  /**
+   * The role is creatable by somebody — just not by this actor. HR reaching for
+   * GM, AGM or another HR lands here. Kept distinct from ROLE_NOT_ASSIGNABLE so
+   * the app can say "not you" rather than "not ever".
+   */
+  roleNotPermitted: () =>
+    staffError(
+      'ROLE_NOT_PERMITTED',
+      'Your role may not create a staff member with this role',
+      HttpStatus.FORBIDDEN,
+    ),
+  /**
+   * Making an account live is the approval decision itself, whichever route it
+   * is reached by. Without this, `staff.update` would be a back door around
+   * `staff.approve`: HR could raise a PENDING_APPROVAL row and then set it to
+   * ACTIVE, and no manager would ever have decided anything.
+   */
+  activationRequiresApproval: () =>
+    staffError(
+      'ACTIVATION_NOT_PERMITTED',
+      'Only a manager with approval rights can make an account active',
       HttpStatus.FORBIDDEN,
     ),
 };

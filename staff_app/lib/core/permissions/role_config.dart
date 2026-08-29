@@ -4,7 +4,7 @@ import '../routing/routes.dart';
 import 'permission_keys.dart';
 import 'permission_set.dart';
 
-/// The 23 operational roles the unified staff app can sign in as.
+/// The 24 operational roles the unified staff app can sign in as.
 ///
 /// [wire] matches `hotelStaffRoleValues` in `src/database/schema/owner.ts`
 /// exactly — it is the string `GET /auth/me` returns. An unrecognised value
@@ -17,6 +17,7 @@ enum StaffRole {
     'Assistant General Manager',
     'Management',
   ),
+  hr('HR', 'HR', 'Human Resources'),
   accounts('ACCOUNTS', 'Accounts', 'Accounts'),
   receptionist('RECEPTIONIST', 'Receptionist', 'Front Office'),
   salesManager('SALES_MANAGER', 'Sales Manager', 'Sales'),
@@ -63,17 +64,47 @@ enum StaffRole {
     return StaffRole.unknown;
   }
 
-  /// Roles a GM/AGM may create from inside the property. Hotel management is
-  /// appointed by the Owner, so both management roles are excluded — this
-  /// mirrors `staffCreatableRoleValues` on the server, which rejects them.
-  static List<StaffRole> get creatableByManagement => StaffRole.values
-      .where(
-        (r) =>
-            r != StaffRole.generalManager &&
-            r != StaffRole.assistantGeneralManager &&
-            r != StaffRole.unknown,
-      )
-      .toList(growable: false);
+  /// Hotel management is appointed by the Owner, so nobody inside the property
+  /// may create either management role.
+  static const Set<StaffRole> _managementRoles = {
+    StaffRole.generalManager,
+    StaffRole.assistantGeneralManager,
+  };
+
+  /// Roles the server grants `staff.create`. Mirrors the permission map in
+  /// `src/modules/staff-auth/role-permissions.ts`.
+  static const Set<StaffRole> _roleCreators = {
+    StaffRole.generalManager,
+    StaffRole.assistantGeneralManager,
+    StaffRole.hr,
+  };
+
+  /// Actors that may not create their own role. HR is a hiring authority;
+  /// letting it clone itself would grow that authority with no manager
+  /// deciding to.
+  static const Set<StaffRole> _selfExcludingActors = {StaffRole.hr};
+
+  /// Every role [actor] may create — the client mirror of `creatableRolesFor`
+  /// in `src/modules/staff-auth/role-creation.ts`.
+  ///
+  /// The server is the authority and rejects anything outside this set with
+  /// `ROLE_NOT_ASSIGNABLE` / `ROLE_NOT_PERMITTED`. This exists so the Add-staff
+  /// dropdown never offers a choice the API will refuse.
+  ///
+  ///   GM / AGM → everything except GM and AGM (HR included)
+  ///   HR       → everything except GM, AGM and HR itself
+  ///   anyone else → nothing
+  static List<StaffRole> creatableRolesFor(StaffRole actor) {
+    if (!_roleCreators.contains(actor)) return const <StaffRole>[];
+    return StaffRole.values
+        .where(
+          (r) =>
+              r != StaffRole.unknown &&
+              !_managementRoles.contains(r) &&
+              !(_selfExcludingActors.contains(actor) && r == actor),
+        )
+        .toList(growable: false);
+  }
 
   /// Every real role, for filter dropdowns.
   static List<StaffRole> get all =>
@@ -150,6 +181,7 @@ class RoleConfig {
   static const Set<String> _alwaysAllowed = {
     Routes.profile,
     Routes.notifications,
+    Routes.support,
     Routes.accessDenied,
     Routes.welcome,
   };
@@ -185,11 +217,30 @@ class RoleConfig {
     icon: Icons.notifications_none,
     route: Routes.notifications,
   );
+  static const _supportItem = NavItem(
+    label: 'Help & support',
+    icon: Icons.help_outline,
+    route: Routes.support,
+  );
 
-  /// Every role's More menu ends with these two.
-  static const List<NavItem> _commonMore = [_notificationsItem, _profileItem];
+  /// The tail every More menu ends with. No role may have an empty More list —
+  /// the shell hides the More destination entirely rather than opening an
+  /// empty sheet, and these three make sure it never has to.
+  static const List<NavItem> _commonMore = [
+    _notificationsItem,
+    _profileItem,
+    _supportItem,
+  ];
 
-  /// A one-destination role: its module plus the common items.
+  /// The same tail minus Profile, for roles that already carry Profile as a
+  /// primary destination — a duplicate entry in the sheet only confuses.
+  static const List<NavItem> _commonMoreNoProfile = [
+    _notificationsItem,
+    _supportItem,
+  ];
+
+  /// A one-destination role: its module, any secondary modules its permissions
+  /// already reach, and the common items.
   static RoleConfig _simple(
     StaffRole role,
     String route,
@@ -197,6 +248,7 @@ class RoleConfig {
     String navLabel,
     IconData icon, {
     List<String> requires = const [],
+    List<NavItem> more = const <NavItem>[],
   }) => RoleConfig(
     role: role,
     homeRoute: route,
@@ -204,11 +256,81 @@ class RoleConfig {
     bottomNav: [
       NavItem(label: navLabel, icon: icon, route: route, requires: requires),
     ],
-    moreMenu: _commonMore,
+    moreMenu: [...more, ..._commonMore],
+  );
+
+  // Secondary destinations reused across several roles' More menus. Each one
+  // is gated on the permission its owning role actually holds, so a role that
+  // loses the permission loses the entry without any edit here.
+  static const _bookingsMore = NavItem(
+    label: 'Bookings',
+    icon: Icons.event_note_outlined,
+    route: Routes.reservations,
+    requires: [P.reservationRead],
+  );
+  static const _myTasksMore = NavItem(
+    label: 'My tasks',
+    icon: Icons.checklist_outlined,
+    route: Routes.myTasks,
+    requires: [P.taskRead],
+  );
+  static const _inventoryMore = NavItem(
+    label: 'Inventory',
+    icon: Icons.inventory_2_outlined,
+    route: Routes.inventory,
+    requires: [P.inventoryRead],
+  );
+  static const _maintenanceMore = NavItem(
+    label: 'Maintenance',
+    icon: Icons.build_outlined,
+    route: Routes.maintenance,
+    requires: [P.maintenanceRead],
+  );
+  static const _lostFoundMore = NavItem(
+    label: 'Lost & found',
+    icon: Icons.travel_explore_outlined,
+    route: Routes.securityLostFound,
+    requires: [P.lostFoundRead],
+  );
+  static const _eventsMore = NavItem(
+    label: 'Events',
+    icon: Icons.celebration_outlined,
+    route: Routes.events,
+    requires: [P.eventRead],
+  );
+  static const _spaBookingsMore = NavItem(
+    label: 'Spa bookings',
+    icon: Icons.event_available_outlined,
+    route: Routes.spaBookings,
+    requires: [P.spaBookingRead],
+  );
+  static const _spaMore = NavItem(
+    label: 'Spa',
+    icon: Icons.spa_outlined,
+    route: Routes.spa,
+    requires: [P.spaRead],
+  );
+  static const _posMore = NavItem(
+    label: 'POS',
+    icon: Icons.point_of_sale_outlined,
+    route: Routes.pos,
+    requires: [P.posOperate],
+  );
+  static const _myTablesMore = NavItem(
+    label: 'Tables',
+    icon: Icons.table_restaurant_outlined,
+    route: Routes.myTables,
+    requires: [P.tableRead],
+  );
+  static const _kitchenMore = NavItem(
+    label: 'Kitchen',
+    icon: Icons.soup_kitchen_outlined,
+    route: Routes.kitchen,
+    requires: [P.kotRead],
   );
 
   // ---------------------------------------------------------------------
-  // The map. All 23 roles.
+  // The map. All 24 roles.
   // ---------------------------------------------------------------------
 
   static final Map<StaffRole, RoleConfig> _configs = {
@@ -390,6 +512,39 @@ class RoleConfig {
       ],
     ),
 
+    // ============================== HR (BUILT) ============================
+    // HR reuses the management Team module wholesale — same screen, same
+    // widgets. What differs is the permission set the server returns: HR holds
+    // staff.read/create/update but NOT staff.approve, so the Approve button in
+    // TeamScreen simply never renders, and every account HR raises waits in
+    // "Submitted" until a GM or AGM signs it off.
+    StaffRole.hr: RoleConfig(
+      role: StaffRole.hr,
+      homeRoute: Routes.team,
+      homeModuleLabel: 'Staff Directory',
+      built: true,
+      bottomNav: const [
+        NavItem(
+          label: 'Team',
+          icon: Icons.groups_outlined,
+          route: Routes.team,
+          requires: [P.staffRead],
+        ),
+        NavItem(
+          label: 'Submitted',
+          icon: Icons.hourglass_top_outlined,
+          route: Routes.teamPending,
+          requires: [P.staffRead],
+        ),
+        NavItem(
+          label: 'Profile',
+          icon: Icons.person_outline,
+          route: Routes.profile,
+        ),
+      ],
+      moreMenu: _commonMoreNoProfile,
+    ),
+
     // ========================== Reception (BUILT) =========================
     StaffRole.receptionist: RoleConfig(
       role: StaffRole.receptionist,
@@ -440,7 +595,7 @@ class RoleConfig {
           route: Routes.profile,
         ),
       ],
-      moreMenu: const [_notificationsItem],
+      moreMenu: _commonMoreNoProfile,
     ),
 
     // Same permission shape as the attendant (`task.read/start/complete`), so
@@ -463,7 +618,7 @@ class RoleConfig {
           route: Routes.profile,
         ),
       ],
-      moreMenu: const [_notificationsItem],
+      moreMenu: _commonMoreNoProfile,
     ),
 
     // ====================== Security staff / gate (BUILT) =================
@@ -526,6 +681,7 @@ class RoleConfig {
       'Accounts',
       Icons.account_balance_outlined,
       requires: [P.financeRead],
+      more: const [_bookingsMore],
     ),
     StaffRole.salesManager: _simple(
       StaffRole.salesManager,
@@ -534,6 +690,7 @@ class RoleConfig {
       'Sales',
       Icons.trending_up_outlined,
       requires: [P.leadRead],
+      more: const [_bookingsMore, _eventsMore],
     ),
     StaffRole.travelDesk: _simple(
       StaffRole.travelDesk,
@@ -542,6 +699,7 @@ class RoleConfig {
       'Travel desk',
       Icons.map_outlined,
       requires: [P.tripRead],
+      more: const [_bookingsMore, _myTasksMore],
     ),
     StaffRole.housekeepingSupervisor: RoleConfig(
       role: StaffRole.housekeepingSupervisor,
@@ -561,7 +719,12 @@ class RoleConfig {
           requires: [P.taskRead],
         ),
       ],
-      moreMenu: _commonMore,
+      moreMenu: const [
+        _maintenanceMore,
+        _inventoryMore,
+        _lostFoundMore,
+        ..._commonMore,
+      ],
     ),
     StaffRole.technician: _simple(
       StaffRole.technician,
@@ -570,6 +733,7 @@ class RoleConfig {
       'My work',
       Icons.handyman_outlined,
       requires: [P.maintenanceRead],
+      more: const [_maintenanceMore, _myTasksMore],
     ),
     StaffRole.spaManager: _simple(
       StaffRole.spaManager,
@@ -578,6 +742,7 @@ class RoleConfig {
       'Spa',
       Icons.spa_outlined,
       requires: [P.spaRead],
+      more: const [_spaBookingsMore, _myTasksMore, _inventoryMore],
     ),
     StaffRole.spaAccounts: _simple(
       StaffRole.spaAccounts,
@@ -586,6 +751,7 @@ class RoleConfig {
       'Spa billing',
       Icons.receipt_long_outlined,
       requires: [P.spaBookingRead],
+      more: const [_spaMore],
     ),
     StaffRole.spaStaff: _simple(
       StaffRole.spaStaff,
@@ -594,6 +760,7 @@ class RoleConfig {
       'Appointments',
       Icons.event_available_outlined,
       requires: [P.spaBookingRead],
+      more: const [_myTasksMore],
     ),
     StaffRole.restaurantManager: _simple(
       StaffRole.restaurantManager,
@@ -602,6 +769,7 @@ class RoleConfig {
       'Restaurant',
       Icons.restaurant_outlined,
       requires: [P.restaurantRead],
+      more: const [_posMore, _myTablesMore, _kitchenMore, _inventoryMore],
     ),
     StaffRole.cashier: _simple(
       StaffRole.cashier,
@@ -610,6 +778,7 @@ class RoleConfig {
       'POS',
       Icons.point_of_sale_outlined,
       requires: [P.posOperate],
+      more: const [_myTablesMore],
     ),
     StaffRole.waiter: _simple(
       StaffRole.waiter,
@@ -618,6 +787,7 @@ class RoleConfig {
       'My tables',
       Icons.table_restaurant_outlined,
       requires: [P.tableRead],
+      more: const [_myTasksMore],
     ),
     StaffRole.chef: _simple(
       StaffRole.chef,
@@ -626,6 +796,7 @@ class RoleConfig {
       'Kitchen',
       Icons.soup_kitchen_outlined,
       requires: [P.kotRead],
+      more: const [_inventoryMore, _myTasksMore],
     ),
     StaffRole.cleaner: _simple(
       StaffRole.cleaner,
@@ -634,6 +805,7 @@ class RoleConfig {
       'Cleaning',
       Icons.cleaning_services_outlined,
       requires: [P.taskRead],
+      more: const [_myTasksMore],
     ),
     StaffRole.inventoryStoreManager: _simple(
       StaffRole.inventoryStoreManager,
@@ -650,6 +822,39 @@ class RoleConfig {
       'Security',
       Icons.shield_outlined,
       requires: [P.incidentRead],
+      more: const [
+        NavItem(
+          label: 'Gate',
+          icon: Icons.sensor_door_outlined,
+          route: Routes.securityGate,
+          requires: [P.gateRead],
+        ),
+        NavItem(
+          label: 'Visitors',
+          icon: Icons.badge_outlined,
+          route: Routes.securityVisitors,
+          requires: [P.visitorRead],
+        ),
+        NavItem(
+          label: 'Incidents',
+          icon: Icons.report_gmailerrorred_outlined,
+          route: Routes.securityIncidents,
+          requires: [P.incidentRead],
+        ),
+        NavItem(
+          label: 'Vehicle log',
+          icon: Icons.directions_car_outlined,
+          route: Routes.securityVehicles,
+          requires: [P.vehicleEntry],
+        ),
+        NavItem(
+          label: 'Staff movement',
+          icon: Icons.transfer_within_a_station_outlined,
+          route: Routes.securityStaffMovement,
+          requires: [P.staffEntry],
+        ),
+        _lostFoundMore,
+      ],
     ),
     StaffRole.driver: _simple(
       StaffRole.driver,
@@ -658,6 +863,7 @@ class RoleConfig {
       'Trips',
       Icons.local_taxi_outlined,
       requires: [P.tripRead],
+      more: const [_myTasksMore],
     ),
     StaffRole.eventManager: _simple(
       StaffRole.eventManager,
@@ -666,6 +872,7 @@ class RoleConfig {
       'Events',
       Icons.celebration_outlined,
       requires: [P.eventRead],
+      more: const [_bookingsMore, _myTasksMore],
     ),
 
     // ============================== Fallback ==============================
@@ -680,7 +887,7 @@ class RoleConfig {
           route: Routes.profile,
         ),
       ],
-      moreMenu: const [_notificationsItem],
+      moreMenu: _commonMoreNoProfile,
     ),
   };
 }

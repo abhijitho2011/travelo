@@ -222,7 +222,7 @@ describe('StaffTeamService — role escalation is impossible', () => {
     expect(staffCreatableRoleValues).not.toContain('GENERAL_MANAGER');
     expect(staffCreatableRoleValues).not.toContain('ASSISTANT_GENERAL_MANAGER');
     expect(staffCreatableRoleValues).toContain('RECEPTIONIST');
-    expect(staffCreatableRoleValues).toHaveLength(21);
+    expect(staffCreatableRoleValues).toHaveLength(22);
   });
 
   it('rejects a GM/AGM role at the service layer even if the DTO were bypassed', async () => {
@@ -234,6 +234,101 @@ describe('StaffTeamService — role escalation is impossible', () => {
       ).toBe('ROLE_NOT_ASSIGNABLE');
       expect(db.inserts).toEqual([]);
     }
+  });
+
+  it('lets a GM and an AGM create an HR', async () => {
+    for (const actor of ['GENERAL_MANAGER', 'ASSISTANT_GENERAL_MANAGER']) {
+      const db = makeDb();
+      await new StaffTeamService(db as never).create(meAs(actor), {
+        ...validMember,
+        role: 'HR',
+      } as never);
+      expect(db.inserts[0]).toMatchObject({ role: 'HR' });
+    }
+  });
+
+  it('refuses an actor with no staff.create at all, DTO bypassed', async () => {
+    for (const actor of ['RECEPTIONIST', 'CHEF', 'SECURITY_STAFF', 'SUPER_HACKER']) {
+      const db = makeDb();
+      const svc = new StaffTeamService(db as never);
+      expect(await rejectionCode(svc.create(meAs(actor), validMember as never))).toBe(
+        'ROLE_NOT_ASSIGNABLE',
+      );
+      expect(db.inserts).toEqual([]);
+    }
+  });
+});
+
+/**
+ * HR is the role the whole approval story hangs on: it may staff the hotel, but
+ * every account it raises has to be signed off by a GM or an AGM.
+ */
+describe('StaffTeamService — HR', () => {
+  const hr = meAs('HR');
+
+  it('may create ordinary roles', async () => {
+    const db = makeDb();
+    await new StaffTeamService(db as never).create(hr, validMember as never);
+    expect(db.inserts[0]).toMatchObject({ role: 'RECEPTIONIST', propertyId: 'prop-A' });
+  });
+
+  it('may NOT create GM, AGM or another HR — ROLE_NOT_PERMITTED, nothing written', async () => {
+    for (const role of ['GENERAL_MANAGER', 'ASSISTANT_GENERAL_MANAGER', 'HR']) {
+      const db = makeDb();
+      const svc = new StaffTeamService(db as never);
+      expect(await rejectionCode(svc.create(hr, { ...validMember, role } as never))).toBe(
+        'ROLE_NOT_PERMITTED',
+      );
+      expect(db.inserts).toEqual([]);
+    }
+  });
+
+  // `staff.update` must not become a back door around `staff.approve`.
+  it('may not set anybody to ACTIVE, and writes nothing when it tries', async () => {
+    const db = makeDb([[{ id: 'staff-2', status: 'PENDING_APPROVAL', propertyId: 'prop-A' }]]);
+    const svc = new StaffTeamService(db as never);
+    expect(await rejectionCode(svc.setStatus(hr, 'staff-2', 'ACTIVE'))).toBe(
+      'ACTIVATION_NOT_PERMITTED',
+    );
+    expect(db.updates).toEqual([]);
+    expect(db.wheres).toEqual([]);
+  });
+
+  it('may still block, suspend and deactivate — the restrictive moves', async () => {
+    for (const status of ['BLOCKED', 'SUSPENDED', 'DEACTIVATED']) {
+      const db = makeDb([[{ id: 'staff-2', status: 'ACTIVE', propertyId: 'prop-A' }]]);
+      await new StaffTeamService(db as never).setStatus(hr, 'staff-2', status);
+      expect(db.updates[0]).toMatchObject({ status });
+    }
+  });
+
+  // The explicit requirement: HR cannot self-activate, however it asks.
+  it('creates as PENDING_APPROVAL even when activate:true is sent', async () => {
+    const db = makeDb();
+    await new StaffTeamService(db as never).create(hr, {
+      ...validMember,
+      activate: true,
+    } as never);
+    expect(db.inserts[0].status).toBe('PENDING_APPROVAL');
+  });
+
+  it('holds no staff.approve, so the activate shortcut can never open for it', () => {
+    expect(permissionsForRole('HR')).not.toContain('staff.approve');
+    expect(permissionsForRole('HR')).toContain('staff.create');
+  });
+
+  // An HR-created row lands in PENDING_APPROVAL, which is exactly the status the
+  // GM/AGM Approval Centre queries — so it surfaces there with no extra wiring.
+  it('lands in the status the approval centre lists, and a GM can approve it', async () => {
+    const db = makeDb();
+    await new StaffTeamService(db as never).create(hr, validMember as never);
+    const created = db.inserts[0];
+    expect(created.status).toBe('PENDING_APPROVAL');
+
+    const gmDb = makeDb([[{ id: 'new-1', status: created.status, propertyId: 'prop-A' }]]);
+    await expect(
+      new StaffTeamService(gmDb as never).approve(meAs('GENERAL_MANAGER'), 'new-1'),
+    ).resolves.toEqual({ id: 'new-1', status: 'ACTIVE' });
   });
 });
 
@@ -280,6 +375,25 @@ describe('StaffTeamService.create', () => {
       activate: true,
     } as never);
     expect(db.inserts[0].status).toBe('PENDING_APPROVAL');
+  });
+});
+
+describe('StaffTeamService.setStatus — activation is an approval', () => {
+  it('lets a GM and an AGM reactivate, since both hold staff.approve', async () => {
+    for (const role of ['GENERAL_MANAGER', 'ASSISTANT_GENERAL_MANAGER']) {
+      const db = makeDb([[{ id: 'staff-2', status: 'SUSPENDED', propertyId: 'prop-A' }]]);
+      await new StaffTeamService(db as never).setStatus(meAs(role), 'staff-2', 'ACTIVE');
+      expect(db.updates[0]).toMatchObject({ status: 'ACTIVE' });
+    }
+  });
+
+  it('refuses any actor without staff.approve, whatever else they hold', async () => {
+    const actor = meAs('GENERAL_MANAGER', { permissions: ['staff.read', 'staff.update'] });
+    const db = makeDb([[{ id: 'staff-2', status: 'BLOCKED', propertyId: 'prop-A' }]]);
+    expect(
+      await rejectionCode(new StaffTeamService(db as never).setStatus(actor, 'staff-2', 'ACTIVE')),
+    ).toBe('ACTIVATION_NOT_PERMITTED');
+    expect(db.updates).toEqual([]);
   });
 });
 

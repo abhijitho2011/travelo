@@ -72,9 +72,18 @@ class DefaultFirebaseOptions {
   // platform apps in the Firebase console and pass their values via --dart-define
   // (FIREBASE_ANDROID_APP_ID / FIREBASE_IOS_APP_ID) or drop in the generated
   // google-services.json / GoogleService-Info.plist.
+  /// Values from the Android app registered in Firebase (google-services.json,
+  /// package `com.tavelo.hotel`). The Android app has its OWN appId and API key
+  /// — reusing the web ones makes Google sign-in hang.
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: _apiKey,
-    appId: String.fromEnvironment('FIREBASE_ANDROID_APP_ID', defaultValue: _appId),
+    apiKey: String.fromEnvironment(
+      'FIREBASE_ANDROID_API_KEY',
+      defaultValue: 'AIzaSyCWOF8iYePzbbMRrJG40Cikur5UtBnPZGs',
+    ),
+    appId: String.fromEnvironment(
+      'FIREBASE_ANDROID_APP_ID',
+      defaultValue: '1:754494069859:android:6f438b65c92cf295762c56',
+    ),
     messagingSenderId: _senderId,
     projectId: _projectId,
     storageBucket: _storageBucket,

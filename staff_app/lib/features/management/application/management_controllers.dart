@@ -83,6 +83,25 @@ final teamProvider = FutureProvider.autoDispose<List<TeamMember>>((ref) {
   return ref.watch(managementRepositoryProvider).team(filter);
 });
 
+/// Everyone at this property whose account is not live yet.
+///
+/// Deliberately independent of [teamFilterProvider]: the Submitted view is a
+/// fixed question ("what is still waiting?"), so the directory's filters must
+/// not silently change what it shows. One unfiltered read, partitioned here,
+/// rather than three status-filtered round trips.
+final teamAwaitingApprovalProvider =
+    FutureProvider.autoDispose<List<TeamMember>>((ref) async {
+      final all = await ref
+          .watch(managementRepositoryProvider)
+          .team(const TeamFilter());
+      return all
+          .where(
+            (m) =>
+                m.awaitingApproval || m.status == AccountStatus.approved,
+          )
+          .toList(growable: false);
+    });
+
 /// Actions on a single team member. Each throws on failure — the caller
 /// surfaces the message rather than pretending the change stuck.
 class TeamActions {
@@ -114,6 +133,7 @@ class TeamActions {
 
   void _invalidate() {
     _ref.invalidate(teamProvider);
+    _ref.invalidate(teamAwaitingApprovalProvider);
     _ref.invalidate(approvalsProvider);
   }
 }

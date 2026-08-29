@@ -21,6 +21,7 @@ import '../../features/maintenance/presentation/my_work_orders_screen.dart';
 import '../../features/management/presentation/add_staff_screen.dart';
 import '../../features/management/presentation/approvals_screen.dart';
 import '../../features/management/presentation/management_dashboard_screen.dart';
+import '../../features/management/presentation/pending_approvals_screen.dart';
 import '../../features/management/presentation/team_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
@@ -43,6 +44,7 @@ import '../../features/security/presentation/visitors_screen.dart';
 import '../../features/spa/presentation/spa_appointments_screen.dart';
 import '../../features/spa/presentation/spa_bookings_screen.dart';
 import '../../features/spa/presentation/spa_screen.dart';
+import '../../features/support/presentation/support_screen.dart';
 import '../../features/travel_desk/presentation/travel_desk_screen.dart';
 import '../providers.dart';
 import '../widgets/app_shell.dart';
@@ -123,6 +125,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: Routes.teamNew,
             builder: (_, _) => const AddStaffScreen(),
           ),
+          GoRoute(
+            path: Routes.teamPending,
+            builder: (_, _) => const PendingApprovalsScreen(),
+          ),
 
           // Reception (built)
           GoRoute(
@@ -186,6 +192,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: Routes.notifications,
             builder: (_, _) => const NotificationsScreen(),
           ),
+          GoRoute(path: Routes.support, builder: (_, _) => const SupportScreen()),
 
           // ------------------- deferred modules (honest placeholders) -------
           GoRoute(path: Routes.accounts, builder: (_, _) => const AccountsScreen()),

@@ -4,7 +4,8 @@ import { DRIZZLE, Database } from '../../database/database.module';
 import { hotelStaff, type HotelStaffRole, type HotelStaffStatus } from '../../database/schema';
 import { AuthenticatedStaff } from './current-staff.decorator';
 import { StaffErrors } from './staff-errors';
-import { CreateTeamMemberDto, StaffTeamFilterDto, staffCreatableRoleValues } from './dto';
+import { CreateTeamMemberDto, StaffTeamFilterDto } from './dto';
+import { ROLE_NARROWED_ACTORS, creatableRolesFor } from './role-creation';
 
 const MAX_LIMIT = 100;
 
@@ -20,8 +21,9 @@ const MAX_LIMIT = 100;
  *  2. No self-service — nobody may approve, re-status or delete their own row,
  *     so a suspended-pending manager cannot rescue themselves and no one can
  *     escalate by editing their own record. Role is not editable at all through
- *     this surface; the only place a role is chosen is on creation, from a
- *     whitelist that excludes GM and AGM.
+ *     this surface; the only place a role is chosen is on creation, from the
+ *     per-actor whitelist in `creatableRolesFor` — which excludes GM and AGM
+ *     for everyone, and excludes HR for HR.
  */
 @Injectable()
 export class StaffTeamService {
@@ -69,14 +71,22 @@ export class StaffTeamService {
   }
 
   async create(me: AuthenticatedStaff, dto: CreateTeamMemberDto) {
-    // Defence in depth: the DTO already whitelists, but a role that is not
-    // assignable must never slip through even if the DTO is bypassed.
-    if (!(staffCreatableRoleValues as readonly string[]).includes(dto.role)) {
-      throw StaffErrors.roleNotAssignable();
+    // Defence in depth: the DTO whitelists the property-wide set, but the
+    // per-actor set is narrower and is the one that decides. `creatableRolesFor`
+    // is the single tested authority — no conditionals on role live here.
+    if (!(creatableRolesFor(me.role) as readonly string[]).includes(dto.role)) {
+      throw ROLE_NARROWED_ACTORS.has(me.role)
+        ? StaffErrors.roleNotPermitted()
+        : StaffErrors.roleNotAssignable();
     }
 
     // New team members wait for approval unless the creator can approve, in
     // which case they may opt to activate immediately.
+    //
+    // This is what makes HR's accounts always PENDING_APPROVAL: HR holds
+    // `staff.create` but NOT `staff.approve`, and `me.permissions` is resolved
+    // server-side from the DB role on every request (see StaffJwtGuard), so an
+    // `activate: true` in the body is simply inert for them.
     const canApprove = me.permissions.includes('staff.approve');
     const status: HotelStaffStatus = canApprove && dto.activate ? 'ACTIVE' : 'PENDING_APPROVAL';
 
@@ -117,6 +127,14 @@ export class StaffTeamService {
   }
 
   async setStatus(me: AuthenticatedStaff, staffId: string, status: string) {
+    // ACTIVE is the approval outcome, so it needs the approval permission no
+    // matter which endpoint asks for it. `staff.update` buys the restrictive
+    // moves — block, suspend, deactivate — and nothing that puts somebody into
+    // service. This is what stops HR from raising a row and then activating it
+    // itself, which would make the whole pending state decorative.
+    if (status === 'ACTIVE' && !me.permissions.includes('staff.approve')) {
+      throw StaffErrors.activationRequiresApproval();
+    }
     await this.requireTeamMember(me, staffId);
     await this.db
       .update(hotelStaff)

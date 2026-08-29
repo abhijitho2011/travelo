@@ -31,8 +31,9 @@ class AppShell extends ConsumerWidget {
     final more = config.visibleMore(permissions);
 
     final location = GoRouterState.of(context).uri.path;
-    final selected = _selectedIndex(nav.map((n) => n.route).toList(), location);
 
+    // A role with nothing in More gets no More destination at all — an empty
+    // sheet is worse than an absent button.
     final showMore = more.isNotEmpty;
     final destinations = <NavigationDestination>[
       for (final item in nav)
@@ -49,15 +50,25 @@ class AppShell extends ConsumerWidget {
         ),
     ];
 
+    // The More destination is always last, in the rail exactly as in the bottom
+    // bar — both call this one function, so neither can drop it.
+    final moreIndex = showMore ? destinations.length - 1 : -1;
+
     void onSelect(int i) {
-      if (showMore && i == destinations.length - 1) {
-        _MoreSheet.show(context, more);
+      if (i == moreIndex) {
+        _MoreSheet.show(context, more, current: location);
         return;
       }
       context.go(nav[i].route);
     }
 
-    final index = selected.clamp(0, destinations.length - 1);
+    // Sitting on a More destination lights "More" rather than leaving the first
+    // tab lit on a screen it does not serve.
+    final navMatch = _selectedIndex(nav.map((n) => n.route).toList(), location);
+    final moreMatch = _selectedIndex(more.map((n) => n.route).toList(), location);
+    final index = navMatch >= 0
+        ? navMatch
+        : (showMore && moreMatch >= 0 ? moreIndex : 0);
     final hasNav = destinations.length >= 2;
 
     // Tablets get a side rail instead of a bottom bar: on a 10" screen a bottom
@@ -77,18 +88,33 @@ class AppShell extends ConsumerWidget {
                 decoration: BoxDecoration(
                   border: Border(right: BorderSide(color: c.border)),
                 ),
-                child: NavigationRail(
-                  selectedIndex: index,
-                  onDestinationSelected: onSelect,
-                  labelType: NavigationRailLabelType.all,
-                  backgroundColor: c.surface,
-                  destinations: [
-                    for (final d in destinations)
-                      NavigationRailDestination(
-                        icon: d.icon,
-                        label: Text(d.label),
+                // A NavigationRail does not scroll on its own: a role with many
+                // destinations would overflow a short landscape tablet and take
+                // the last one — More — off screen with it. Wrapping it in a
+                // min-height scroll view keeps every destination reachable.
+                child: LayoutBuilder(
+                  builder: (context, constraints) => SingleChildScrollView(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
                       ),
-                  ],
+                      child: IntrinsicHeight(
+                        child: NavigationRail(
+                          selectedIndex: index,
+                          onDestinationSelected: onSelect,
+                          labelType: NavigationRailLabelType.all,
+                          backgroundColor: c.surface,
+                          destinations: [
+                            for (final d in destinations)
+                              NavigationRailDestination(
+                                icon: d.icon,
+                                label: Text(d.label),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
               // Keep line length readable rather than letting a list span the
@@ -133,10 +159,11 @@ class AppShell extends ConsumerWidget {
   /// Comfortable reading width for list/detail content on a wide screen.
   static const double _contentMaxWidth = 1100;
 
-  /// Highlights the tab whose route is the longest prefix of the current
-  /// location, so a detail screen keeps its parent tab lit.
+  /// Index of the destination whose route is the longest prefix of the current
+  /// location, so a detail screen keeps its parent tab lit. Returns -1 when no
+  /// destination serves this location — the caller decides what to light.
   static int _selectedIndex(List<String> routes, String location) {
-    var best = 0;
+    var best = -1;
     var bestLength = -1;
     for (var i = 0; i < routes.length; i++) {
       final r = routes[i];
@@ -312,16 +339,35 @@ class _BellButton extends StatelessWidget {
 }
 
 /// The "More" sheet — the overflow half of the role's navigation.
+///
+/// Opened identically from the bottom bar and from the tablet rail. Every item
+/// in the role's More list appears here with its icon and label; the list
+/// scrolls, so a role with a dozen extra modules is no harder to use than one
+/// with two.
 class _MoreSheet extends StatelessWidget {
-  const _MoreSheet({required this.items});
+  const _MoreSheet({required this.items, this.current});
 
   final List<NavItem> items;
 
-  static Future<void> show(BuildContext context, List<NavItem> items) =>
-      showModalBottomSheet(
-        context: context,
-        builder: (_) => _MoreSheet(items: items),
-      );
+  /// The location the sheet was opened from, so the entry you are already on
+  /// reads as selected rather than as one more thing to tap.
+  final String? current;
+
+  static Future<void> show(
+    BuildContext context,
+    List<NavItem> items, {
+    String? current,
+  }) => showModalBottomSheet(
+    context: context,
+    showDragHandle: true,
+    // Long lists get the height they need instead of being capped at half the
+    // screen and silently clipping the last entries.
+    isScrollControlled: true,
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+    ),
+    builder: (_) => _MoreSheet(items: items, current: current),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -346,6 +392,8 @@ class _MoreSheet extends StatelessWidget {
                 children: [
                   for (final item in items)
                     ListTile(
+                      selected: item.route == current,
+                      selectedColor: c.primary,
                       leading: Icon(item.icon, size: 20),
                       title: Text(item.label),
                       trailing: Icon(

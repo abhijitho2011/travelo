@@ -17,8 +17,10 @@ import '../data/team_models.dart';
 
 /// Create a colleague at this property.
 ///
-/// The role list excludes both management roles: a GM cannot mint a peer or a
-/// superior, and the server rejects it too — the client just does not offer it.
+/// The role list comes from `StaffRole.creatableRolesFor(signed-in role)`, the
+/// client mirror of `creatableRolesFor` on the server. A GM cannot mint a peer
+/// or a superior; HR additionally cannot mint another HR. The server rejects
+/// all of it anyway — the client simply never offers a choice the API refuses.
 class AddStaffScreen extends ConsumerStatefulWidget {
   const AddStaffScreen({super.key});
 
@@ -82,16 +84,29 @@ class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
             ),
           );
       if (!mounted) return;
+      final name = _first.text.trim();
+      final activated = _activate && ref.read(canProvider(P.staffApprove));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          duration: const Duration(seconds: 5),
           content: Text(
-            _activate
-                ? '${_first.text.trim()} added and activated'
-                : '${_first.text.trim()} added — waiting for approval',
+            activated
+                ? '$name added and activated'
+                : '$name added — pending approval by a General Manager or '
+                      'Assistant General Manager. They cannot sign in until '
+                      'then.',
           ),
         ),
       );
-      context.go(Routes.team);
+      // Land them where the outcome is visible: the Submitted queue when the
+      // account is waiting and this role has that destination, otherwise the
+      // directory. Asking the role's own config keeps this from ever routing
+      // somewhere the RoleGuard would bounce.
+      final hasSubmitted = ref
+          .read(roleConfigProvider)
+          .allowedRoutes
+          .contains(Routes.teamPending);
+      context.go(!activated && hasSubmitted ? Routes.teamPending : Routes.team);
     } on ApiException catch (e) {
       if (mounted) setState(() => _submitError = e.message);
     } finally {
@@ -104,7 +119,10 @@ class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
     final c = context.colors;
     // `activate` is honoured by the server only for a creator holding
     // staff.approve — so the switch is only offered to someone who has it.
+    // HR does not hold it, which is exactly why every HR-created account waits.
     final canActivate = ref.watch(canProvider(P.staffApprove));
+    final myRole = ref.watch(roleProvider);
+    final creatable = StaffRole.creatableRolesFor(myRole);
 
     return PageBody(
       children: [
@@ -144,7 +162,7 @@ class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
                         prefixIcon: Icon(Icons.badge_outlined, size: 20),
                       ),
                       items: [
-                        for (final role in StaffRole.creatableByManagement)
+                        for (final role in creatable)
                           DropdownMenuItem(
                             value: role,
                             child: Text(
@@ -162,9 +180,14 @@ class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
                     ),
                     const SizedBox(height: Sp.sm),
                     Text(
-                      'General Manager and Assistant General Manager are '
-                      'appointed by the hotel owner, so they are not in this '
-                      'list.',
+                      myRole == StaffRole.hr
+                          ? 'General Manager and Assistant General Manager are '
+                                'appointed by the hotel owner. A second HR '
+                                'account is created by a manager, not by HR — '
+                                'so none of the three are in this list.'
+                          : 'General Manager and Assistant General Manager are '
+                                'appointed by the hotel owner, so they are not '
+                                'in this list.',
                       style: AppTypography.body(
                         size: 11.5,
                         color: c.mutedForeground,
@@ -319,9 +342,16 @@ class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
                             _activate
                                 ? 'They will be active straight away and can '
                                       'sign in as soon as you save.'
-                                : 'They will be created as Pending approval. '
+                                : canActivate
+                                ? 'They will be created as Pending approval. '
                                       'They cannot sign in until you or another '
-                                      'manager approves them.',
+                                      'manager approves them.'
+                                : 'They will be created as Pending approval. '
+                                      'Your role can raise the account but not '
+                                      'sign it off — a General Manager or '
+                                      'Assistant General Manager approves it '
+                                      'before they can sign in. You can watch '
+                                      'for it under Submitted.',
                             style: AppTypography.body(
                               size: 12.5,
                               color: c.foreground,

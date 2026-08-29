@@ -108,6 +108,20 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
   GENERAL_MANAGER,
   ASSISTANT_GENERAL_MANAGER,
 
+  /**
+   * HR staffs the hotel; it does not run it.
+   *
+   * The list is deliberately four keys long. HR reads the directory, raises a
+   * new account and corrects a record — and stops there:
+   *   - NO `staff.approve`: every account HR raises waits for a GM/AGM. This is
+   *     the whole point of the role, and the reason the `activate: true`
+   *     shortcut in `StaffTeamService.create` is inert for HR.
+   *   - NO `staff.delete`: removing a colleague is a GM decision.
+   *   - NOTHING matching finance/revenue/payroll/payment/procurement/owner.
+   *     HR handles people, never their pay or the hotel's money.
+   */
+  HR: ['staff.read', 'staff.create', 'staff.update', 'profile.read'],
+
   ACCOUNTS: [
     'finance.read',
     'finance.export',

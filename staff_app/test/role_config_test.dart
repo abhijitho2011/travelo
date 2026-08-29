@@ -86,24 +86,154 @@ void main() {
     });
 
     test('management cannot create a GM or an AGM', () {
+      for (final actor in StaffRole.values) {
+        final creatable = StaffRole.creatableRolesFor(actor);
+        expect(
+          creatable,
+          isNot(contains(StaffRole.generalManager)),
+          reason: actor.wire,
+        );
+        expect(
+          creatable,
+          isNot(contains(StaffRole.assistantGeneralManager)),
+          reason: actor.wire,
+        );
+        expect(creatable, isNot(contains(StaffRole.unknown)), reason: actor.wire);
+      }
+    });
+
+    // Mirrors `creatableRolesFor` in src/modules/staff-auth/role-creation.ts.
+    // If these two ever drift, the app offers a role the API refuses.
+    test('HR cannot create a GM, an AGM or another HR', () {
+      final creatable = StaffRole.creatableRolesFor(StaffRole.hr);
+      expect(creatable, isNot(contains(StaffRole.generalManager)));
+      expect(creatable, isNot(contains(StaffRole.assistantGeneralManager)));
+      expect(creatable, isNot(contains(StaffRole.hr)));
+      expect(creatable, contains(StaffRole.receptionist));
       expect(
-        StaffRole.creatableByManagement,
-        isNot(contains(StaffRole.generalManager)),
-      );
-      expect(
-        StaffRole.creatableByManagement,
-        isNot(contains(StaffRole.assistantGeneralManager)),
+        creatable.length,
+        StaffRole.creatableRolesFor(StaffRole.generalManager).length - 1,
       );
     });
 
-    test('there are 23 real roles', () {
-      expect(StaffRole.all.length, 23);
+    test('a GM and an AGM may create HR, and share one creatable set', () {
+      final gm = StaffRole.creatableRolesFor(StaffRole.generalManager);
+      expect(gm, contains(StaffRole.hr));
+      expect(StaffRole.creatableRolesFor(StaffRole.assistantGeneralManager), gm);
+    });
+
+    test('every other role may create nothing at all', () {
+      for (final actor in StaffRole.values) {
+        if (actor == StaffRole.generalManager ||
+            actor == StaffRole.assistantGeneralManager ||
+            actor == StaffRole.hr) {
+          continue;
+        }
+        expect(
+          StaffRole.creatableRolesFor(actor),
+          isEmpty,
+          reason: actor.wire,
+        );
+      }
+    });
+
+    test('there are 24 real roles', () {
+      expect(StaffRole.all.length, 24);
+      expect(StaffRole.fromWire('HR'), StaffRole.hr);
+    });
+
+    test('HR lands on the team directory with a read-only submitted queue', () {
+      final hr = RoleConfig.of(StaffRole.hr);
+      expect(hr.homeRoute, Routes.team);
+      final navRoutes = hr.bottomNav.map((i) => i.route);
+      expect(navRoutes, contains(Routes.team));
+      expect(navRoutes, contains(Routes.teamPending));
+      expect(navRoutes, contains(Routes.profile));
+      // Nothing in HR's map reaches the management dashboard or the approvals
+      // centre — approving is not HR's to do.
+      expect(hr.allowedRoutes, isNot(contains(Routes.management)));
+      expect(hr.allowedRoutes, isNot(contains(Routes.approvals)));
+      // Team is permission-gated on staff.read, which HR holds.
+      expect(hr.requirementsFor(Routes.team), contains(P.staffRead));
+    });
+
+    test('the Add-staff screen is reachable for HR via the team route', () {
+      // `/management/team/new` canonicalises to `/management/team`, so HR needs
+      // no separate entry — but it must not fall outside the role's map.
+      expect(
+        RoleConfig.of(StaffRole.hr).allowedRoutes,
+        contains(Routes.team),
+      );
     });
 
     test('an unknown wire value degrades instead of throwing', () {
       expect(StaffRole.fromWire('SOMETHING_NEW'), StaffRole.unknown);
       expect(StaffRole.fromWire(null), StaffRole.unknown);
       expect(RoleConfig.of(StaffRole.unknown).homeRoute, isNotEmpty);
+    });
+  });
+
+  group('the More menu', () {
+    // The shell hides the More destination when the list is empty, so an empty
+    // sheet is impossible — but a role with nothing extra to offer is a sign
+    // its map was never finished. Every role gets a real More set.
+    test('every role has a non-empty More list', () {
+      for (final role in StaffRole.values) {
+        expect(
+          RoleConfig.of(role).moreMenu,
+          isNotEmpty,
+          reason: '${role.wire} would show a More entry with nothing in it',
+        );
+      }
+    });
+
+    test('every More item has a label, an icon and a routed destination', () {
+      for (final role in StaffRole.values) {
+        for (final item in RoleConfig.of(role).moreMenu) {
+          expect(item.label.trim(), isNotEmpty, reason: role.wire);
+          expect(item.route.startsWith('/'), isTrue, reason: item.label);
+          expect(
+            RoleConfig.of(role).allowedRoutes,
+            contains(item.route),
+            reason: '${role.wire} → ${item.label}',
+          );
+        }
+      }
+    });
+
+    test('no role repeats a destination inside its own More list', () {
+      for (final role in StaffRole.values) {
+        final routes = RoleConfig.of(role).moreMenu.map((i) => i.route).toList();
+        expect(routes.toSet().length, routes.length, reason: role.wire);
+      }
+    });
+
+    test('every role can reach help, alerts and its own profile', () {
+      for (final role in StaffRole.values) {
+        final config = RoleConfig.of(role);
+        final reachable = {
+          ...config.bottomNav.map((i) => i.route),
+          ...config.moreMenu.map((i) => i.route),
+        };
+        for (final route in [
+          Routes.support,
+          Routes.notifications,
+          Routes.profile,
+        ]) {
+          expect(reachable, contains(route), reason: '${role.wire} → $route');
+          expect(config.allowedRoutes, contains(route), reason: role.wire);
+        }
+      }
+    });
+
+    test('a More item hides when its permission is missing', () {
+      final gm = RoleConfig.of(StaffRole.generalManager);
+      const frontDeskOnly = PermissionSet({'reservation.read'});
+      final visible = gm.visibleMore(frontDeskOnly).map((i) => i.route);
+      expect(visible, contains(Routes.reservations));
+      expect(visible, isNot(contains(Routes.accounts)));
+      // The ungated common tail survives any permission set.
+      expect(visible, contains(Routes.support));
     });
   });
 

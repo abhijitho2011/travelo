@@ -23,7 +23,9 @@ import '../data/team_models.dart';
 ///
 /// Row actions are the clearest demonstration of button-level gating: a GM
 /// sees Approve / Block / Suspend / Remove; an AGM — who the server does not
-/// grant `staff.delete` — never sees Remove at all. Nothing here inspects the
+/// grant `staff.delete` — never sees Remove at all; HR, which holds neither
+/// `staff.approve` nor `staff.delete`, sees Add staff, Block and Suspend and
+/// nothing that would put a colleague into service. Nothing here inspects the
 /// role; each button asks only for its own permission.
 class TeamScreen extends ConsumerStatefulWidget {
   const TeamScreen({super.key});
@@ -446,11 +448,15 @@ class _TeamMemberCardState extends ConsumerState<TeamMemberCard> {
                     ),
                   ),
                 ],
+                // Reactivating puts somebody back into service, which is the
+                // approval decision by another name — so it asks for
+                // staff.approve as well as staff.update, exactly as the server
+                // does. HR, which holds only the latter, never sees it.
                 if (m.status == AccountStatus.blocked ||
                     m.status == AccountStatus.suspended ||
                     m.status == AccountStatus.deactivated)
-                  PermissionGate(
-                    permission: P.staffUpdate,
+                  PermissionGate.all(
+                    permissions: const [P.staffUpdate, P.staffApprove],
                     child: OutlinedButton(
                       onPressed: _busy
                           ? null

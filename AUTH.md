@@ -141,8 +141,8 @@ disclosed only once possession of the number is proved.
 
 ## Roles and permissions
 `src/modules/staff-auth/role-permissions.ts` is the server-side source of truth
-mapping all 23 roles to dot-namespaced permissions. Security, housekeeping,
-kitchen, cleaning, attendant and driving roles hold **no** `finance.*`,
+mapping all 24 roles to dot-namespaced permissions. Security, housekeeping,
+kitchen, cleaning, attendant, driving **and HR** roles hold **no** `finance.*`,
 `revenue.*`, `payroll.*`, `payment.*`, `procurement.*` or `owner.*` permission.
 `/auth/me` returns the resolved list; `StaffPermissionsGuard` re-checks it
 server-side on every protected route.
@@ -152,8 +152,31 @@ Every `/staff/team` route resolves its target by
 `(id, propertyId = the caller's own, deleted_at IS NULL)`. A row at another
 property returns **404**, not 403, so property membership never leaks. Nobody
 may approve, re-status or delete their own row, and role is not editable through
-this surface at all — the only place a role is chosen is on creation, from a
-whitelist that excludes GM and AGM (hotel management is appointed by the owner).
+this surface at all — the only place a role is chosen is on creation, from the
+per-actor whitelist `creatableRolesFor(actorRole)` in
+`src/modules/staff-auth/role-creation.ts`:
+
+| Actor | May create |
+| --- | --- |
+| `GENERAL_MANAGER` | every role except GM and AGM (HR included) |
+| `ASSISTANT_GENERAL_MANAGER` | every role except GM and AGM (HR included) |
+| `HR` | every role except GM, AGM and HR itself |
+| anyone else | nothing — they hold no `staff.create` |
+
+A role nobody may create returns `ROLE_NOT_ASSIGNABLE`; a role this particular
+actor may not create returns `ROLE_NOT_PERMITTED`. Both are 403.
+
+`HR` holds `staff.read`, `staff.create`, `staff.update` and `profile.read` — and
+crucially **not** `staff.approve`, so every account HR raises is written as
+`PENDING_APPROVAL` and waits for a GM/AGM in the approval centre. The
+`activate: true` shortcut on `POST /staff/team` is honoured only for a creator
+holding `staff.approve`, which makes it inert for HR.
+
+`POST /staff/team/:id/status` closes the matching back door: moving anybody
+**to `ACTIVE`** requires `staff.approve`, not merely `staff.update`
+(`ACTIVATION_NOT_PERMITTED` otherwise). Putting someone into service is the
+approval decision whichever endpoint reaches it, so HR can block, suspend and
+deactivate but never activate or reactivate.
 
 ## The chain
 Super Admin → Owner → Property + GM/AGM → GM-created staff → staff app. All

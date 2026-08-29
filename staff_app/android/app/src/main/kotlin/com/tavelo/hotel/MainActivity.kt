@@ -1,4 +1,4 @@
-package app.tavelo.tavelo_staff
+package com.tavelo.hotel
 
 import io.flutter.embedding.android.FlutterActivity
 

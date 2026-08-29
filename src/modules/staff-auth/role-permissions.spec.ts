@@ -5,8 +5,8 @@ import { STAFF_ROLE_PERMISSIONS, permissionsForRole, roleHasPermission } from '.
 const SENSITIVE = /^(finance|revenue|payroll|payment|procurement|owner)\./;
 
 describe('staff role → permission map', () => {
-  it('covers all 23 roles with a non-empty list', () => {
-    expect(hotelStaffRoleValues).toHaveLength(23);
+  it('covers all 24 roles with a non-empty list', () => {
+    expect(hotelStaffRoleValues).toHaveLength(24);
     for (const role of hotelStaffRoleValues) {
       const perms = STAFF_ROLE_PERMISSIONS[role];
       expect(Array.isArray(perms)).toBe(true);
@@ -106,16 +106,36 @@ describe('staff role → permission map', () => {
     );
   });
 
-  it('only GM and AGM may create or approve staff; only GM may delete', () => {
+  it('only GM, AGM and HR may create staff; only GM and AGM approve; only GM deletes', () => {
     for (const role of hotelStaffRoleValues) {
       const canCreate = roleHasPermission(role, 'staff.create');
       const canApprove = roleHasPermission(role, 'staff.approve');
       const canDelete = roleHasPermission(role, 'staff.delete');
       const isManagement = role === 'GENERAL_MANAGER' || role === 'ASSISTANT_GENERAL_MANAGER';
-      expect(canCreate).toBe(isManagement);
-      expect(canApprove).toBe(isManagement);
-      expect(canDelete).toBe(role === 'GENERAL_MANAGER');
+      expect({ role, canCreate }).toEqual({ role, canCreate: isManagement || role === 'HR' });
+      expect({ role, canApprove }).toEqual({ role, canApprove: isManagement });
+      expect({ role, canDelete }).toEqual({ role, canDelete: role === 'GENERAL_MANAGER' });
     }
+  });
+
+  // The headline rule for the new role: HR hires, HR never signs off, and HR
+  // never sees a rupee.
+  it('HR may read, create and update staff — and nothing else', () => {
+    expect(permissionsForRole('HR').sort()).toEqual(
+      ['staff.read', 'staff.create', 'staff.update', 'profile.read'].sort(),
+    );
+  });
+
+  it('withholds approval and deletion from HR, so its accounts need a manager', () => {
+    expect(roleHasPermission('HR', 'staff.create')).toBe(true);
+    expect(roleHasPermission('HR', 'staff.approve')).toBe(false);
+    expect(roleHasPermission('HR', 'staff.delete')).toBe(false);
+  });
+
+  it('HR holds nothing financial, payroll, procurement or owner-related', () => {
+    const perms = permissionsForRole('HR');
+    expect(perms.length).toBeGreaterThan(0);
+    expect(perms.filter((p) => SENSITIVE.test(p))).toEqual([]);
   });
 
   it('resolves an unknown role to no permissions, never to all', () => {

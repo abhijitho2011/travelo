@@ -10,6 +10,7 @@ import {
   Min,
 } from 'class-validator';
 import { hotelStaffRoleValues } from '../../database/schema';
+import { staffCreatableRoleValues } from './role-creation';
 
 const MOBILE_REGEX = /^[0-9]{10,15}$/;
 
@@ -31,13 +32,16 @@ export class StaffRefreshDto {
 }
 
 /**
- * Roles a GM/AGM may create from inside the property. GENERAL_MANAGER and
- * ASSISTANT_GENERAL_MANAGER are excluded: hotel management is appointed by the
- * OWNER, so no staff member can mint a peer or a superior for themselves.
+ * Roles SOMEBODY inside the property may create — the outer bound the DTO
+ * validates against. GENERAL_MANAGER and ASSISTANT_GENERAL_MANAGER are
+ * excluded: hotel management is appointed by the OWNER, so no staff member can
+ * mint a peer or a superior for themselves.
+ *
+ * It is deliberately NOT the per-actor answer. `creatableRolesFor(me.role)` in
+ * `role-creation.ts` narrows it further (HR may not create HR), and
+ * `StaffTeamService.create` enforces that narrower set.
  */
-export const staffCreatableRoleValues = hotelStaffRoleValues.filter(
-  (r) => r !== 'GENERAL_MANAGER' && r !== 'ASSISTANT_GENERAL_MANAGER',
-);
+export { staffCreatableRoleValues };
 
 /** Statuses a GM/AGM may set on a team member. */
 export const staffAssignableStatusValues = [

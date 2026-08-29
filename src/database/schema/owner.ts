@@ -61,6 +61,9 @@ export const ownerSessions = pgTable(
 export const hotelStaffRoleValues = [
   'GENERAL_MANAGER',
   'ASSISTANT_GENERAL_MANAGER',
+  // HR onboards people but does not run the hotel: it may raise a new staff
+  // account, never approve one, and never mint management or another HR.
+  'HR',
   'ACCOUNTS',
   'RECEPTIONIST',
   'SALES_MANAGER',

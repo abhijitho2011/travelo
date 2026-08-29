@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "754494069859",
+    "project_id": "tavelo-c4669",
+    "storage_bucket": "tavelo-c4669.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:754494069859:android:6f438b65c92cf295762c56",
+        "android_client_info": {
+          "package_name": "com.tavelo.hotel"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "754494069859-5jrpm77p2fa1vcid0imbkq3qbejr6s16.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCWOF8iYePzbbMRrJG40Cikur5UtBnPZGs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "754494069859-5jrpm77p2fa1vcid0imbkq3qbejr6s16.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
