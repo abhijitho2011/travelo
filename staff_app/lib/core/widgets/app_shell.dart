@@ -49,30 +49,89 @@ class AppShell extends ConsumerWidget {
         ),
     ];
 
+    void onSelect(int i) {
+      if (showMore && i == destinations.length - 1) {
+        _MoreSheet.show(context, more);
+        return;
+      }
+      context.go(nav[i].route);
+    }
+
+    final index = selected.clamp(0, destinations.length - 1);
+    final hasNav = destinations.length >= 2;
+
+    // Tablets get a side rail instead of a bottom bar: on a 10" screen a bottom
+    // bar strands navigation far from the hands holding the device, and wastes
+    // the horizontal space the rail uses well.
+    final isTablet = MediaQuery.sizeOf(context).shortestSide >= _tabletBreakpoint;
+
+    if (isTablet && hasNav) {
+      return Scaffold(
+        backgroundColor: c.background,
+        appBar: const _TopBar(),
+        body: SafeArea(
+          top: false,
+          child: Row(
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border(right: BorderSide(color: c.border)),
+                ),
+                child: NavigationRail(
+                  selectedIndex: index,
+                  onDestinationSelected: onSelect,
+                  labelType: NavigationRailLabelType.all,
+                  backgroundColor: c.surface,
+                  destinations: [
+                    for (final d in destinations)
+                      NavigationRailDestination(
+                        icon: d.icon,
+                        label: Text(d.label),
+                      ),
+                  ],
+                ),
+              ),
+              // Keep line length readable rather than letting a list span the
+              // full width of a landscape tablet.
+              Expanded(
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: _contentMaxWidth),
+                    child: child,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: c.background,
       appBar: const _TopBar(),
       body: SafeArea(top: false, child: child),
-      bottomNavigationBar: destinations.length < 2
+      bottomNavigationBar: !hasNav
           ? null
           : DecoratedBox(
               decoration: BoxDecoration(
                 border: Border(top: BorderSide(color: c.border)),
               ),
               child: NavigationBar(
-                selectedIndex: selected.clamp(0, destinations.length - 1),
+                selectedIndex: index,
                 destinations: destinations,
-                onDestinationSelected: (i) {
-                  if (showMore && i == destinations.length - 1) {
-                    _MoreSheet.show(context, more);
-                    return;
-                  }
-                  context.go(nav[i].route);
-                },
+                onDestinationSelected: onSelect,
               ),
             ),
     );
   }
+
+  /// Shortest-side threshold that separates a large phone from a small tablet.
+  static const double _tabletBreakpoint = 600;
+
+  /// Comfortable reading width for list/detail content on a wide screen.
+  static const double _contentMaxWidth = 1100;
 
   /// Highlights the tab whose route is the longest prefix of the current
   /// location, so a detail screen keeps its parent tab lit.
