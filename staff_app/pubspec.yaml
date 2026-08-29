@@ -1,0 +1,52 @@
+name: tavelo_staff
+description: "Tavelo — unified staff app. One app; the interface follows your role."
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # Auth (Google sign-in via Firebase; Postgres remains source of truth)
+  firebase_core: ^3.8.0
+  firebase_auth: ^5.3.4
+  google_sign_in: ^6.2.2
+
+  # Networking
+  dio: ^5.7.0
+
+  # State management
+  flutter_riverpod: ^2.6.1
+
+  # Routing
+  go_router: ^14.6.2
+
+  # Secure token storage
+  flutter_secure_storage: ^9.2.4
+
+  # Local (non-secret) cache: theme mode, cached payloads, pending mutations
+  shared_preferences: ^2.3.3
+
+  # Connectivity for the online/offline indicator
+  connectivity_plus: ^6.1.0
+
+  # Typography — Sora (display) + Manrope (body)
+  google_fonts: ^6.2.1
+
+  # Media capture for task evidence photos
+  image_picker: ^1.1.2
+
+  # Utils
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

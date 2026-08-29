@@ -1,0 +1,248 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../features/accounts/presentation/accounts_screen.dart';
+import '../../features/auth/presentation/access_denied_screen.dart';
+import '../../features/auth/presentation/account_status_screen.dart';
+import '../../features/auth/presentation/login_screen.dart';
+import '../../features/auth/presentation/otp_screen.dart';
+import '../../features/auth/presentation/session_expired_screen.dart';
+import '../../features/auth/presentation/welcome_screen.dart';
+import '../../features/dashboard/presentation/home_redirect.dart';
+import '../../features/driver/presentation/driver_screen.dart';
+import '../../features/events/presentation/events_screen.dart';
+import '../../features/housekeeping/presentation/housekeeping_board_screen.dart';
+import '../../features/housekeeping/presentation/my_tasks_screen.dart';
+import '../../features/housekeeping/presentation/task_detail_screen.dart';
+import '../../features/inventory/presentation/inventory_screen.dart';
+import '../../features/maintenance/presentation/maintenance_screen.dart';
+import '../../features/maintenance/presentation/my_work_orders_screen.dart';
+import '../../features/management/presentation/add_staff_screen.dart';
+import '../../features/management/presentation/approvals_screen.dart';
+import '../../features/management/presentation/management_dashboard_screen.dart';
+import '../../features/management/presentation/team_screen.dart';
+import '../../features/notifications/presentation/notifications_screen.dart';
+import '../../features/profile/presentation/profile_screen.dart';
+import '../../features/reception/presentation/check_in_screen.dart';
+import '../../features/reception/presentation/reception_dashboard_screen.dart';
+import '../../features/reception/presentation/reservation_detail_screen.dart';
+import '../../features/reception/presentation/reservations_screen.dart';
+import '../../features/restaurant/presentation/kitchen_screen.dart';
+import '../../features/restaurant/presentation/my_tables_screen.dart';
+import '../../features/restaurant/presentation/pos_screen.dart';
+import '../../features/restaurant/presentation/restaurant_cleaning_screen.dart';
+import '../../features/restaurant/presentation/restaurant_screen.dart';
+import '../../features/sales/presentation/sales_screen.dart';
+import '../../features/security/presentation/gate_log_screen.dart';
+import '../../features/security/presentation/gate_screen.dart';
+import '../../features/security/presentation/incidents_screen.dart';
+import '../../features/security/presentation/lost_found_screen.dart';
+import '../../features/security/presentation/security_manager_screen.dart';
+import '../../features/security/presentation/visitors_screen.dart';
+import '../../features/spa/presentation/spa_appointments_screen.dart';
+import '../../features/spa/presentation/spa_bookings_screen.dart';
+import '../../features/spa/presentation/spa_screen.dart';
+import '../../features/travel_desk/presentation/travel_desk_screen.dart';
+import '../providers.dart';
+import '../widgets/app_shell.dart';
+import 'guards.dart';
+import 'routes.dart';
+
+/// Re-runs the router's redirect whenever the session changes.
+class _AuthRefresh extends ChangeNotifier {
+  _AuthRefresh(this._ref) {
+    _ref.listen(authControllerProvider, (_, _) => notifyListeners());
+  }
+
+  final Ref _ref;
+}
+
+final routerProvider = Provider<GoRouter>((ref) {
+  final refresh = _AuthRefresh(ref);
+  ref.onDispose(refresh.dispose);
+
+  return GoRouter(
+    initialLocation: Routes.splash,
+    refreshListenable: refresh,
+    debugLogDiagnostics: kDebugMode,
+
+    // The one and only guard chain: AuthGuard → AccountStatusGuard →
+    // FirstLoginGuard → RoleGuard → PermissionGuard. No screen repeats it.
+    redirect: (context, state) {
+      final auth = ref.read(authControllerProvider);
+      return applyGuards(
+        GuardContext(
+          location: state.uri.path,
+          auth: auth,
+          config: ref.read(roleConfigProvider),
+          permissions: ref.read(permissionsProvider),
+        ),
+      );
+    },
+
+    routes: [
+      // ------------------------------------------------ unauthenticated ---
+      GoRoute(
+        path: Routes.splash,
+        builder: (_, _) => const HomeRedirect(),
+      ),
+      GoRoute(path: Routes.login, builder: (_, _) => const LoginScreen()),
+      GoRoute(path: Routes.otp, builder: (_, _) => const OtpScreen()),
+      GoRoute(
+        path: Routes.accountStatus,
+        builder: (_, _) => const AccountStatusScreen(),
+      ),
+      GoRoute(
+        path: Routes.sessionExpired,
+        builder: (_, _) => const SessionExpiredScreen(),
+      ),
+
+      // --------------------------------------------- full-screen, in-app ---
+      GoRoute(path: Routes.welcome, builder: (_, _) => const WelcomeScreen()),
+      GoRoute(
+        path: Routes.accessDenied,
+        builder: (_, _) => const AccessDeniedScreen(),
+      ),
+
+      // ------------------------------------------------- inside the shell ---
+      ShellRoute(
+        builder: (_, _, child) => AppShell(child: child),
+        routes: [
+          // Management (built)
+          GoRoute(
+            path: Routes.management,
+            builder: (_, _) => const ManagementDashboardScreen(),
+          ),
+          GoRoute(
+            path: Routes.approvals,
+            builder: (_, _) => const ApprovalsScreen(),
+          ),
+          GoRoute(path: Routes.team, builder: (_, _) => const TeamScreen()),
+          GoRoute(
+            path: Routes.teamNew,
+            builder: (_, _) => const AddStaffScreen(),
+          ),
+
+          // Reception (built)
+          GoRoute(
+            path: Routes.reception,
+            builder: (_, _) => const ReceptionDashboardScreen(),
+          ),
+          GoRoute(
+            path: Routes.reservations,
+            builder: (_, _) => const ReservationsScreen(),
+          ),
+          GoRoute(
+            path: Routes.reservationPattern,
+            builder: (_, state) => ReservationDetailScreen(
+              reservationId: state.pathParameters['id'] ?? '',
+            ),
+          ),
+          GoRoute(
+            path: Routes.checkIn,
+            builder: (_, state) => CheckInScreen(
+              reservationId: state.uri.queryParameters['reservationId'],
+            ),
+          ),
+
+          // Room attendant / cleaning staff (built)
+          GoRoute(path: Routes.myTasks, builder: (_, _) => const MyTasksScreen()),
+          GoRoute(
+            path: Routes.taskPattern,
+            builder: (_, state) =>
+                TaskDetailScreen(taskId: state.pathParameters['id'] ?? ''),
+          ),
+
+          // Security staff / gate (built)
+          GoRoute(
+            path: Routes.securityGate,
+            builder: (_, _) => const GateScreen(),
+          ),
+          GoRoute(
+            path: Routes.securityVehicles,
+            builder: (_, _) => const GateLogScreen(vehicles: true),
+          ),
+          GoRoute(
+            path: Routes.securityStaffMovement,
+            builder: (_, _) => const GateLogScreen(vehicles: false),
+          ),
+          GoRoute(
+            path: Routes.securityVisitors,
+            builder: (_, _) => const VisitorsScreen(),
+          ),
+          GoRoute(
+            path: Routes.securityLostFound,
+            builder: (_, _) => const LostFoundScreen(),
+          ),
+          GoRoute(
+            path: Routes.securityIncidents,
+            builder: (_, _) => const IncidentsScreen(),
+          ),
+
+          // Common
+          GoRoute(path: Routes.profile, builder: (_, _) => const ProfileScreen()),
+          GoRoute(
+            path: Routes.notifications,
+            builder: (_, _) => const NotificationsScreen(),
+          ),
+
+          // ------------------- deferred modules (honest placeholders) -------
+          GoRoute(path: Routes.accounts, builder: (_, _) => const AccountsScreen()),
+          GoRoute(path: Routes.sales, builder: (_, _) => const SalesScreen()),
+          GoRoute(
+            path: Routes.travelDesk,
+            builder: (_, _) => const TravelDeskScreen(),
+          ),
+          GoRoute(
+            path: Routes.housekeeping,
+            builder: (_, _) => const HousekeepingBoardScreen(),
+          ),
+          GoRoute(
+            path: Routes.maintenance,
+            builder: (_, _) => const MaintenanceScreen(),
+          ),
+          GoRoute(
+            path: Routes.myWorkOrders,
+            builder: (_, _) => const MyWorkOrdersScreen(),
+          ),
+          GoRoute(path: Routes.spa, builder: (_, _) => const SpaScreen()),
+          GoRoute(
+            path: Routes.spaAppointments,
+            builder: (_, _) => const SpaAppointmentsScreen(),
+          ),
+          GoRoute(
+            path: Routes.spaBookings,
+            builder: (_, _) => const SpaBookingsScreen(),
+          ),
+          GoRoute(
+            path: Routes.restaurant,
+            builder: (_, _) => const RestaurantScreen(),
+          ),
+          GoRoute(path: Routes.pos, builder: (_, _) => const PosScreen()),
+          GoRoute(
+            path: Routes.myTables,
+            builder: (_, _) => const MyTablesScreen(),
+          ),
+          GoRoute(path: Routes.kitchen, builder: (_, _) => const KitchenScreen()),
+          GoRoute(
+            path: Routes.restaurantCleaning,
+            builder: (_, _) => const RestaurantCleaningScreen(),
+          ),
+          GoRoute(
+            path: Routes.inventory,
+            builder: (_, _) => const InventoryScreen(),
+          ),
+          GoRoute(
+            path: Routes.securityManager,
+            builder: (_, _) => const SecurityManagerScreen(),
+          ),
+          GoRoute(path: Routes.driver, builder: (_, _) => const DriverScreen()),
+          GoRoute(path: Routes.events, builder: (_, _) => const EventsScreen()),
+        ],
+      ),
+    ],
+
+    errorBuilder: (_, _) => const AccessDeniedScreen(),
+  );
+});

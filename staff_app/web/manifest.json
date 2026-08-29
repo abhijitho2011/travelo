@@ -1,0 +1,35 @@
+{
+    "name": "Tavelo Staff",
+    "short_name": "Tavelo",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#F4F8F6",
+    "theme_color": "#139E6F",
+    "description": "Tavelo staff app \u2014 one app; the interface follows your role.",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}
