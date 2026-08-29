@@ -9,6 +9,8 @@ import {
   subscriptionPlans,
   subscriptions,
 } from '../../database/schema';
+import { ChannexSyncService } from '../integrations/channex-sync.service';
+import { IntegrationsModule } from '../integrations/integrations.module';
 
 @Injectable()
 export class SubscriptionLifecycleWorker {
@@ -139,14 +141,59 @@ export class NotificationDispatchWorker implements OnModuleInit {
   }
 }
 
+/**
+ * Polls Channex for every live connection, on a schedule.
+ *
+ * Two things make it safe to leave running everywhere: it is INERT while
+ * CHANNEX_ENABLED is false (no query, no socket, one debug line), and ONE
+ * connection failing cannot abort the others — each is caught individually, so
+ * a hotel with a revoked API key does not stop every other hotel from syncing.
+ */
+@Injectable()
+export class ChannexSyncWorker {
+  private readonly logger = new Logger(ChannexSyncWorker.name);
+  /** Channels expect inventory freshness in minutes, not hours. */
+  static readonly INTERVAL_MS = 15 * 60 * 1000;
+
+  constructor(private readonly channex: ChannexSyncService) {}
+
+  async run(): Promise<{ ran: boolean; ok: number; failed: number }> {
+    if (!this.channex.configured) {
+      this.logger.debug('Channex not configured — sync worker is inert');
+      return { ran: false, ok: 0, failed: 0 };
+    }
+    const connections = await this.channex.activeConnections();
+    let ok = 0;
+    let failed = 0;
+    for (const connection of connections) {
+      try {
+        const outcome = await this.channex.syncConnection(connection.id);
+        if (outcome.ok) ok += 1;
+        else failed += 1;
+      } catch (err) {
+        // Swallowed on purpose: the connection's own health row and sync log
+        // already carry the reason, and the next connection must still run.
+        failed += 1;
+        this.logger.warn(
+          `Channex sync failed for connection ${connection.id}: ${(err as Error).message}`,
+        );
+      }
+    }
+    return { ran: true, ok, failed };
+  }
+}
+
 @Module({
+  imports: [IntegrationsModule],
   providers: [
+    ChannexSyncWorker,
     SubscriptionLifecycleWorker,
     DailyMetricsAggregator,
     AnnouncementPublisherWorker,
     NotificationDispatchWorker,
   ],
   exports: [
+    ChannexSyncWorker,
     SubscriptionLifecycleWorker,
     DailyMetricsAggregator,
     AnnouncementPublisherWorker,

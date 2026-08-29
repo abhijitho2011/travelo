@@ -7,6 +7,12 @@ import { integrationConnections } from '../../database/schema';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { loadEnv } from '../../config/env';
+import { AuditModule } from '../audit/audit.module';
+import { ReservationsModule } from '../reservations/reservations.module';
+import { ChannexClient } from './channex.client';
+import { ChannexSyncService } from './channex-sync.service';
+import { ChannexController, ChannexWebhookController } from './channex.controller';
 
 @Injectable()
 export class IntegrationsService {
@@ -75,9 +81,29 @@ export class IntegrationsController {
   }
 }
 
+/**
+ * The Channex client is a FACTORY, not a plain provider: its whole contract is
+ * "am I configured", and that is decided once, from env, at boot — where the
+ * single inert/enabled log line belongs.
+ */
+export const CHANNEX_CLIENT_PROVIDER = {
+  provide: ChannexClient,
+  useFactory: () => {
+    const env = loadEnv();
+    const client = new ChannexClient({
+      baseUrl: env.CHANNEX_BASE_URL,
+      apiKey: env.CHANNEX_API_KEY,
+      enabled: env.CHANNEX_ENABLED,
+    });
+    client.logBootState();
+    return client;
+  },
+};
+
 @Module({
-  providers: [IntegrationsService],
-  controllers: [IntegrationsController],
-  exports: [IntegrationsService],
+  imports: [AuditModule, ReservationsModule],
+  providers: [IntegrationsService, ChannexSyncService, CHANNEX_CLIENT_PROVIDER],
+  controllers: [IntegrationsController, ChannexController, ChannexWebhookController],
+  exports: [IntegrationsService, ChannexSyncService],
 })
 export class IntegrationsModule {}

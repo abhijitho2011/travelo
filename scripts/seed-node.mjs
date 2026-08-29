@@ -19,7 +19,7 @@ const PERMISSIONS = [
   ['Impersonation', 'impersonation', ['view', 'start', 'stop']],
   ['Announcement', 'announcement', ['view', 'edit']],
   ['Notification', 'notification', ['view', 'edit']],
-  ['Integration', 'integration', ['view']],
+  ['Integration', 'integration', ['view','sync']],
   ['Job', 'job', ['view', 'retry']],
   ['Analytics', 'analytics', ['view']],
   ['Search', 'search', ['query']],
@@ -34,7 +34,7 @@ const ROLES = [
   { key: 'super_admin', name: 'Super Admin', description: 'Unrestricted access', permissions: ['*'] },
   { key: 'finance_admin', name: 'Finance Admin', description: 'Billing / refunds / invoices', permissions: ['billing.view','billing.refund','billing.export','payment.record','refund.view','refund.create','invoice.view','invoice.create','invoice.edit','subscription.view','subscription.edit','owner.view','analytics.view','search.query','notification.view'] },
   { key: 'support_admin', name: 'Support Admin', description: 'Support + impersonation', permissions: ['support.view','support.reply','support.assign','support.resolve','owner.view','property.view','staff.read','subscription.view','impersonation.start','impersonation.stop','impersonation.view','notification.view','search.query'] },
-  { key: 'operations_admin', name: 'Operations Admin', description: 'Operational view + jobs', permissions: ['owner.view','subscription.view','property.view','staff.read','staff.manage','integration.view','job.view','job.retry','analytics.view','search.query','notification.view','settings.locations.manage','settings.amenities.manage'] },
+  { key: 'operations_admin', name: 'Operations Admin', description: 'Operational view + jobs', permissions: ['owner.view','subscription.view','property.view','staff.read','staff.manage','integration.view','integration.sync','job.view','job.retry','analytics.view','search.query','notification.view','settings.locations.manage','settings.amenities.manage'] },
   { key: 'platform_admin', name: 'Platform Admin', description: 'Plans + announcements', permissions: ['owner.view','owner.create','owner.edit','property.view','property.edit','staff.read','subscription.view','subscription.edit','plan.view','plan.edit','announcement.view','announcement.edit','notification.view','notification.edit','search.query','analytics.view'] },
 ];
 

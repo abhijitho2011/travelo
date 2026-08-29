@@ -93,6 +93,20 @@ const envSchema = z.object({
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
 
+  // ---------- Channex channel manager ----------
+  // All optional on purpose. With CHANNEX_ENABLED false (or no API key) the
+  // adapter is INERT: it logs one boot line, never opens a socket, and every
+  // entry point returns a typed CHANNEX_NOT_CONFIGURED. An unconfigured
+  // deployment is a working deployment.
+  CHANNEX_BASE_URL: z.string().default('https://staging.channex.io/api/v1'),
+  CHANNEX_API_KEY: z.string().optional(),
+  CHANNEX_ENABLED: z
+    .string()
+    .default('false')
+    .transform((v) => v === 'true'),
+  /** Optional. When set, the webhook refuses payloads without a matching secret. */
+  CHANNEX_WEBHOOK_SECRET: z.string().optional(),
+
   RUN_SEED: z
     .string()
     .default('false')

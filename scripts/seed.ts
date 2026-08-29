@@ -22,7 +22,7 @@ const PERMISSIONS: { key: string; group: string; description: string }[] = [
   ...groupPerms('Impersonation', 'impersonation', ['view', 'start', 'stop']),
   ...groupPerms('Announcement', 'announcement', ['view', 'edit']),
   ...groupPerms('Notification', 'notification', ['view', 'edit']),
-  ...groupPerms('Integration', 'integration', ['view']),
+  ...groupPerms('Integration', 'integration', ['view', 'sync']),
   ...groupPerms('Job', 'job', ['view', 'retry']),
   ...groupPerms('Analytics', 'analytics', ['view']),
   ...groupPerms('Search', 'search', ['query']),
@@ -73,7 +73,7 @@ const ROLES = [
     isSystem: true,
     permissions: [
       'owner.view', 'subscription.view', 'property.view', 'staff.read', 'staff.manage',
-      'integration.view', 'job.view', 'job.retry',
+      'integration.view', 'integration.sync', 'job.view', 'job.retry',
       'analytics.view', 'search.query', 'notification.view',
     ],
   },
