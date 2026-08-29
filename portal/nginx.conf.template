@@ -1,0 +1,44 @@
+server {
+    listen       ${PORT};
+    listen       [::]:${PORT};
+    server_name  _;
+    root         /usr/share/nginx/html;
+    index        index.html;
+
+    # Flutter's entry files are NOT content-hashed — the filenames stay the same
+    # across builds, so caching them pins visitors to a stale app after a deploy.
+    location ~* /(index\.html|main\.dart\.js|flutter\.js|flutter_bootstrap\.js|flutter_service_worker\.js|version\.json|manifest\.json)$ {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        try_files $uri =404;
+    }
+
+    # Content-addressed / immutable assets are safe to cache.
+    location ~* /(assets|canvaskit|icons)/ {
+        expires 7d;
+        add_header Cache-Control "public";
+        try_files $uri =404;
+    }
+
+    # Each app is a separate SPA under its own prefix, so an unknown deep link
+    # must fall back to THAT app's index.html — not the portal chooser.
+    location /owner/ {
+        add_header Cache-Control "no-cache, must-revalidate";
+        try_files $uri $uri/ /owner/index.html;
+    }
+
+    location /staff/ {
+        add_header Cache-Control "no-cache, must-revalidate";
+        try_files $uri $uri/ /staff/index.html;
+    }
+
+    # Bare prefixes without the trailing slash would otherwise 404.
+    location = /owner { return 301 /owner/; }
+    location = /staff { return 301 /staff/; }
+
+    # The chooser.
+    location / {
+        add_header Cache-Control "no-cache, must-revalidate";
+        try_files $uri $uri/ /index.html;
+    }
+}

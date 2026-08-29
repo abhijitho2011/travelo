@@ -1,0 +1,28 @@
+# Build context for the portal image (BuildKit reads <dockerfile>.dockerignore).
+# The root .dockerignore excludes owner_app/ for the backend build; this file
+# replaces it so both Flutter apps are visible here, while the backend sources
+# are excluded instead.
+.git
+.env
+.env.local
+*.log
+.DS_Store
+.vscode
+.idea
+node_modules
+
+# Backend — not needed to build the web apps.
+src
+scripts
+dist
+coverage
+test
+docs
+
+# Flutter build artefacts and platform folders the web build does not need.
+**/build
+**/.dart_tool
+owner_app/android
+owner_app/ios
+staff_app/android
+staff_app/ios

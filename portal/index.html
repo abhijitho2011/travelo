@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Tavelo</title>
+    <meta name="description" content="Tavelo — choose the Owner portal or the Staff app." />
+    <meta name="theme-color" content="#0F766E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ink: #0f172a;
+        --ink-muted: #475569;
+        --ink-faint: #94a3b8;
+        --line: #e2e8f0;
+        --canvas: #f8fafc;
+        --card: #ffffff;
+        --owner: #0f766e;
+        --owner-dark: #115e59;
+        --staff: #17a67b;
+        --staff-dark: #0f7f5e;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ink: #f1f5f9;
+          --ink-muted: #94a3b8;
+          --ink-faint: #64748b;
+          --line: #1e293b;
+          --canvas: #0b1220;
+          --card: #111a2e;
+        }
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        background: var(--canvas);
+        color: var(--ink);
+        font-family: "Manrope", ui-sans-serif, system-ui, -apple-system, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .wrap { width: 100%; max-width: 880px; }
+      .brand {
+        display: flex; align-items: center; gap: 12px;
+        justify-content: center; margin-bottom: 28px;
+      }
+      .mark {
+        width: 44px; height: 44px; border-radius: 12px;
+        background: var(--owner); color: #fff;
+        display: grid; place-items: center; font-size: 22px;
+      }
+      .wordmark {
+        font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
+        font-weight: 800; font-size: 28px; letter-spacing: -0.03em;
+      }
+      h1 {
+        font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
+        font-size: clamp(24px, 4vw, 34px); font-weight: 700;
+        letter-spacing: -0.02em; text-align: center; margin: 0 0 8px;
+      }
+      .sub {
+        text-align: center; color: var(--ink-muted);
+        margin: 0 0 32px; font-size: 15.5px;
+      }
+      .grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+      @media (min-width: 720px) { .grid { grid-template-columns: 1fr 1fr; } }
+      .card {
+        display: block; text-decoration: none; color: inherit;
+        background: var(--card); border: 1px solid var(--line);
+        border-radius: 18px; padding: 26px;
+        transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+      }
+      .card:hover, .card:focus-visible {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.10);
+        border-color: transparent;
+        outline: none;
+      }
+      .card:focus-visible { box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.45); }
+      .icon {
+        width: 48px; height: 48px; border-radius: 13px;
+        display: grid; place-items: center; font-size: 24px;
+        margin-bottom: 16px;
+      }
+      .icon.owner { background: rgba(15, 118, 110, 0.12); color: var(--owner); }
+      .icon.staff { background: rgba(23, 166, 123, 0.14); color: var(--staff-dark); }
+      .card h2 {
+        font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
+        font-size: 19px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.01em;
+      }
+      .card p { margin: 0 0 16px; color: var(--ink-muted); font-size: 14.5px; line-height: 1.5; }
+      .go { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; font-size: 14.5px; }
+      .go.owner { color: var(--owner); }
+      .go.staff { color: var(--staff-dark); }
+      .foot {
+        margin-top: 30px; text-align: center;
+        color: var(--ink-faint); font-size: 12.5px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <div class="brand">
+        <div class="mark" aria-hidden="true">🏨</div>
+        <div class="wordmark">Tavelo</div>
+      </div>
+
+      <h1>Welcome to Tavelo</h1>
+      <p class="sub">Choose how you want to sign in.</p>
+
+      <div class="grid">
+        <a class="card" href="/owner/">
+          <div class="icon owner" aria-hidden="true">🔑</div>
+          <h2>Hotel Owner</h2>
+          <p>
+            Manage your hotel portfolio — properties, managers, subscription
+            and billing.
+          </p>
+          <span class="go owner">Continue as Owner →</span>
+        </a>
+
+        <a class="card" href="/staff/">
+          <div class="icon staff" aria-hidden="true">👥</div>
+          <h2>Hotel Staff</h2>
+          <p>
+            Day-to-day operations for your role — front desk, housekeeping,
+            maintenance, security and more.
+          </p>
+          <span class="go staff">Continue as Staff →</span>
+        </a>
+      </div>
+
+      <p class="foot">Need help? Contact your hotel administrator.</p>
+    </main>
+  </body>
+</html>

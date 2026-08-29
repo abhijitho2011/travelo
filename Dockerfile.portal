@@ -1,0 +1,55 @@
+# syntax=docker/dockerfile:1.7
+# Serves BOTH Flutter web apps plus a chooser from one service:
+#   /        → portal chooser
+#   /owner/  → owner_app
+#   /staff/  → staff_app
+# Each app is built with its own --base-href so its asset paths resolve under
+# the sub-path rather than at the domain root.
+
+FROM ghcr.io/cirruslabs/flutter:stable AS build
+WORKDIR /src
+
+ARG API_BASE_URL=https://travelo-admin-api-production.up.railway.app/api/v1
+
+# Firebase web config (public by design) — consumed by the owner app.
+ARG FIREBASE_API_KEY=AIzaSyDTyOc2-jyPMirqGEzm_IKdsD05bYPY2N4
+ARG FIREBASE_AUTH_DOMAIN=tavelo-c4669.firebaseapp.com
+ARG FIREBASE_PROJECT_ID=tavelo-c4669
+ARG FIREBASE_STORAGE_BUCKET=tavelo-c4669.firebasestorage.app
+ARG FIREBASE_MESSAGING_SENDER_ID=754494069859
+ARG FIREBASE_APP_ID=1:754494069859:web:66edfe94fdba8e6e762c56
+ARG FIREBASE_MEASUREMENT_ID=G-B925V8XDZJ
+
+# --- owner app ---
+COPY owner_app/pubspec.yaml owner_app/pubspec.lock ./owner_app/
+RUN cd owner_app && flutter pub get
+COPY owner_app ./owner_app
+RUN cd owner_app && flutter build web --release --no-wasm-dry-run \
+    --base-href /owner/ \
+    --dart-define=API_BASE_URL=${API_BASE_URL} \
+    --dart-define=FIREBASE_API_KEY=${FIREBASE_API_KEY} \
+    --dart-define=FIREBASE_AUTH_DOMAIN=${FIREBASE_AUTH_DOMAIN} \
+    --dart-define=FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID} \
+    --dart-define=FIREBASE_STORAGE_BUCKET=${FIREBASE_STORAGE_BUCKET} \
+    --dart-define=FIREBASE_MESSAGING_SENDER_ID=${FIREBASE_MESSAGING_SENDER_ID} \
+    --dart-define=FIREBASE_APP_ID=${FIREBASE_APP_ID} \
+    --dart-define=FIREBASE_MEASUREMENT_ID=${FIREBASE_MEASUREMENT_ID}
+
+# --- staff app ---
+COPY staff_app/pubspec.yaml staff_app/pubspec.lock ./staff_app/
+RUN cd staff_app && flutter pub get
+COPY staff_app ./staff_app
+RUN cd staff_app && flutter build web --release --no-wasm-dry-run \
+    --base-href /staff/ \
+    --dart-define=API_BASE_URL=${API_BASE_URL}
+
+# --- serve ---
+FROM nginx:1.27-alpine AS runtime
+RUN apk add --no-cache gettext
+COPY --from=build /src/owner_app/build/web /usr/share/nginx/html/owner
+COPY --from=build /src/staff_app/build/web /usr/share/nginx/html/staff
+COPY portal/index.html /usr/share/nginx/html/index.html
+COPY portal/nginx.conf.template /etc/nginx/templates/default.conf.template
+
+ENV PORT=8080
+EXPOSE 8080
