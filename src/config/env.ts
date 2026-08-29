@@ -35,6 +35,11 @@ const envSchema = z.object({
   THROTTLE_TTL: z.coerce.number().int().positive().default(60),
   THROTTLE_LIMIT: z.coerce.number().int().positive().default(120),
 
+  // ---------- Restaurant / F&B ----------
+  // Flat sales-tax percentage applied to a restaurant bill's subtotal. A single
+  // rate keeps the first cut simple; GST slabs per item are a later refinement.
+  RESTAURANT_TAX_PERCENT: z.coerce.number().min(0).max(100).default(5),
+
   SEED_SUPER_ADMIN_EMAIL: z.string().email().default('admin@tavelo.local'),
   SEED_SUPER_ADMIN_PASSWORD: z.string().min(8).default('ChangeMe!12345'),
 

@@ -296,18 +296,27 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
     'guest.read',
   ],
 
+  // The manager owns the outlet end to end: the floor (tables), the menu, the
+  // orders and the money that closes them. `restaurant.revenue.read` is not in
+  // the `finance|revenue|...` namespace the invariants forbid operational roles
+  // — it is scoped to this outlet — and the manager is not an operational role.
   RESTAURANT_MANAGER: [
     'restaurant.read',
     'restaurant.revenue.read',
     'menu.read',
-    'menu.update',
+    'menu.manage',
     'table.read',
     'table.assign',
+    'table.manage',
     'order.read',
     'order.create',
     'order.update',
     'order.void',
     'kot.read',
+    'kot.update',
+    'bill.read',
+    'bill.generate',
+    'bill.settle',
     'pos.read',
     'pos.operate',
     'inventory.read',
@@ -319,13 +328,18 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
     'reports.read',
   ],
 
+  // The cashier closes bills. Settling is `bill.settle` — deliberately NOT a
+  // `finance.*`/`payment.*` grant that would imply the till belongs to a
+  // finance role; it is the outlet action of taking payment and freeing a table.
   CASHIER: [
+    'restaurant.read',
     'pos.read',
     'pos.operate',
     'order.read',
     'order.update',
     'bill.read',
     'bill.generate',
+    'bill.settle',
     'payment.read',
     'payment.collect',
     'shift.close',
@@ -340,6 +354,11 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
     'order.create',
     'order.update',
     'kot.create',
+    // Sends items to the kitchen and marks them SERVED. The chef/waiter split
+    // on WHICH kot moves each may make is enforced in the service, not here.
+    'kot.update',
+    // Requests the bill (OPEN → BILLED). Settling it is the cashier's job.
+    'bill.generate',
     'menu.read',
     'guest.read',
     'task.read',
@@ -350,8 +369,9 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
     'kot.read',
     'kot.update',
     'kot.complete',
+    // Reads the menu to cook from it; managing the menu is the manager's, not
+    // the kitchen's — so no `menu.manage`/`menu.update` here.
     'menu.read',
-    'menu.update',
     'order.read',
     'kitchen.stock.read',
     'inventory.read',
