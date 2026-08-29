@@ -1,0 +1,29 @@
+server {
+    listen       ${PORT};
+    listen       [::]:${PORT};
+    server_name  _;
+    root         /usr/share/nginx/html;
+    index        index.html;
+
+    # Flutter's entry files are NOT content-hashed — the filenames stay the same
+    # across builds. Caching them pins visitors to a stale app after every deploy,
+    # so they must always be revalidated.
+    location ~* ^/(index\.html|main\.dart\.js|flutter\.js|flutter_bootstrap\.js|flutter_service_worker\.js|version\.json|manifest\.json)$ {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        try_files $uri =404;
+    }
+
+    # Content-addressed / immutable assets are safe to cache.
+    location ~* ^/(assets|canvaskit|icons)/ {
+        expires 7d;
+        add_header Cache-Control "public";
+        try_files $uri =404;
+    }
+
+    # SPA fallback — every route serves index.html, never cached.
+    location / {
+        add_header Cache-Control "no-cache, must-revalidate";
+        try_files $uri $uri/ /index.html;
+    }
+}
