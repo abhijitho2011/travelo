@@ -14,10 +14,21 @@ import { admins, adminSessions } from '../../database/schema';
 import { PermissionsService } from '../permissions/permissions.service';
 import { AuditService } from '../audit/audit.service';
 import { getRequestContext } from '../../common/context/request-context';
+import { AdminMfaService, MfaChallenge } from './admin-mfa.service';
 
 export interface AdminLoginResult {
   admin: { id: string; email: string; name: string; roles: string[]; permissions: string[] };
   tokens: TokenPair;
+}
+
+/**
+ * What a sign-in attempt resolves to. An admin with MFA enabled gets the
+ * challenge, NOT a session — see `issueLoginForAdmin`.
+ */
+export type AdminSignInResult = AdminLoginResult | MfaChallenge;
+
+export function isMfaChallenge(r: AdminSignInResult): r is MfaChallenge {
+  return (r as MfaChallenge).mfaRequired === true;
 }
 
 interface TokenPair {
@@ -37,6 +48,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly perms: PermissionsService,
     private readonly audit: AuditService,
+    private readonly mfa: AdminMfaService,
   ) {}
 
   /**
@@ -63,8 +75,41 @@ export class AuthService {
    * one session table. The caller is responsible for having authenticated the
    * identity (and for the allowlist check).
    */
-  async issueLoginForAdmin(adminId: string, method: 'google' | 'otp'): Promise<AdminLoginResult> {
+  async issueLoginForAdmin(adminId: string, method: 'google' | 'otp'): Promise<AdminSignInResult> {
+    const [admin] = await this.db
+      .select({ id: admins.id, email: admins.email, mfaEnabled: admins.mfaEnabled })
+      .from(admins)
+      .where(and(eq(admins.id, adminId), isNull(admins.deletedAt)))
+      .limit(1);
+    if (!admin) throw new UnauthorizedException('Invalid credentials');
+
+    // THE GATE. An admin who has enrolled in MFA never receives tokens from
+    // the first factor alone — only `completeLoginAfterMfa`, reached through
+    // POST /auth/mfa, can mint a session for them.
+    if (admin.mfaEnabled) {
+      await this.audit.record({
+        action: 'admin.login.mfa_required',
+        entity: 'admin',
+        entityId: admin.id,
+        actorId: admin.id,
+        actorEmail: admin.email,
+        after: { method },
+      });
+      return this.mfa.issueChallenge(admin.id, method);
+    }
+
     return this.establishSession(adminId, method, `admin.login.${method}`);
+  }
+
+  /**
+   * The other side of the gate: called ONLY after AdminMfaService has verified
+   * a TOTP or a recovery code against a live challenge token.
+   */
+  async completeLoginAfterMfa(
+    adminId: string,
+    method: 'google' | 'otp',
+  ): Promise<AdminLoginResult> {
+    return this.establishSession(adminId, method, `admin.login.${method}.mfa`);
   }
 
   private async establishSession(

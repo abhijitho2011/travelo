@@ -117,8 +117,10 @@ export class AdminMfaService {
     const qrDataUri = await QRCode.toDataURL(otpauthUrl, { margin: 1, width: 240 });
 
     const recoveryCodes = Array.from({ length: RECOVERY_CODE_COUNT }, () => generateRecoveryCode());
+    // Hash the NORMALISED form so a user who retypes the code without its
+    // separator (or in lower case) still matches — see normalizeRecoveryCode.
     const hashes = await Promise.all(
-      recoveryCodes.map((c) => argon2.hash(c, { type: argon2.argon2id })),
+      recoveryCodes.map((c) => argon2.hash(normalizeRecoveryCode(c), { type: argon2.argon2id })),
     );
 
     await this.db
@@ -308,6 +310,7 @@ export class AdminMfaService {
   ): Promise<'totp' | 'recovery' | null> {
     const cleaned = code.replace(/[\s-]/g, '');
     if (!cleaned) return null;
+    const normalisedRecovery = normalizeRecoveryCode(code);
 
     if (storedSecret) {
       let key: Buffer | null = null;
@@ -327,7 +330,7 @@ export class AdminMfaService {
     for (const row of rows) {
       let matches = false;
       try {
-        matches = await argon2.verify(row.codeHash, cleaned.toUpperCase());
+        matches = await argon2.verify(row.codeHash, normalisedRecovery);
       } catch {
         matches = false;
       }
@@ -389,6 +392,11 @@ export function verifyTotp(secret: string, code: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** Separator- and case-insensitive, so a retyped code still matches. */
+export function normalizeRecoveryCode(code: string): string {
+  return code.replace(/[\s-]/g, '').toUpperCase();
 }
 
 /** Crockford-ish base32, grouped for legibility: `A1B2C-D3E4F`. */
