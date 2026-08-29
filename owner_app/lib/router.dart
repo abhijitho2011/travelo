@@ -10,6 +10,7 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/app_typography.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/widgets/app_shell.dart';
+import 'core/widgets/impersonation_banner.dart';
 import 'features/account/profile_screen.dart';
 import 'features/account/security_screen.dart';
 import 'features/auth/invite_screen.dart';
@@ -211,6 +212,16 @@ class _RouterHost extends ConsumerWidget {
       darkTheme: AppTheme.dark(),
       themeMode: ref.watch(themeControllerProvider),
       routerConfig: router,
+      // Above EVERY route, not just the ones inside AppShell: the property
+      // and staff forms are pushed full-screen over the shell, and those are
+      // exactly the screens where "am I looking at someone else's account?"
+      // matters most. Collapses to nothing when there is no session.
+      builder: (context, child) => Column(
+        children: [
+          const ImpersonationBanner(),
+          Expanded(child: child ?? const SizedBox.shrink()),
+        ],
+      ),
     );
   }
 }

@@ -11,6 +11,7 @@ import '../../core/widgets/auth_scaffold.dart' show ButtonSpinner;
 import '../../core/widgets/cards.dart';
 import '../../core/widgets/primitives.dart';
 import '../../core/widgets/states.dart';
+import '../../core/widgets/impersonation_banner.dart';
 
 const _priorities = <(String, String)>[
   ('LOW', 'Low'),
@@ -154,9 +155,13 @@ class _NewTicketScreenState extends ConsumerState<NewTicketScreen> {
               },
             ),
             const SizedBox(height: 28),
-            FilledButton(
-              onPressed: _busy ? null : _submit,
-              child: _busy ? const ButtonSpinner() : const Text('Open ticket'),
+            ReadOnlyWhenImpersonating(
+              child: FilledButton(
+                onPressed: _busy ? null : _submit,
+                child: _busy
+                    ? const ButtonSpinner()
+                    : const Text('Open ticket'),
+              ),
             ),
             const SizedBox(height: 16),
             Text(

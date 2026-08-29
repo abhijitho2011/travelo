@@ -17,6 +17,7 @@ import '../../core/widgets/cards.dart';
 import '../../core/widgets/primitives.dart';
 import '../../core/widgets/states.dart';
 import '../../core/widgets/status_badge.dart';
+import '../../core/widgets/impersonation_banner.dart';
 
 /// The owner's own details. Email is shown but never editable — it is the
 /// address the account signs in with, so changing it is a support action.
@@ -298,9 +299,11 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
             },
           ),
           const SizedBox(height: 28),
-          FilledButton(
-            onPressed: _busy ? null : _save,
-            child: _busy ? const ButtonSpinner() : const Text('Save changes'),
+          ReadOnlyWhenImpersonating(
+            child: FilledButton(
+              onPressed: _busy ? null : _save,
+              child: _busy ? const ButtonSpinner() : const Text('Save changes'),
+            ),
           ),
         ],
       ),

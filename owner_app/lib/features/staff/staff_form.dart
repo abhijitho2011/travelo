@@ -13,6 +13,7 @@ import '../../core/widgets/auth_scaffold.dart' show ButtonSpinner;
 import '../../core/widgets/cards.dart';
 import '../../core/widgets/primitives.dart';
 import '../../core/widgets/states.dart';
+import '../../core/widgets/impersonation_banner.dart';
 
 /// The one manager form, used for both create and edit.
 ///
@@ -325,11 +326,13 @@ class _StaffFormState extends ConsumerState<StaffForm> {
             validator: (v) => (v?.trim().length == 6) ? null : '6-digit PIN',
           ),
           const SizedBox(height: 28),
-          FilledButton(
-            onPressed: _busy ? null : _submit,
-            child: _busy
-                ? const ButtonSpinner()
-                : Text(isEdit ? 'Save changes' : 'Create ${_role.label}'),
+          ReadOnlyWhenImpersonating(
+            child: FilledButton(
+              onPressed: _busy ? null : _submit,
+              child: _busy
+                  ? const ButtonSpinner()
+                  : Text(isEdit ? 'Save changes' : 'Create ${_role.label}'),
+            ),
           ),
         ],
       ),
