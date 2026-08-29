@@ -1,4 +1,6 @@
 import { OwnerPortalService } from './owner-portal.service';
+import { mockDb, sqlText, type MockDb } from './testing/db.mock';
+import type { Database } from '../../database/database.module';
 
 describe('OwnerPortalService.effectivePropertyLimit', () => {
   it('uses the plan limit when no override is set', () => {
@@ -294,5 +296,95 @@ describe('OwnerPortalService.listAllStaff — portfolio-wide directory', () => {
       propertyName: 'Hilltop Retreat',
       role: 'CHEF',
     });
+  });
+});
+
+describe('OwnerPortalService.portfolioSummary — real occupancy and revenue', () => {
+  const OWNER = 'owner-1';
+
+  function portal(db: MockDb) {
+    return new OwnerPortalService(
+      db as unknown as Database,
+      photosStub as never,
+      auditStub as never,
+    );
+  }
+
+  it('reports zeros for an owner with no hotels, without querying rooms at all', async () => {
+    const db = mockDb({ select: { properties: [[{ hotels: 0, rooms: 0 }], []] } });
+    await expect(portal(db).portfolioSummary(OWNER)).resolves.toEqual({
+      hotels: 0,
+      rooms: 0,
+      revenue: 0,
+      occupancy: 0,
+    });
+    expect(db.selects.filter((s) => s.table === 'rooms')).toEqual([]);
+  });
+
+  it('computes occupancy over every sellable room across the portfolio', async () => {
+    const db = mockDb({
+      select: {
+        properties: [[{ hotels: 2, rooms: 30 }], [{ id: 'p1' }, { id: 'p2' }]],
+        rooms: [[{ sellable: 24, occupied: 18 }]],
+        reservations: [[{ total: '4200000' }]],
+      },
+    });
+    await expect(portal(db).portfolioSummary(OWNER)).resolves.toEqual({
+      hotels: 2,
+      rooms: 30,
+      revenue: 4_200_000,
+      occupancy: 75,
+    });
+  });
+
+  /**
+   * These tiles used to be hard-coded zeros. A zero is a CLAIM — "you sold
+   * nothing this month" — and an owner cannot tell it apart from "not wired up
+   * yet", so the only acceptable zero is a real one.
+   */
+  it('no longer returns a hard-coded zero when there is business to report', async () => {
+    const db = mockDb({
+      select: {
+        properties: [[{ hotels: 1, rooms: 10 }], [{ id: 'p1' }]],
+        rooms: [[{ sellable: 10, occupied: 3 }]],
+        reservations: [[{ total: '125000' }]],
+      },
+    });
+    const summary = await portal(db).portfolioSummary(OWNER);
+    expect(summary.revenue).toBe(125_000);
+    expect(summary.occupancy).toBe(30);
+  });
+
+  it('divides by nothing safely when every room is out of order', async () => {
+    const db = mockDb({
+      select: {
+        properties: [[{ hotels: 1, rooms: 4 }], [{ id: 'p1' }]],
+        rooms: [[{ sellable: 0, occupied: 0 }]],
+        reservations: [[{ total: 0 }]],
+      },
+    });
+    await expect(portal(db).portfolioSummary(OWNER)).resolves.toMatchObject({ occupancy: 0 });
+  });
+
+  it('counts only committed stays that touch the current month', async () => {
+    const db = mockDb({
+      select: {
+        properties: [[{ hotels: 1, rooms: 4 }], [{ id: 'p1' }]],
+        rooms: [[{ sellable: 4, occupied: 1 }]],
+        reservations: [[{ total: 0 }]],
+      },
+    });
+    await portal(db).portfolioSummary(OWNER);
+
+    const where = sqlText(db.wheresFor('reservations')[0]);
+    expect(where).toContain('CHECKED_IN');
+    expect(where).toContain('CHECKED_OUT');
+    // A cancelled or no-show booking is money nobody owes.
+    expect(where).not.toContain('CANCELLED');
+    expect(where).not.toContain('NO_SHOW');
+    // Strict inequalities: check_out is exclusive, so a stay ending on the 1st
+    // does not belong to the month that starts on the 1st.
+    expect(where).not.toContain('<=');
+    expect(where).not.toContain('>=');
   });
 });

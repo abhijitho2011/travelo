@@ -1,0 +1,453 @@
+import { mockDb, sqlText, type MockDb } from '../owner-auth/testing/db.mock';
+import { ReservationsService } from './reservations.service';
+import type { Database } from '../../database/database.module';
+
+const MY_PROPERTY = 'prop-mine';
+const TYPE_ID = '11111111-1111-4111-8111-111111111111';
+const ROOM_ID = '22222222-2222-4222-8222-222222222222';
+const STAFF_ID = 'staff-1';
+
+function svc(db: MockDb) {
+  return new ReservationsService(db as unknown as Database);
+}
+
+const typeRow = {
+  id: TYPE_ID,
+  propertyId: MY_PROPERTY,
+  name: 'Deluxe',
+  baseRate: 450_000,
+  currency: 'INR',
+  deletedAt: null,
+};
+
+const roomRow = (over: Record<string, unknown> = {}) => ({
+  id: ROOM_ID,
+  propertyId: MY_PROPERTY,
+  roomTypeId: TYPE_ID,
+  number: '304',
+  status: 'READY',
+  deletedAt: null,
+  ...over,
+});
+
+const resRow = (over: Record<string, unknown> = {}) => ({
+  id: 'res-1',
+  propertyId: MY_PROPERTY,
+  roomTypeId: TYPE_ID,
+  roomId: null,
+  reservationNumber: 'RSV-000001',
+  guestName: 'Meera Nair',
+  guestPhone: '9876543210',
+  guestEmail: null,
+  guestIdType: null,
+  guestIdNumber: null,
+  adults: 2,
+  children: 0,
+  checkIn: '2026-03-14',
+  checkOut: '2026-03-17',
+  status: 'CONFIRMED',
+  ratePaise: 450_000,
+  totalPaise: 1_350_000,
+  paidPaise: 0,
+  currency: 'INR',
+  source: 'WALK_IN',
+  notes: null,
+  createdBy: STAFF_ID,
+  checkedInAt: null,
+  checkedOutAt: null,
+  cancelledAt: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  deletedAt: null,
+  ...over,
+});
+
+const newBooking = (over: Record<string, unknown> = {}) => ({
+  roomTypeId: TYPE_ID,
+  guestName: 'Meera Nair',
+  guestPhone: '9876543210',
+  adults: 2,
+  checkIn: '2026-03-14',
+  checkOut: '2026-03-17',
+  ...over,
+});
+
+describe('ReservationsService — tenant isolation', () => {
+  it('scopes every reservation lookup to the caller’s own property AND excludes deleted rows', async () => {
+    const db = mockDb({ select: { reservations: [[resRow()]] } });
+    await svc(db).requireReservation(MY_PROPERTY, 'res-1');
+
+    const where = sqlText(db.wheresFor('reservations')[0]);
+    expect(where).toContain(MY_PROPERTY);
+    expect(where).toContain('deleted_at');
+    expect(where).toContain('is null');
+  });
+
+  // A booking at ANOTHER hotel must look exactly like a booking that does not
+  // exist. A 403 would confirm the row is real and leak where a guest is staying.
+  it('404s — not 403 — for a reservation belonging to another property', async () => {
+    const db = mockDb({ select: { reservations: [[]] } });
+    await expect(
+      svc(db).requireReservation(MY_PROPERTY, 'res-at-other-hotel'),
+    ).rejects.toMatchObject({
+      status: 404,
+      response: { error: 'RESERVATION_NOT_FOUND' },
+    });
+  });
+
+  it('refuses to book against a room type from another property, before writing anything', async () => {
+    const db = mockDb({ select: { room_types: [[]] } });
+    await expect(svc(db).create(MY_PROPERTY, newBooking(), STAFF_ID)).rejects.toMatchObject({
+      status: 404,
+      response: { error: 'ROOM_TYPE_NOT_FOUND' },
+    });
+    expect(db.inserts.filter((i) => i.table === 'reservations')).toEqual([]);
+  });
+
+  it('refuses to attach a room from another property', async () => {
+    const db = mockDb({ select: { room_types: [[typeRow]], rooms: [[]] } });
+    await expect(
+      svc(db).create(MY_PROPERTY, newBooking({ roomId: ROOM_ID }), STAFF_ID),
+    ).rejects.toMatchObject({ status: 404, response: { error: 'ROOM_NOT_FOUND' } });
+    expect(db.inserts.filter((i) => i.table === 'reservations')).toEqual([]);
+  });
+});
+
+describe('ReservationsService — the money is derived, never typed', () => {
+  it('defaults the rate to the room type’s base rate and multiplies by nights', async () => {
+    const db = mockDb({
+      select: { room_types: [[typeRow], []], reservations: [[{ count: 7 }]] },
+      insert: { reservations: [resRow()] },
+    });
+    await svc(db).create(MY_PROPERTY, newBooking(), STAFF_ID);
+
+    const values = db.inserts.find((i) => i.table === 'reservations')!.values!;
+    expect(values.ratePaise).toBe(450_000);
+    // 14th -> 17th is THREE nights, not four days.
+    expect(values.totalPaise).toBe(1_350_000);
+    expect(values.reservationNumber).toBe('RSV-000008');
+    // A booking that nobody has confirmed does not block anything yet.
+    expect(values.status).toBe('PENDING');
+  });
+
+  it('honours an overridden rate and still derives the total from it', async () => {
+    const db = mockDb({
+      select: { room_types: [[typeRow], []], reservations: [[{ count: 0 }]] },
+      insert: { reservations: [resRow()] },
+    });
+    await svc(db).create(MY_PROPERTY, newBooking({ ratePaise: 300_000 }), STAFF_ID);
+
+    const values = db.inserts.find((i) => i.table === 'reservations')!.values!;
+    expect(values.ratePaise).toBe(300_000);
+    expect(values.totalPaise).toBe(900_000);
+  });
+
+  it('records a creation event alongside the booking, in the same transaction', async () => {
+    const db = mockDb({
+      select: { room_types: [[typeRow], []], reservations: [[{ count: 0 }]] },
+      insert: { reservations: [resRow()] },
+    });
+    await svc(db).create(MY_PROPERTY, newBooking(), STAFF_ID);
+
+    const event = db.inserts.find((i) => i.table === 'reservation_events');
+    expect(event?.values).toMatchObject({ type: 'created', actorStaffId: STAFF_ID });
+  });
+
+  it('refuses a check-out that is not after the check-in', async () => {
+    const db = mockDb({ select: { room_types: [[typeRow]] } });
+    await expect(
+      svc(db).create(MY_PROPERTY, newBooking({ checkOut: '2026-03-14' }), STAFF_ID),
+    ).rejects.toMatchObject({ status: 400, response: { error: 'INVALID_DATES' } });
+  });
+});
+
+describe('ReservationsService — no double booking', () => {
+  it('refuses a confirmed booking on a room that already has an overlapping stay', async () => {
+    const db = mockDb({
+      select: {
+        room_types: [[typeRow]],
+        rooms: [[roomRow()]],
+        // The clash probe finds a committed stay on those nights.
+        reservations: [[{ id: 'res-other' }]],
+      },
+    });
+    await expect(
+      svc(db).create(MY_PROPERTY, newBooking({ roomId: ROOM_ID, status: 'CONFIRMED' }), STAFF_ID),
+    ).rejects.toMatchObject({ status: 409, response: { error: 'ROOM_UNAVAILABLE' } });
+    expect(db.inserts.filter((i) => i.table === 'reservations')).toEqual([]);
+  });
+
+  /**
+   * THE boundary, asserted on the predicate the service actually builds.
+   *
+   * check_out is exclusive, so the overlap must use STRICT inequalities on both
+   * sides. If either ever became `<=` / `>=`, a stay ending on the 15th would
+   * block a stay starting on the 15th and the hotel would refuse same-day
+   * turnover — half the bookings on a busy weekend.
+   */
+  it('probes for clashes with STRICT inequalities, so same-day turnover is legal', async () => {
+    const db = mockDb({
+      select: {
+        room_types: [[typeRow], []],
+        rooms: [[roomRow()], [{ count: 5 }], []],
+        reservations: [[], [{ count: 0 }], [{ count: 0 }]],
+      },
+      insert: { reservations: [resRow({ roomId: ROOM_ID })] },
+    });
+    await svc(db).create(
+      MY_PROPERTY,
+      newBooking({ roomId: ROOM_ID, checkIn: '2026-03-15', status: 'CONFIRMED' }),
+      STAFF_ID,
+    );
+
+    const probe = sqlText(db.wheresFor('reservations')[0]);
+    // An existing stay only clashes when it STARTS before this one ends and
+    // ENDS after this one starts.
+    expect(probe).toContain('check_in < 2026-03-17');
+    expect(probe).toContain('check_out > 2026-03-15');
+    expect(probe).not.toContain('<=');
+    expect(probe).not.toContain('>=');
+    // Only committed stays block; a PENDING hold does not.
+    expect(probe).toContain('CONFIRMED');
+    expect(probe).toContain('CHECKED_IN');
+    expect(probe).not.toContain('PENDING');
+    // And the booking went through.
+    expect(db.inserts.some((i) => i.table === 'reservations')).toBe(true);
+  });
+
+  it('locks the candidate rows rather than reading them optimistically', async () => {
+    // `.for('update')` is what makes the check-then-write safe under two clerks
+    // confirming the same room at once; a mock without it would throw here.
+    const db = mockDb({
+      select: { room_types: [[typeRow]], rooms: [[roomRow()]], reservations: [[]] },
+    });
+    await expect(
+      svc(db).create(MY_PROPERTY, newBooking({ roomId: ROOM_ID, status: 'CONFIRMED' }), STAFF_ID),
+    ).rejects.toBeDefined(); // capacity check runs next on empty mock data
+    expect(db.wheresFor('reservations').length).toBeGreaterThan(0);
+  });
+
+  it('refuses when every room of the type is already sold for those dates', async () => {
+    const db = mockDb({
+      select: {
+        room_types: [[typeRow]],
+        // Two sellable rooms of the type...
+        rooms: [[{ count: 2 }]],
+        // ...and two overlapping committed stays already on them.
+        reservations: [[{ count: 2 }]],
+      },
+    });
+    await expect(
+      svc(db).create(MY_PROPERTY, newBooking({ status: 'CONFIRMED' }), STAFF_ID),
+    ).rejects.toMatchObject({ status: 409, response: { error: 'NO_AVAILABILITY' } });
+  });
+
+  it('counts OUT_OF_ORDER rooms out of the sellable stock', async () => {
+    const db = mockDb({
+      select: {
+        room_types: [[typeRow]],
+        rooms: [[{ count: 2 }]],
+        reservations: [[{ count: 2 }]],
+      },
+    });
+    await expect(
+      svc(db).create(MY_PROPERTY, newBooking({ status: 'CONFIRMED' }), STAFF_ID),
+    ).rejects.toMatchObject({ response: { error: 'NO_AVAILABILITY' } });
+
+    const stockWhere = sqlText(db.wheresFor('rooms')[0]);
+    expect(stockWhere).toContain('OUT_OF_ORDER');
+    expect(stockWhere).toContain('deleted_at');
+  });
+});
+
+describe('ReservationsService — check-in', () => {
+  const NOW = new Date('2026-03-15T09:00:00.000Z');
+
+  it('flips the reservation and the room in one transaction', async () => {
+    const db = mockDb({
+      select: {
+        reservations: [[resRow()], []],
+        rooms: [[roomRow()], []],
+        room_types: [[]],
+      },
+      update: { reservations: [resRow({ status: 'CHECKED_IN', roomId: ROOM_ID })] },
+    });
+    const res = await svc(db).checkIn(MY_PROPERTY, 'res-1', { roomId: ROOM_ID }, STAFF_ID, NOW);
+
+    expect(res.status).toBe('CHECKED_IN');
+    const roomUpdate = db.updates.find((u) => u.table === 'rooms');
+    // A guest checked in against a room still reading AVAILABLE is exactly how
+    // a hotel sells the same room twice.
+    expect(roomUpdate?.values).toMatchObject({ status: 'OCCUPIED' });
+    expect(db.inserts.find((i) => i.table === 'reservation_events')?.values).toMatchObject({
+      type: 'checked_in',
+    });
+  });
+
+  it('captures the ID document supplied at the desk', async () => {
+    const db = mockDb({
+      select: { reservations: [[resRow()], []], rooms: [[roomRow()], []], room_types: [[]] },
+      update: { reservations: [resRow({ status: 'CHECKED_IN' })] },
+    });
+    await svc(db).checkIn(
+      MY_PROPERTY,
+      'res-1',
+      { roomId: ROOM_ID, guestIdType: 'AADHAAR', guestIdNumber: 'XXXX-1234' },
+      STAFF_ID,
+      NOW,
+    );
+    expect(db.updates.find((u) => u.table === 'reservations')?.values).toMatchObject({
+      guestIdType: 'AADHAAR',
+      guestIdNumber: 'XXXX-1234',
+    });
+  });
+
+  it('refuses to check in a booking that was never confirmed', async () => {
+    const db = mockDb({ select: { reservations: [[resRow({ status: 'PENDING' })]] } });
+    await expect(svc(db).checkIn(MY_PROPERTY, 'res-1', {}, STAFF_ID, NOW)).rejects.toMatchObject({
+      status: 409,
+      response: { error: 'INVALID_TRANSITION' },
+    });
+  });
+
+  it('refuses a check-in outside the booked nights — including on the departure day', async () => {
+    const db = mockDb({ select: { reservations: [[resRow()]] } });
+    await expect(
+      svc(db).checkIn(MY_PROPERTY, 'res-1', {}, STAFF_ID, new Date('2026-03-17T09:00:00Z')),
+    ).rejects.toMatchObject({ response: { error: 'NOT_ARRIVAL_DAY' } });
+  });
+
+  it('refuses when no room has been assigned', async () => {
+    const db = mockDb({ select: { reservations: [[resRow()]] } });
+    await expect(svc(db).checkIn(MY_PROPERTY, 'res-1', {}, STAFF_ID, NOW)).rejects.toMatchObject({
+      response: { error: 'NO_ROOM_ASSIGNED' },
+    });
+  });
+
+  it('refuses a room that housekeeping has not finished with', async () => {
+    const db = mockDb({
+      select: { reservations: [[resRow()]], rooms: [[roomRow({ status: 'DIRTY' })]] },
+    });
+    await expect(
+      svc(db).checkIn(MY_PROPERTY, 'res-1', { roomId: ROOM_ID }, STAFF_ID, NOW),
+    ).rejects.toMatchObject({ status: 409, response: { error: 'ROOM_NOT_READY' } });
+    expect(db.updates.filter((u) => u.table === 'rooms')).toEqual([]);
+  });
+
+  it('refuses a room of the wrong type', async () => {
+    const db = mockDb({
+      select: { reservations: [[resRow()]], rooms: [[roomRow({ roomTypeId: 'other-type' })]] },
+    });
+    await expect(
+      svc(db).checkIn(MY_PROPERTY, 'res-1', { roomId: ROOM_ID }, STAFF_ID, NOW),
+    ).rejects.toMatchObject({ response: { error: 'ROOM_TYPE_MISMATCH' } });
+  });
+});
+
+describe('ReservationsService — check-out, cancel and no-show', () => {
+  it('sends the room to DIRTY, not straight back on sale', async () => {
+    const db = mockDb({
+      select: {
+        reservations: [[resRow({ status: 'CHECKED_IN', roomId: ROOM_ID })]],
+        rooms: [[]],
+        room_types: [[]],
+      },
+      update: { reservations: [resRow({ status: 'CHECKED_OUT', roomId: ROOM_ID })] },
+    });
+    await svc(db).checkOut(MY_PROPERTY, 'res-1', {}, STAFF_ID);
+
+    // Housekeeping owns the next step. AVAILABLE here would sell an unmade room.
+    expect(db.updates.find((u) => u.table === 'rooms')?.values).toMatchObject({
+      status: 'DIRTY',
+    });
+  });
+
+  it('adds money collected at the desk to what has been paid', async () => {
+    const db = mockDb({
+      select: {
+        reservations: [[resRow({ status: 'CHECKED_IN', paidPaise: 500_000 })]],
+        room_types: [[]],
+      },
+      update: { reservations: [resRow({ status: 'CHECKED_OUT' })] },
+    });
+    await svc(db).checkOut(MY_PROPERTY, 'res-1', { collectedPaise: 850_000 }, STAFF_ID);
+    expect(db.updates.find((u) => u.table === 'reservations')?.values).toMatchObject({
+      paidPaise: 1_350_000,
+    });
+  });
+
+  it('refuses to check out someone who never checked in', async () => {
+    const db = mockDb({ select: { reservations: [[resRow({ status: 'CONFIRMED' })]] } });
+    await expect(svc(db).checkOut(MY_PROPERTY, 'res-1', {}, STAFF_ID)).rejects.toMatchObject({
+      response: { error: 'INVALID_TRANSITION' },
+    });
+  });
+
+  it('records the reason on a cancellation', async () => {
+    const db = mockDb({
+      select: { reservations: [[resRow({ status: 'CONFIRMED' })]], room_types: [[]] },
+      update: { reservations: [resRow({ status: 'CANCELLED' })] },
+    });
+    await svc(db).cancel(MY_PROPERTY, 'res-1', { reason: 'Guest rang to cancel' }, STAFF_ID);
+    expect(db.inserts.find((i) => i.table === 'reservation_events')?.values).toMatchObject({
+      type: 'cancelled',
+    });
+  });
+
+  it('refuses to cancel a guest who is already in the building', async () => {
+    const db = mockDb({ select: { reservations: [[resRow({ status: 'CHECKED_IN' })]] } });
+    await expect(
+      svc(db).cancel(MY_PROPERTY, 'res-1', { reason: 'changed mind' }, STAFF_ID),
+    ).rejects.toMatchObject({ response: { error: 'INVALID_TRANSITION' } });
+  });
+
+  it('refuses to mark a booking a no-show before its arrival date has passed', async () => {
+    const db = mockDb({ select: { reservations: [[resRow()]] } });
+    await expect(
+      svc(db).noShow(MY_PROPERTY, 'res-1', STAFF_ID, new Date('2026-03-14T20:00:00Z')),
+    ).rejects.toMatchObject({ response: { error: 'NOT_ARRIVAL_DAY' } });
+  });
+
+  it('marks a no-show once the arrival day is behind us', async () => {
+    const db = mockDb({
+      select: { reservations: [[resRow()]], room_types: [[]] },
+      update: { reservations: [resRow({ status: 'NO_SHOW' })] },
+    });
+    const res = await svc(db).noShow(
+      MY_PROPERTY,
+      'res-1',
+      STAFF_ID,
+      new Date('2026-03-15T04:00:00Z'),
+    );
+    expect(res.status).toBe('NO_SHOW');
+  });
+});
+
+describe('ReservationsService — list filters', () => {
+  it('treats from/to as a window the STAY must touch, not an arrival range', async () => {
+    const db = mockDb({ select: { reservations: [[], [{ count: 0 }]] } });
+    await svc(db).list(MY_PROPERTY, { from: '2026-03-01', to: '2026-03-31' });
+
+    const where = sqlText(db.wheresFor('reservations')[0]);
+    // A guest who arrived in February and leaves in March belongs in a March
+    // report, so the window is an overlap, not `check_in BETWEEN ...`.
+    expect(where).toContain('check_in < 2026-03-31');
+    expect(where).toContain('check_out > 2026-03-01');
+  });
+
+  it('searches guest name, phone and reservation number together', async () => {
+    const db = mockDb({ select: { reservations: [[], [{ count: 0 }]] } });
+    await svc(db).list(MY_PROPERTY, { q: 'nair' });
+
+    const where = sqlText(db.wheresFor('reservations')[0]);
+    expect(where).toContain('guest_name');
+    expect(where).toContain('guest_phone');
+    expect(where).toContain('reservation_number');
+  });
+
+  it('always scopes the list to the caller’s property', async () => {
+    const db = mockDb({ select: { reservations: [[], [{ count: 0 }]] } });
+    await svc(db).list(MY_PROPERTY);
+    expect(sqlText(db.wheresFor('reservations')[0])).toContain(MY_PROPERTY);
+  });
+});

@@ -160,6 +160,8 @@ export function mockDb(opts: MockDbOptions = {}): MockDb {
       'offset',
       'returning',
       'onConflictDoNothing',
+      // `SELECT ... FOR UPDATE`, used by the reservations overlap check.
+      'for',
     ]) {
       c[m] = passthrough;
     }

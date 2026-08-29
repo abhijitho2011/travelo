@@ -38,6 +38,10 @@ class Routes {
   // --- reception — built ---
   static const reception = '/reception';
   static const reservations = '/reception/reservations';
+
+  /// Declared — and, in the router, registered — BEFORE the `:id` pattern, or
+  /// "new" is matched as a reservation whose id is the word "new".
+  static const reservationNew = '/reception/reservations/new';
   static String reservation(String id) => '/reception/reservations/$id';
   static const reservationPattern = '/reception/reservations/:id';
   static const checkIn = '/reception/check-in';

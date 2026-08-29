@@ -9,25 +9,25 @@ import '../../../core/routing/routes.dart';
 import '../../../core/utils/formatting.dart';
 import '../../../core/widgets/primitives.dart';
 import '../../../core/widgets/states.dart';
-import '../data/reception_repository.dart';
+import '../application/reception_controllers.dart';
+import '../data/reception_models.dart';
 import 'reservation_list.dart';
 
-/// The receptionist's home — HF's `front-desk.tsx`: a dense KPI strip, then the
-/// live arrival queue.
+/// The receptionist's home: today's four numbers, then the three queues the
+/// shift actually works through — arrivals, departures, and who is in house.
+///
+/// All of it comes from one `GET /desk/today`, so the counts and the lists can
+/// never disagree with each other.
 class ReceptionDashboardScreen extends ConsumerWidget {
   const ReceptionDashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
-    final summary = ref.watch(deskSummaryProvider);
-    final reservations = ref.watch(reservationsProvider);
+    final board = ref.watch(deskTodayProvider);
 
     return PageBody(
-      onRefresh: () async {
-        ref.invalidate(deskSummaryProvider);
-        ref.invalidate(reservationsProvider);
-      },
+      onRefresh: () async => ref.invalidate(deskTodayProvider),
       children: [
         PageHeader(
           eyebrow: [
@@ -40,91 +40,102 @@ class ReceptionDashboardScreen extends ConsumerWidget {
             PermissionGate(
               permission: P.reservationCreate,
               child: OutlinedButton.icon(
-                onPressed: () => context.go(Routes.reservations),
+                onPressed: () => context.go(Routes.reservationNew),
                 icon: const Icon(Icons.person_add_alt_outlined, size: 16),
-                label: const Text('Walk-in'),
+                label: const Text('New booking'),
               ),
             ),
             PermissionGate(
-              permission: P.checkInPerform,
+              permission: P.reservationRead,
               child: FilledButton.icon(
-                onPressed: () => context.go(Routes.checkIn),
-                icon: const Icon(Icons.login_outlined, size: 16),
-                label: const Text('Start check-in'),
+                onPressed: () => context.go(Routes.reservations),
+                icon: const Icon(Icons.event_note_outlined, size: 16),
+                label: const Text('All bookings'),
               ),
             ),
           ],
         ),
         gapSection,
 
-        summary.when(
-          loading: () => const KpiSkeleton(count: 6),
+        board.when(
+          loading: () => const KpiSkeleton(count: 4),
           error: (e, _) =>
-              ErrorState(error: e, onRetry: () => ref.invalidate(deskSummaryProvider)),
-          data: (s) => s == null
+              ErrorState(error: e, onRetry: () => ref.invalidate(deskTodayProvider)),
+          data: (data) => data == null
               ? const EmptyState(
-                  title: 'Desk figures are not available yet',
+                  title: 'The desk board is not available yet',
                   hint:
-                      'The front-office feed for this property has not been '
-                      'switched on. Reservations below will still load once '
-                      'they exist.',
+                      'The reservations service has not been switched on for '
+                      'this property.',
                   icon: Icons.insights_outlined,
                 )
-              : KpiGrid(
-                  children: [
-                    KpiCard(
-                      label: 'Arrivals',
-                      value: Fmt.count(s.arrivals),
-                      hint: s.arrivalsUnassigned == null
-                          ? null
-                          : '${s.arrivalsUnassigned} without a room',
-                    ),
-                    KpiCard(
-                      label: 'Departures',
-                      value: Fmt.count(s.departures),
-                      hint: s.lateCheckouts == null
-                          ? null
-                          : '${s.lateCheckouts} late checkout',
-                    ),
-                    KpiCard(label: 'In-house', value: Fmt.count(s.inHouse)),
-                    KpiCard(
-                      label: 'Available',
-                      value: Fmt.count(s.available),
-                      hint: 'ready to sell',
-                    ),
-                    KpiCard(label: 'Dirty', value: Fmt.count(s.dirty)),
-                    KpiCard(label: 'Walk-ins', value: Fmt.count(s.walkIns)),
-                    // Money is shown only to someone allowed to take it.
-                    if (ref.watch(canProvider(P.paymentCollect)))
-                      KpiCard(
-                        label: 'Pending payment',
-                        value: Fmt.money(s.pendingPayment, compact: true),
-                      ),
-                    KpiCard(label: 'Ready', value: Fmt.count(s.ready)),
-                  ],
-                ),
+              : _Board(board: data),
+        ),
+      ],
+    );
+  }
+}
+
+class _Board extends StatelessWidget {
+  const _Board({required this.board});
+
+  final DeskBoard board;
+
+  @override
+  Widget build(BuildContext context) {
+    final counts = board.counts;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        KpiGrid(
+          children: [
+            KpiCard(
+              label: 'Arrivals',
+              value: Fmt.count(counts.arrivals),
+              hint: 'still to check in',
+            ),
+            KpiCard(
+              label: 'Departures',
+              value: Fmt.count(counts.departures),
+              hint: 'due out today',
+            ),
+            KpiCard(label: 'In-house', value: Fmt.count(counts.inHouse)),
+            KpiCard(
+              label: 'Rooms free',
+              value: Fmt.count(counts.availableRooms),
+              hint: 'ready to sell',
+            ),
+          ],
         ),
 
         gapSection,
-        SectionHeader(
-          title: 'Arrival queue',
+        const SectionHeader(
+          title: 'Arrivals',
           icon: Icons.flight_land_outlined,
-          trailing: TextButton(
-            onPressed: () => context.go(Routes.reservations),
-            child: const Text('All bookings'),
-          ),
         ),
-        reservations.when(
-          loading: () => const ListSkeleton(rows: 3),
-          error: (e, _) =>
-              ErrorState(error: e, onRetry: () => ref.invalidate(reservationsProvider)),
-          data: (items) => ReservationList(
-            reservations: items.take(6).toList(),
-            emptyTitle: 'No arrivals in the book',
-            emptyHint:
-                "When today's arrivals are loaded they appear here, sorted by "
-                'expected time.',
-          ),
+        ReservationList(
+          reservations: board.arrivals,
+          emptyTitle: 'Nobody left to check in',
+          emptyHint: "Every confirmed arrival for today is already in house.",
+        ),
+
+        gapSection,
+        const SectionHeader(
+          title: 'Departures',
+          icon: Icons.flight_takeoff_outlined,
+        ),
+        ReservationList(
+          reservations: board.departures,
+          emptyTitle: 'No departures today',
+          emptyHint: 'Nobody in house is due out before tomorrow.',
+        ),
+
+        gapSection,
+        const SectionHeader(title: 'In house', icon: Icons.hotel_outlined),
+        ReservationList(
+          reservations: board.inHouse,
+          emptyTitle: 'The hotel is empty tonight',
+          emptyHint: 'Guests appear here from the moment they are checked in.',
         ),
       ],
     );

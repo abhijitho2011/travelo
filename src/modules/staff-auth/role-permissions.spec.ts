@@ -89,6 +89,10 @@ describe('staff role → permission map', () => {
         'reservation.read',
         'reservation.create',
         'reservation.update',
+        // Reception cancels bookings: a guest who rings to cancel cannot be
+        // told to wait for the GM. Sales and the travel desk, who can RAISE
+        // bookings, deliberately do not get this one.
+        'reservation.cancel',
         'checkin.perform',
         'checkout.perform',
         'guest.read',
