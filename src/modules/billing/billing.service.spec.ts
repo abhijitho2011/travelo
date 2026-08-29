@@ -1,6 +1,7 @@
 import { BillingService } from './billing.service';
 import { InvoiceNumberService } from './invoice-number.service';
 import { mockAudit, mockDb, MockDb } from '../owner-auth/testing/db.mock';
+import { mockNotifications } from '../notifications/testing/notifications.mock';
 
 const PLAN = { durationMonths: 12, monthlyPrice: 250_000, currency: 'INR' };
 
@@ -31,6 +32,7 @@ function build(opts: {
   const audit = mockAudit();
   const pdf = { generateQuietly: jest.fn(async () => undefined), generate: jest.fn() };
   const invNum = { next: jest.fn(async () => 'INV-202608-000001') };
+  const notifications = mockNotifications();
   const svc = new BillingService(
     db as never,
     audit as never,
@@ -39,8 +41,9 @@ function build(opts: {
     { getSignedUrl: async () => 'https://signed' } as never,
     pdf as never,
     { configured: false } as never,
+    notifications as never,
   );
-  return { svc, db, audit, pdf, invNum };
+  return { svc, db, audit, pdf, invNum, notifications };
 }
 
 /** The `set(...)` payload of the first update issued against a table. */
@@ -348,6 +351,7 @@ describe('BillingService.handleWebhook idempotency', () => {
       {} as never,
       { generateQuietly: async () => undefined } as never,
       { configured: false } as never,
+      mockNotifications() as never,
     );
     jest.spyOn(svc, 'settleSuccessfulPayment').mockImplementation(async (input) => {
       settled.push(input);
@@ -474,6 +478,7 @@ describe('invoice numbers stay unique', () => {
       {} as never,
       { generateQuietly: async () => undefined } as never,
       { configured: false } as never,
+      mockNotifications() as never,
     );
     await expect(
       svc.settleSuccessfulPayment({

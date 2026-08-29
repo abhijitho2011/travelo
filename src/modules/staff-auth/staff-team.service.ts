@@ -1,7 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, ilike, isNull, or, sql, SQL } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, isNull, or, sql, SQL } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
-import { hotelStaff, type HotelStaffRole, type HotelStaffStatus } from '../../database/schema';
+import { hotelStaff, properties, type HotelStaffRole, type HotelStaffStatus } from '../../database/schema';
+import { NotificationDeliveryService } from '../notifications/notification-delivery.service';
+import { inAppRecipient } from '../notifications/channels/channel.interface';
 import { AuthenticatedStaff } from './current-staff.decorator';
 import { StaffErrors } from './staff-errors';
 import { CreateTeamMemberDto, StaffTeamFilterDto } from './dto';
@@ -27,7 +29,10 @@ const MAX_LIMIT = 100;
  */
 @Injectable()
 export class StaffTeamService {
-  constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Database,
+    private readonly notifications: NotificationDeliveryService,
+  ) {}
 
   /** Every filter clause is AND-ed onto the caller's own property. */
   static conditions(propertyId: string, params: StaffTeamFilterDto): SQL[] {
@@ -111,6 +116,8 @@ export class StaffTeamService {
         status,
       })
       .returning();
+    // Post-write, best-effort: an unheard notification must never undo a hire.
+    if (row.status === 'PENDING_APPROVAL') await this.announcePending(row);
     return this.toDto(row);
   }
 
@@ -123,6 +130,7 @@ export class StaffTeamService {
       .update(hotelStaff)
       .set({ status: 'ACTIVE', updatedAt: new Date() })
       .where(eq(hotelStaff.id, staffId));
+    await this.announceApproved(target);
     return { id: staffId, status: 'ACTIVE' };
   }
 
@@ -151,6 +159,66 @@ export class StaffTeamService {
       .set({ deletedAt: now, updatedAt: now })
       .where(eq(hotelStaff.id, staffId));
     return { id: staffId, deleted: true };
+  }
+
+  private async propertyName(propertyId: string): Promise<string> {
+    const [p] = await this.db
+      .select({ name: properties.name })
+      .from(properties)
+      .where(eq(properties.id, propertyId))
+      .limit(1);
+    return p?.name ?? 'your property';
+  }
+
+  /** In-app to whoever can approve at this property — the GM and the AGM. */
+  private async announcePending(row: typeof hotelStaff.$inferSelect): Promise<void> {
+    const approvers = await this.db
+      .select({ id: hotelStaff.id })
+      .from(hotelStaff)
+      .where(
+        and(
+          eq(hotelStaff.propertyId, row.propertyId),
+          inArray(hotelStaff.role, [
+            'GENERAL_MANAGER',
+            'ASSISTANT_GENERAL_MANAGER',
+          ] as HotelStaffRole[]),
+          eq(hotelStaff.status, 'ACTIVE'),
+          isNull(hotelStaff.deletedAt),
+        ),
+      );
+    const vars = {
+      staffName: `${row.firstName} ${row.lastName}`.trim(),
+      role: row.role,
+      propertyName: await this.propertyName(row.propertyId),
+    };
+    for (const approver of approvers) {
+      await this.notifications.notifyQuietly({
+        key: 'staff.pending_approval',
+        relatedType: 'hotel_staff',
+        relatedId: row.id,
+        targets: [{ channel: 'IN_APP', to: inAppRecipient('staff', approver.id) }],
+        vars,
+      });
+    }
+  }
+
+  /** SMS + email to the staff member whose account just went live. */
+  private async announceApproved(row: typeof hotelStaff.$inferSelect): Promise<void> {
+    await this.notifications.notifyQuietly({
+      key: 'staff.approved',
+      relatedType: 'hotel_staff',
+      relatedId: row.id,
+      targets: [
+        { channel: 'SMS', to: row.mobile ?? '' },
+        { channel: 'EMAIL', to: row.email ?? '' },
+        { channel: 'IN_APP', to: inAppRecipient('staff', row.id) },
+      ],
+      vars: {
+        staffName: `${row.firstName} ${row.lastName}`.trim(),
+        role: row.role,
+        propertyName: await this.propertyName(row.propertyId),
+      },
+    });
   }
 
   /**

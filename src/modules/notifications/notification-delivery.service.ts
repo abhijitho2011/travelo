@@ -150,6 +150,32 @@ export class NotificationDeliveryService {
     }
   }
 
+  /**
+   * The admins who should hear about a platform event, resolved from the RBAC
+   * tables rather than a hard-coded role list — `'*'` (SUPER_ADMIN) counts.
+   *
+   * Used for the "tell the support desk" style notifications, where the
+   * audience is "whoever is allowed to act on this", not a named person.
+   */
+  async adminsWithPermission(
+    permissionKey: string,
+  ): Promise<Array<{ id: string; name: string; email: string }>> {
+    const res = await this.db.execute(sql`
+      SELECT DISTINCT a.id, a.name, a.email
+        FROM admins a
+        JOIN admin_roles ar ON ar.admin_id = a.id
+        JOIN role_permissions rp ON rp.role_id = ar.role_id
+       WHERE a.deleted_at IS NULL
+         AND a.status = 'Active'
+         AND rp.permission_key IN (${permissionKey}, '*')
+    `);
+    return ((res as unknown as { rows?: Record<string, unknown>[] }).rows ?? []).map((r) => ({
+      id: String(r.id),
+      name: (r.name as string) ?? '',
+      email: (r.email as string) ?? '',
+    }));
+  }
+
   // ---------- Drain ----------
 
   /**
