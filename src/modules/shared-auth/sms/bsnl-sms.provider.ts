@@ -3,7 +3,7 @@ import * as https from 'node:https';
 import * as http from 'node:http';
 import { URL } from 'node:url';
 import { AppEnv } from '../../../config/env';
-import { SmsProvider } from './sms-provider.interface';
+import { SmsProvider, SmsTextNotConfiguredError } from './sms-provider.interface';
 
 interface HttpJsonResponse {
   status: number;
@@ -28,15 +28,40 @@ export class BsnlSmsProvider implements SmsProvider {
   constructor(private readonly env: AppEnv) {}
 
   async sendOtp(mobile: string, otp: string): Promise<void> {
+    await this.sendWithRetry(mobile, otp);
+  }
+
+  /**
+   * Non-OTP notification SMS. DLT binds every message to a registered content
+   * template, so this needs its OWN template id — the OTP template must not
+   * carry a notification body. Without one configured this refuses rather than
+   * sending something the regulator would reject.
+   */
+  async sendText(mobile: string, body: string): Promise<void> {
+    const templateId = this.env.BSNL_NOTIFY_TEMPLATE_ID;
+    if (!templateId) {
+      throw new SmsTextNotConfiguredError(
+        'BSNL_NOTIFY_TEMPLATE_ID is not set — no DLT template registered for notification SMS',
+      );
+    }
+    await this.sendWithRetry(mobile, body, templateId, this.env.BSNL_NOTIFY_VAR_KEY);
+  }
+
+  private async sendWithRetry(
+    mobile: string,
+    value: string,
+    templateId?: string,
+    varKey?: string,
+  ): Promise<void> {
     try {
-      await this.send(mobile, otp);
+      await this.send(mobile, value, templateId, varKey);
     } catch (err) {
       const message = (err as Error).message ?? '';
       if (/invalid token/i.test(message)) {
         // Token likely expired/rejected server-side — refresh once and retry.
         this.token = null;
         this.tokenExpiresAt = 0;
-        await this.send(mobile, otp);
+        await this.send(mobile, value, templateId, varKey);
         return;
       }
       throw err;
@@ -44,7 +69,12 @@ export class BsnlSmsProvider implements SmsProvider {
   }
 
   /** Build the BSNL Send_SMS payload. Exposed for unit testing the shape. */
-  buildPayload(mobile: string, otp: string): Record<string, unknown> {
+  buildPayload(
+    mobile: string,
+    otp: string,
+    templateId?: string,
+    varKey?: string,
+  ): Record<string, unknown> {
     const payload: Record<string, unknown> = {
       Header: this.env.BSNL_HEADER,
       Target: mobile,
@@ -52,17 +82,22 @@ export class BsnlSmsProvider implements SmsProvider {
       Is_Flash: '0',
       Message_Type: 'TXN',
       Entity_Id: this.env.BSNL_ENTITY_ID,
-      Content_Template_Id: this.env.BSNL_TEMPLATE_ID,
-      Template_Keys_and_Values: [{ Key: this.env.BSNL_TEMPLATE_VAR_KEY, Value: otp }],
+      Content_Template_Id: templateId ?? this.env.BSNL_TEMPLATE_ID,
+      Template_Keys_and_Values: [{ Key: varKey ?? this.env.BSNL_TEMPLATE_VAR_KEY, Value: otp }],
     };
     if (this.env.BSNL_SERVICE_ID) payload.Service_Id = this.env.BSNL_SERVICE_ID;
     return payload;
   }
 
-  private async send(mobile: string, otp: string): Promise<void> {
+  private async send(
+    mobile: string,
+    otp: string,
+    templateId?: string,
+    varKey?: string,
+  ): Promise<void> {
     const token = await this.getToken();
     const url = this.join(this.env.BSNL_SEND_PATH);
-    const res = await this.postJson(url, this.buildPayload(mobile, otp), {
+    const res = await this.postJson(url, this.buildPayload(mobile, otp, templateId, varKey), {
       Authorization: `Bearer ${token}`,
     });
     if (res.data && res.data.Error) {

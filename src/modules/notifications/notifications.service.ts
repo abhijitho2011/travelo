@@ -100,7 +100,8 @@ export class NotificationsService {
         status: dto.status ?? 'Active',
       })
       .onConflictDoUpdate({
-        target: notificationTemplates.templateKey,
+        // (key, channel) is the unique pair — a key now has one row per channel.
+        target: [notificationTemplates.templateKey, notificationTemplates.channel],
         set: {
           name: dto.name,
           channel: dto.channel,

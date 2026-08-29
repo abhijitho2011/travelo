@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { SharedAuthModule } from '../shared-auth/shared-auth.module';
 import { StaffAuthController } from './staff-auth.controller';
 import { StaffTeamController } from './staff-team.controller';
@@ -16,7 +17,7 @@ import { StaffPermissionsGuard } from './staff-permissions.guard';
  * three views of it.
  */
 @Module({
-  imports: [JwtModule.register({}), SharedAuthModule],
+  imports: [JwtModule.register({}), SharedAuthModule, NotificationsModule],
   controllers: [StaffAuthController, StaffTeamController],
   providers: [
     StaffAuthService,

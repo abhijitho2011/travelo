@@ -12,4 +12,8 @@ export class ConsoleSmsProvider implements SmsProvider {
   async sendOtp(mobile: string, otp: string): Promise<void> {
     this.logger.log(`[SMS] OTP for ${mobile}: ${otp}`);
   }
+
+  async sendText(mobile: string, body: string): Promise<void> {
+    this.logger.log(`[SMS] to ${mobile}: ${body}`);
+  }
 }

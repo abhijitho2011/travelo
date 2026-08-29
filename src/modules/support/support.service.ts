@@ -4,12 +4,15 @@ import { DRIZZLE, Database } from '../../database/database.module';
 import { admins, owners, properties, supportMessages, supportTickets } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { getRequestContext } from '../../common/context/request-context';
+import { NotificationDeliveryService } from '../notifications/notification-delivery.service';
+import { inAppRecipient } from '../notifications/channels/channel.interface';
 
 @Injectable()
 export class SupportService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationDeliveryService,
   ) {}
 
   async list(params: {
@@ -91,7 +94,9 @@ export class SupportService {
       entityId: t.id,
       after: t,
     });
-    return this.get(t.id);
+    const ticket = await this.get(t.id);
+    await this.announceCreated(ticket);
+    return ticket;
   }
 
   async get(id: string) {
@@ -148,7 +153,65 @@ export class SupportService {
       entityId: ticketId,
       after: msg,
     });
+    // An internal note is admin-to-admin: the owner must never see it, so it
+    // is not a reply and raises nothing.
+    if (!msg.isInternalNote) await this.announceReply(ticketId, dto.body);
     return msg;
+  }
+
+  /** Post-write and best-effort — a ticket exists whether or not anyone is told. */
+  private async announceCreated(ticket: {
+    id: string;
+    subject: string;
+    priority: string | null;
+    category: string | null;
+    owner: string | null;
+  }): Promise<void> {
+    const desk = await this.notifications.adminsWithPermission('support.view');
+    for (const admin of desk) {
+      await this.notifications.notifyQuietly({
+        key: 'support.ticket.created',
+        relatedType: 'ticket',
+        relatedId: ticket.id,
+        targets: [{ channel: 'IN_APP', to: inAppRecipient('admin', admin.id) }],
+        vars: {
+          subject: ticket.subject,
+          priority: ticket.priority ?? 'NORMAL',
+          category: ticket.category ?? 'General',
+          ownerName: ticket.owner ?? 'An owner',
+        },
+      });
+    }
+  }
+
+  /** An admin replied — the owner who raised the ticket gets email + in-app. */
+  private async announceReply(ticketId: string, body: string): Promise<void> {
+    const [row] = await this.db
+      .select({
+        subject: supportTickets.subject,
+        ownerId: supportTickets.ownerId,
+        ownerName: owners.name,
+        ownerEmail: owners.email,
+      })
+      .from(supportTickets)
+      .leftJoin(owners, eq(supportTickets.ownerId, owners.id))
+      .where(eq(supportTickets.id, ticketId))
+      .limit(1);
+    if (!row?.ownerId) return;
+    await this.notifications.notifyQuietly({
+      key: 'support.ticket.replied',
+      relatedType: 'ticket',
+      relatedId: ticketId,
+      targets: [
+        { channel: 'EMAIL', to: row.ownerEmail ?? '' },
+        { channel: 'IN_APP', to: inAppRecipient('owner', row.ownerId) },
+      ],
+      vars: {
+        subject: row.subject,
+        ownerName: row.ownerName ?? 'there',
+        message: body,
+      },
+    });
   }
 
   async assign(ticketId: string, adminId: string) {

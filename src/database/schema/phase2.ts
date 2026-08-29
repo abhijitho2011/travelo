@@ -568,9 +568,12 @@ export const notifications = pgTable(
     id: uuid('id')
       .primaryKey()
       .default(sql`gen_random_uuid()`),
-    adminId: uuid('admin_id')
-      .notNull()
-      .references(() => admins.id, { onDelete: 'cascade' }),
+    // Exactly one recipient column is set. `admin_id` was the original (and
+    // still the only one the admin inbox endpoints read); owners and hotel
+    // staff arrived with real IN_APP delivery, so it is now nullable.
+    adminId: uuid('admin_id').references(() => admins.id, { onDelete: 'cascade' }),
+    ownerId: uuid('owner_id'),
+    staffId: uuid('staff_id'),
     type: varchar('type', { length: 64 }).notNull(),
     tone: varchar('tone', { length: 16 }).notNull().default('info'),
     title: varchar('title', { length: 255 }).notNull(),
@@ -579,22 +582,79 @@ export const notifications = pgTable(
     readAt: timestamp('read_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => ({ adminIdx: index('notifications_admin_idx').on(t.adminId, t.readAt) }),
+  (t) => ({
+    adminIdx: index('notifications_admin_idx').on(t.adminId, t.readAt),
+    ownerIdx: index('notifications_owner_idx').on(t.ownerId, t.readAt),
+    staffIdx: index('notifications_staff_idx').on(t.staffId, t.readAt),
+  }),
 );
 
-export const notificationTemplates = pgTable('notification_templates', {
-  id: uuid('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  templateKey: varchar('template_key', { length: 128 }).notNull().unique(),
-  name: varchar('name', { length: 255 }).notNull(),
-  channel: varchar('channel', { length: 32 }).notNull(),
-  subject: varchar('subject', { length: 255 }),
-  body: text('body').notNull(),
-  status: varchar('status', { length: 16 }).notNull().default('Active'),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+/**
+ * One row per (template_key, channel). The key alone used to be unique, which
+ * made a per-channel variant impossible — an email body and its short SMS
+ * counterpart could not coexist. The pair is what is unique now.
+ */
+export const notificationTemplates = pgTable(
+  'notification_templates',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    templateKey: varchar('template_key', { length: 128 }).notNull(),
+    name: varchar('name', { length: 255 }).notNull(),
+    channel: varchar('channel', { length: 32 }).notNull(),
+    subject: varchar('subject', { length: 255 }),
+    body: text('body').notNull(),
+    status: varchar('status', { length: 16 }).notNull().default('Active'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    keyChannelIdx: uniqueIndex('notification_templates_key_channel_idx').on(
+      t.templateKey,
+      t.channel,
+    ),
+  }),
+);
+
+export const notificationChannelValues = ['EMAIL', 'SMS', 'WHATSAPP', 'PUSH', 'IN_APP'] as const;
+export type NotificationChannelName = (typeof notificationChannelValues)[number];
+
+export const notificationDeliveryStatusValues = ['PENDING', 'SENT', 'FAILED', 'SKIPPED'] as const;
+export type NotificationDeliveryStatus = (typeof notificationDeliveryStatusValues)[number];
+
+/**
+ * The answer to "did the owner actually get told?".
+ *
+ * Every send attempt — successful, failed, or skipped because no template
+ * exists for the channel — leaves exactly one row here, rendered subject and
+ * body included, so the copy that went out is recoverable after the fact.
+ */
+export const notificationDeliveries = pgTable(
+  'notification_deliveries',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    notificationKey: varchar('notification_key', { length: 128 }).notNull(),
+    channel: varchar('channel', { length: 16 }).notNull(),
+    recipient: varchar('recipient', { length: 320 }).notNull(),
+    subject: varchar('subject', { length: 255 }),
+    body: text('body').notNull(),
+    status: varchar('status', { length: 16 }).notNull().default('PENDING'),
+    attempts: integer('attempts').notNull().default(0),
+    lastError: text('last_error'),
+    relatedType: varchar('related_type', { length: 64 }),
+    relatedId: uuid('related_id'),
+    scheduledFor: timestamp('scheduled_for', { withTimezone: true }).notNull().defaultNow(),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    dueIdx: index('notification_deliveries_due_idx').on(t.status, t.scheduledFor),
+    createdIdx: index('notification_deliveries_created_idx').on(t.createdAt),
+  }),
+);
 
 // ---------- Integrations ----------
 export const integrationConnections = pgTable(

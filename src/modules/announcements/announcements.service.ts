@@ -1,15 +1,19 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { desc, eq } from 'drizzle-orm';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
-import { announcements } from '../../database/schema';
+import { announcements, owners } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { getRequestContext } from '../../common/context/request-context';
+import { NotificationDeliveryService } from '../notifications/notification-delivery.service';
+import { inAppRecipient } from '../notifications/channels/channel.interface';
 
 @Injectable()
 export class AnnouncementsService {
+  private readonly logger = new Logger(AnnouncementsService.name);
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationDeliveryService,
   ) {}
 
   async list(params: { limit?: number; offset?: number; status?: string }) {
@@ -122,7 +126,44 @@ export class AnnouncementsService {
       before,
       after,
     });
+    await this.announce(after);
     return after;
+  }
+
+  /**
+   * In-app to the targeted owners, after the row is already PUBLISHED.
+   *
+   * `audience` is free-form jsonb. An explicit `ownerIds` array targets exactly
+   * those owners; anything else (`{all:true}`, a segment description, null) is
+   * read as "every active owner", which is the safe reading for a broadcast.
+   */
+  private async announce(row: { id: string; title: string; message: string; audience: unknown }) {
+    try {
+      const owners = await this.resolveAudience(row.audience);
+      for (const owner of owners) {
+        await this.notifications.notifyQuietly({
+          key: 'announcement.published',
+          relatedType: 'announcement',
+          relatedId: row.id,
+          targets: [{ channel: 'IN_APP', to: inAppRecipient('owner', owner.id) }],
+          vars: { title: row.title, message: row.message, ownerName: owner.name },
+        });
+      }
+    } catch (err) {
+      this.logger.error(`announcement.published notification failed for ${row.id}`, err as Error);
+    }
+  }
+
+  private async resolveAudience(audience: unknown): Promise<Array<{ id: string; name: string }>> {
+    const explicit = (audience as { ownerIds?: unknown })?.ownerIds;
+    const ids = Array.isArray(explicit) ? explicit.filter((v) => typeof v === 'string') : null;
+    const conds = [isNull(owners.deletedAt), eq(owners.status, 'ACTIVE')];
+    if (ids && ids.length) conds.push(inArray(owners.id, ids as string[]));
+    else if (ids) return [];
+    return this.db
+      .select({ id: owners.id, name: owners.name })
+      .from(owners)
+      .where(and(...conds));
   }
 
   async remove(id: string) {
