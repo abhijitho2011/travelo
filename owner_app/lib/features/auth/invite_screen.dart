@@ -5,8 +5,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/providers.dart';
-import '../../theme/app_theme.dart';
-import '../../widgets/auth_shell.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/auth_scaffold.dart';
+import '../../core/widgets/otp_field.dart';
 
 /// Invitation acceptance / account activation. Owner accounts are created by
 /// the Super Admin; the owner activates via mobile + OTP.
@@ -19,6 +22,7 @@ class InviteScreen extends ConsumerStatefulWidget {
 class _InviteScreenState extends ConsumerState<InviteScreen> {
   final _mobile = TextEditingController();
   final _otp = TextEditingController();
+  final _otpKey = GlobalKey<OtpFieldState>();
   bool _otpSent = false;
   bool _busy = false;
   String? _error;
@@ -40,7 +44,9 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
       _error = null;
     });
     try {
-      await ref.read(authControllerProvider.notifier).requestOtp(_mobile.text.trim());
+      await ref
+          .read(authControllerProvider.notifier)
+          .requestOtp(_mobile.text.trim());
       setState(() => _otpSent = true);
     } on ApiException catch (e) {
       setState(() => _error = e.message);
@@ -64,9 +70,11 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
           .verifyOtp(mobile: _mobile.text.trim(), otp: _otp.text.trim());
       // Router redirects to dashboard on auth.
     } on ApiException catch (e) {
-      setState(() => _error = e.code == 'INVITATION_EXPIRED'
-          ? 'This invitation is no longer valid. Contact Tavelo Support for a new one.'
-          : 'Incorrect or expired code.');
+      setState(
+        () => _error = e.code == 'INVITATION_EXPIRED'
+            ? 'This invitation is no longer valid. Contact Tavelo Support for a new one.'
+            : 'Incorrect or expired code.',
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -74,82 +82,89 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return AuthShell(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text("You're invited",
-              style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.ink)),
-          const SizedBox(height: 6),
-          const Text('Activate your Tavelo account to manage your hotel portfolio.',
-              style: TextStyle(color: AppColors.inkMuted, fontSize: 15)),
-          const SizedBox(height: 24),
-          if (_error != null) ...[
-            _err(_error!),
-            const SizedBox(height: 16),
+    final c = context.colors;
+
+    return AuthScaffold(
+      children: [
+        Text(
+          "You're invited",
+          style: AppTypography.display(size: 26, color: c.foreground),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Activate your Tavelo account to manage your hotel portfolio.',
+          style: AppTypography.body(size: 14, color: c.mutedForeground),
+        ),
+        const SizedBox(height: Sp.xxl),
+
+        if (_error != null) ...[
+          InlineError(message: _error!),
+          const SizedBox(height: Sp.lg),
+        ],
+
+        TextField(
+          controller: _mobile,
+          enabled: !_otpSent && !_busy,
+          keyboardType: TextInputType.phone,
+          autofillHints: const [AutofillHints.telephoneNumberNational],
+          style: AppTypography.numeric(size: 16, color: c.foreground),
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(10),
           ],
-          const Text('Mobile number',
-              style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink)),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _mobile,
-            enabled: !_otpSent && !_busy,
-            keyboardType: TextInputType.phone,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(10),
-            ],
-            decoration: const InputDecoration(prefixText: '+91  ', hintText: 'Registered number'),
-          ),
-          if (_otpSent) ...[
-            const SizedBox(height: 16),
-            const Text('OTP', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _otp,
-              enabled: !_busy,
-              keyboardType: TextInputType.number,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(6),
-              ],
-              decoration: const InputDecoration(hintText: 'Enter 6-digit code'),
+          decoration: InputDecoration(
+            labelText: 'Mobile number',
+            hintText: 'Registered number',
+            prefixIcon: const Icon(Icons.phone_iphone_outlined, size: 20),
+            prefix: Padding(
+              padding: const EdgeInsets.only(right: Sp.sm),
+              child: Text(
+                '+91',
+                style: AppTypography.numeric(
+                  size: 15,
+                  color: c.mutedForeground,
+                ),
+              ),
             ),
-          ],
-          const SizedBox(height: 20),
-          FilledButton(
-            onPressed: _busy ? null : (_otpSent ? _activate : _send),
-            child: _busy
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
-                  )
-                : Text(_otpSent ? 'Activate account' : 'Send OTP'),
           ),
-          const SizedBox(height: 16),
-          Center(
-            child: TextButton(
-              onPressed: () => context.go('/login'),
-              child: const Text('Back to sign in'),
+        ),
+
+        if (_otpSent) ...[
+          const SizedBox(height: Sp.xl),
+          Text(
+            'Enter the 6-digit code',
+            style: AppTypography.body(
+              size: 13.5,
+              weight: FontWeight.w600,
+              color: c.foreground,
             ),
+          ),
+          const SizedBox(height: Sp.sm),
+          OtpField(
+            key: _otpKey,
+            length: 6,
+            enabled: !_busy,
+            hasError: _error != null,
+            onChanged: (v) => _otp.text = v,
+            onCompleted: (v) => _otp.text = v,
           ),
         ],
-      ),
+
+        const SizedBox(height: Sp.xl),
+        FilledButton(
+          onPressed: _busy ? null : (_otpSent ? _activate : _send),
+          child: _busy
+              ? const ButtonSpinner()
+              : Text(_otpSent ? 'Activate account' : 'Send OTP'),
+        ),
+        const SizedBox(height: Sp.md),
+        Center(
+          child: TextButton(
+            onPressed: () => context.go('/login'),
+            child: const Text('Back to sign in'),
+          ),
+        ),
+      ],
     );
   }
-
-  Widget _err(String t) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.danger.withValues(alpha: 0.07),
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: AppColors.danger.withValues(alpha: 0.25)),
-        ),
-        child: Row(children: [
-          const Icon(Icons.error_outline, color: AppColors.danger, size: 20),
-          const SizedBox(width: 10),
-          Expanded(child: Text(t, style: const TextStyle(color: AppColors.ink, fontSize: 13.5))),
-        ]),
-      );
 }

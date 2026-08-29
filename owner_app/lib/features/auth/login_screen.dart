@@ -4,9 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/config/app_config.dart';
 import '../../core/providers.dart';
-import '../../theme/app_theme.dart';
-import '../../widgets/auth_shell.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/auth_scaffold.dart';
+import '../../core/widgets/otp_field.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -20,9 +24,9 @@ enum _Step { mobile, otp }
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _mobile = TextEditingController();
   final _otp = TextEditingController();
+  final _otpKey = GlobalKey<OtpFieldState>();
   _Step _step = _Step.mobile;
   bool _busy = false;
-  bool _obscure = true;
   String? _mobileError;
   String? _otpError;
   String? _banner;
@@ -47,13 +51,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _banner = null;
     });
     try {
-      await ref.read(authControllerProvider.notifier).requestOtp(_mobile.text.trim());
+      await ref
+          .read(authControllerProvider.notifier)
+          .requestOtp(_mobile.text.trim());
       if (!mounted) return;
       setState(() => _step = _Step.otp);
     } on ApiException catch (e) {
-      setState(() => _banner = e.isNetwork
-          ? "We couldn't reach Tavelo. Check your connection and try again."
-          : e.message);
+      setState(
+        () => _banner = e.isNetwork
+            ? "We couldn't reach Tavelo. Check your connection and try again."
+            : e.message,
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -78,13 +86,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       setState(() {
         switch (e.code) {
           case 'ACCOUNT_SUSPENDED':
-            _banner = 'Your account is currently suspended. Please contact Tavelo Support.';
+            _banner =
+                'Your account is currently suspended. Please contact Tavelo Support.';
             break;
           case 'ACCOUNT_BLOCKED':
-            _banner = 'Your account has been blocked. Contact Tavelo Support for assistance.';
+            _banner =
+                'Your account has been blocked. Contact Tavelo Support for assistance.';
             break;
           case 'NETWORK':
-            _banner = "We couldn't reach Tavelo. Check your connection and try again.";
+            _banner =
+                "We couldn't reach Tavelo. Check your connection and try again.";
             break;
           default:
             _otpError = 'Incorrect or expired code.';
@@ -97,132 +108,163 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return AuthShell(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Welcome back',
-            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.ink),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Sign in to manage your hotels.',
-            style: TextStyle(color: AppColors.inkMuted, fontSize: 15),
-          ),
-          const SizedBox(height: 28),
-          if (_banner != null) ...[
-            _InlineBanner(text: _banner!),
-            const SizedBox(height: 16),
+    final c = context.colors;
+    final onOtp = _step == _Step.otp;
+
+    return AuthScaffold(
+      footer: const Text(
+        'Manage your entire hotel portfolio from one place.\n'
+        'Support · Privacy · Terms',
+      ),
+      children: [
+        Text(
+          'Welcome back',
+          style: AppTypography.display(size: 26, color: c.foreground),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Sign in to manage your hotels.',
+          style: AppTypography.body(size: 14, color: c.mutedForeground),
+        ),
+        const SizedBox(height: Sp.xxl),
+
+        if (_banner != null) ...[
+          InlineError(message: _banner!),
+          const SizedBox(height: Sp.lg),
+        ],
+
+        TextField(
+          controller: _mobile,
+          enabled: !onOtp && !_busy,
+          autofocus: true,
+          keyboardType: TextInputType.phone,
+          textInputAction: TextInputAction.done,
+          autofillHints: const [AutofillHints.telephoneNumberNational],
+          style: AppTypography.numeric(size: 16, color: c.foreground),
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(10),
           ],
-          _label('Mobile number'),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _mobile,
-            enabled: _step == _Step.mobile && !_busy,
-            autofocus: true,
-            keyboardType: TextInputType.phone,
-            textInputAction: TextInputAction.done,
-            style: const TextStyle(
-              fontSize: 16,
-              color: AppColors.ink,
-              letterSpacing: 0.4,
+          decoration: InputDecoration(
+            labelText: 'Mobile number',
+            hintText: '98765 43210',
+            errorText: _mobileError,
+            prefixIcon: const Icon(Icons.phone_iphone_outlined, size: 20),
+            prefix: Padding(
+              padding: const EdgeInsets.only(right: Sp.sm),
+              child: Text(
+                '+91',
+                style: AppTypography.numeric(
+                  size: 15,
+                  color: c.mutedForeground,
+                ),
+              ),
             ),
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(10),
-            ],
-            decoration: InputDecoration(
-              hintText: '10-digit mobile number',
-              errorText: _mobileError,
-              // A prefixIcon always paints (prefixText only shows once focused).
-              prefixIcon: const Padding(
-                padding: EdgeInsets.only(left: 16, right: 10),
+          ),
+          onSubmitted: (_) => _sendOtp(),
+        ),
+
+        if (onOtp) ...[
+          const SizedBox(height: Sp.xl),
+          Row(
+            children: [
+              Expanded(
                 child: Text(
-                  '+91',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.ink,
+                  'Enter the 6-digit code',
+                  style: AppTypography.body(
+                    size: 13.5,
+                    weight: FontWeight.w600,
+                    color: c.foreground,
                   ),
                 ),
               ),
-              prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
-            ),
-            onSubmitted: (_) => _sendOtp(),
-          ),
-          if (_step == _Step.otp) ...[
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                _label('OTP'),
-                const Spacer(),
-                TextButton(
-                  onPressed: _busy
-                      ? null
-                      : () => setState(() {
-                            _step = _Step.mobile;
-                            _otp.clear();
-                            _otpError = null;
-                          }),
-                  child: const Text('Change number'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _otp,
-              enabled: !_busy,
-              obscureText: _obscure,
-              keyboardType: TextInputType.number,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(6),
-              ],
-              decoration: InputDecoration(
-                hintText: 'Enter 6-digit code',
-                errorText: _otpError,
-                suffixIcon: IconButton(
-                  icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
-                  onPressed: () => setState(() => _obscure = !_obscure),
-                ),
+              TextButton(
+                onPressed: _busy
+                    ? null
+                    : () => setState(() {
+                        _step = _Step.mobile;
+                        _otp.clear();
+                        _otpKey.currentState?.clear();
+                        _otpError = null;
+                      }),
+                child: const Text('Change number'),
               ),
-              onSubmitted: (_) => _verify(),
-            ),
-          ],
-          const SizedBox(height: 20),
-          FilledButton(
-            onPressed: _busy ? null : (_step == _Step.mobile ? _sendOtp : _verify),
-            child: _busy
-                ? const _Spin(light: true)
-                : Text(_step == _Step.mobile ? 'Send OTP' : 'Sign in'),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: const [
-              Expanded(child: Divider()),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12),
-                child: Text('or', style: TextStyle(color: AppColors.inkFaint)),
-              ),
-              Expanded(child: Divider()),
             ],
           ),
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            onPressed: _busy ? null : _google,
-            icon: const Icon(Icons.g_mobiledata, size: 28),
-            label: const Text('Continue with Google'),
+          const SizedBox(height: Sp.sm),
+          OtpField(
+            key: _otpKey,
+            length: 6,
+            enabled: !_busy,
+            hasError: _otpError != null,
+            // Submitting stays on the button, as it always has here — the code
+            // is only remembered as it is typed.
+            onChanged: (v) => setState(() {
+              _otp.text = v;
+              if (_otpError != null) _otpError = null;
+            }),
+            onCompleted: (v) => _otp.text = v,
           ),
-          const SizedBox(height: 20),
-          Center(
-            child: TextButton(
-              onPressed: () => context.push('/invite'),
-              child: const Text('Have an invitation? Activate your account'),
-            ),
-          ),
+          if (_otpError != null) ...[
+            const SizedBox(height: Sp.md),
+            InlineError(message: _otpError!),
+          ],
         ],
-      ),
+
+        const SizedBox(height: Sp.xl),
+        FilledButton(
+          onPressed: _busy ? null : (onOtp ? _verify : _sendOtp),
+          child: _busy
+              ? const ButtonSpinner()
+              : Text(onOtp ? 'Sign in' : 'Send OTP'),
+        ),
+
+        const SizedBox(height: Sp.xl),
+        Row(
+          children: [
+            Expanded(child: Divider(color: c.border)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Sp.md),
+              child: Text(
+                'or',
+                style: AppTypography.body(size: 12, color: c.mutedForeground),
+              ),
+            ),
+            Expanded(child: Divider(color: c.border)),
+          ],
+        ),
+        const SizedBox(height: Sp.xl),
+
+        OutlinedButton.icon(
+          onPressed: _busy ? null : _google,
+          icon: const GoogleGlyph(),
+          label: const Text('Continue with Google'),
+        ),
+
+        const SizedBox(height: Sp.lg),
+        Center(
+          child: TextButton(
+            onPressed: () => context.push('/invite'),
+            child: const Text('Have an invitation? Activate your account'),
+          ),
+        ),
+
+        const SizedBox(height: Sp.sm),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.shield_outlined, size: 15, color: c.mutedForeground),
+            const SizedBox(width: Sp.sm),
+            Expanded(
+              child: Text(
+                'Only owner accounts created by ${AppConfig.appName} can sign in. '
+                'We never say whether a number is registered.',
+                style: AppTypography.body(size: 11.5, color: c.mutedForeground),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -239,10 +281,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       setState(() {
         switch (e.code) {
           case 'ACCOUNT_SUSPENDED':
-            _banner = 'Your account is currently suspended. Please contact Tavelo Support.';
+            _banner =
+                'Your account is currently suspended. Please contact Tavelo Support.';
             break;
           case 'ACCOUNT_BLOCKED':
-            _banner = 'Your account has been blocked. Contact Tavelo Support for assistance.';
+            _banner =
+                'Your account has been blocked. Contact Tavelo Support for assistance.';
             break;
           case 'OWNER_NOT_FOUND':
           case 'NOT_FOUND':
@@ -250,7 +294,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 'This Google account is not registered with Tavelo. Ask your Tavelo administrator for an invitation.';
             break;
           case 'NETWORK':
-            _banner = "We couldn't reach Tavelo. Check your connection and try again.";
+            _banner =
+                "We couldn't reach Tavelo. Check your connection and try again.";
             break;
           default:
             _banner = 'Google sign-in failed. Please try again.';
@@ -260,53 +305,4 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (mounted) setState(() => _busy = false);
     }
   }
-
-  Widget _label(String t) => Text(
-        t,
-        style: const TextStyle(
-          fontWeight: FontWeight.w600,
-          color: AppColors.ink,
-          fontSize: 14,
-        ),
-      );
-}
-
-class _InlineBanner extends StatelessWidget {
-  const _InlineBanner({required this.text});
-  final String text;
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.danger.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.danger.withValues(alpha: 0.25)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline, color: AppColors.danger, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(text,
-                style: const TextStyle(color: AppColors.ink, fontSize: 13.5, height: 1.4)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Spin extends StatelessWidget {
-  const _Spin({this.light = false});
-  final bool light;
-  @override
-  Widget build(BuildContext context) => SizedBox(
-        width: 20,
-        height: 20,
-        child: CircularProgressIndicator(
-          strokeWidth: 2.4,
-          color: light ? Colors.white : AppColors.primary,
-        ),
-      );
 }

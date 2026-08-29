@@ -6,8 +6,13 @@ import 'package:go_router/go_router.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/data/owner_repository.dart';
 import '../../core/models/owner_models.dart';
-import '../../theme/app_theme.dart';
-import '../../widgets/ui.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/auth_scaffold.dart' show ButtonSpinner;
+import '../../core/widgets/cards.dart';
+import '../../core/widgets/primitives.dart';
+import '../../core/widgets/states.dart';
 import 'property_format.dart';
 
 /// Edit what one hotel offers.
@@ -23,14 +28,21 @@ class PropertyAmenitiesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final amenities = ref.watch(propertyAmenitiesProvider(propertyId));
     return Scaffold(
+      backgroundColor: context.colors.background,
       appBar: AppBar(title: const Text('Facilities')),
       body: amenities.when(
-        loading: () => const LoadingView(),
-        error: (e, __) => ErrorView(
-          message: e is ApiException && e.code == 'PROPERTY_NOT_FOUND'
-              ? 'This hotel is no longer in your portfolio.'
-              : 'Could not load facilities.',
-          onRetry: () => ref.invalidate(propertyAmenitiesProvider(propertyId)),
+        loading: () => const PageBody(children: [ListSkeleton(rows: 2)]),
+        error: (e, __) => PageBody(
+          children: [
+            ErrorState(
+              error: e,
+              message: e is ApiException && e.code == 'PROPERTY_NOT_FOUND'
+                  ? 'This hotel is no longer in your portfolio.'
+                  : 'Could not load facilities.',
+              onRetry: () =>
+                  ref.invalidate(propertyAmenitiesProvider(propertyId)),
+            ),
+          ],
         ),
         data: (data) => _AmenitiesEditor(propertyId: propertyId, data: data),
       ),
@@ -79,9 +91,9 @@ class _AmenitiesEditorState extends ConsumerState<_AmenitiesEditor> {
           .setPropertyAmenities(widget.propertyId, _selected.toList());
       ref.invalidate(propertyAmenitiesProvider(widget.propertyId));
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Facilities updated.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Facilities updated.')));
       context.pop();
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -93,49 +105,51 @@ class _AmenitiesEditorState extends ConsumerState<_AmenitiesEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final catalogue = widget.data.catalogue;
     if (catalogue.isEmpty) {
-      return const ErrorView(
-        message: 'No facilities are available to choose from yet.',
+      return const PageBody(
+        children: [
+          EmptyState(
+            icon: Icons.pool_outlined,
+            title: 'No facilities are available to choose from yet.',
+          ),
+        ],
       );
     }
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+    return PageBody(
       children: [
         if (_error != null) ...[
-          Banner2(text: _error!, tone: BannerTone.danger, icon: Icons.error_outline),
-          const SizedBox(height: 16),
+          NoticeBanner(
+            text: _error!,
+            tone: NoticeTone.danger,
+            icon: Icons.error_outline,
+          ),
+          gapMd,
         ],
-        const Text(
+        Text(
           'Tick everything this hotel offers its guests. Guests see these on '
           'your listing.',
-          style: TextStyle(color: AppColors.inkMuted, height: 1.4),
+          style: AppTypography.body(size: 13.5, color: c.mutedForeground),
         ),
-        const SizedBox(height: 20),
+        gapSection,
         Wrap(
-          spacing: 10,
-          runSpacing: 10,
+          spacing: Sp.sm,
+          runSpacing: Sp.sm,
           children: catalogue.map(_chip).toList(),
         ),
         const SizedBox(height: 28),
         FilledButton(
           onPressed: _busy ? null : _save,
-          child: _busy
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
-                )
-              : const Text('Save facilities'),
+          child: _busy ? const ButtonSpinner() : const Text('Save facilities'),
         ),
       ],
     );
   }
 
-  /// The app declares no `chipTheme`, so every colour is set here — otherwise
-  /// Material 3 falls back to the seeded purple, which is not the brand.
   Widget _chip(Amenity a) {
+    final c = context.colors;
     final on = _selected.contains(a.id);
     return FilterChip(
       selected: on,
@@ -144,30 +158,30 @@ class _AmenitiesEditorState extends ConsumerState<_AmenitiesEditor> {
       showCheckmark: false,
       avatar: Icon(
         amenityIcon(a.icon),
-        size: 18,
-        color: on ? AppColors.primaryDark : AppColors.inkMuted,
+        size: 17,
+        color: on ? c.primary : c.mutedForeground,
       ),
       label: Text(a.name),
-      labelStyle: TextStyle(
-        color: on ? AppColors.primaryDark : AppColors.ink,
-        fontWeight: on ? FontWeight.w600 : FontWeight.w500,
-        fontSize: 13.5,
+      labelStyle: AppTypography.body(
+        size: 13,
+        weight: on ? FontWeight.w700 : FontWeight.w500,
+        color: on ? c.primary : c.foreground,
       ),
-      backgroundColor: AppColors.surface,
-      selectedColor: AppColors.primarySoft,
-      side: BorderSide(color: on ? AppColors.primary : AppColors.line),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
+      backgroundColor: c.card,
+      selectedColor: c.primary.withValues(alpha: 0.12),
+      side: BorderSide(
+        color: on ? c.primary.withValues(alpha: 0.45) : c.border,
       ),
+      shape: const RoundedRectangleBorder(borderRadius: R.rMd),
       onSelected: _busy
           ? null
           : (v) => setState(() {
-                if (v) {
-                  _selected.add(a.id);
-                } else {
-                  _selected.remove(a.id);
-                }
-              }),
+              if (v) {
+                _selected.add(a.id);
+              } else {
+                _selected.remove(a.id);
+              }
+            }),
     );
   }
 }

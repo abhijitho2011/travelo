@@ -3,8 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'core/auth/auth_state.dart';
-import 'core/providers.dart';
 import 'core/models/owner_models.dart';
+import 'core/providers.dart';
+import 'core/theme/app_colors.dart';
+import 'core/theme/app_theme.dart';
+import 'core/theme/app_typography.dart';
+import 'core/theme/theme_controller.dart';
+import 'core/widgets/app_shell.dart';
 import 'features/account/profile_screen.dart';
 import 'features/account/security_screen.dart';
 import 'features/auth/invite_screen.dart';
@@ -16,12 +21,12 @@ import 'features/properties/property_amenities_screen.dart';
 import 'features/properties/property_detail_screen.dart';
 import 'features/staff/add_staff_screen.dart';
 import 'features/staff/edit_staff_screen.dart';
+import 'features/staff/managers_screen.dart';
 import 'features/staff/staff_screen.dart';
 import 'features/subscription/subscription_screen.dart';
 import 'features/support/new_ticket_screen.dart';
 import 'features/support/support_screen.dart';
 import 'features/support/support_ticket_screen.dart';
-import 'theme/app_theme.dart';
 
 /// Bridges Riverpod auth state into go_router's refresh mechanism.
 class _AuthListenable extends ChangeNotifier {
@@ -51,11 +56,39 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       GoRoute(path: '/invite', builder: (_, __) => const InviteScreen()),
-      GoRoute(path: '/', builder: (_, __) => const PortfolioScreen()),
-      GoRoute(path: '/properties', builder: (_, __) => const PropertiesScreen()),
+
+      // ------------------------------------------------- inside the shell ---
+      // The seven destinations the navigation offers. Everything else is a
+      // detail or a form: those are pushed full-screen over the shell with
+      // their own back button, exactly as they were before.
+      ShellRoute(
+        builder: (_, __, child) => AppShell(child: child),
+        routes: [
+          GoRoute(path: '/', builder: (_, __) => const PortfolioScreen()),
+          GoRoute(
+            path: '/properties',
+            builder: (_, __) => const PropertiesScreen(),
+          ),
+          GoRoute(path: '/staff', builder: (_, __) => const ManagersScreen()),
+          GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
+          GoRoute(
+            path: '/security',
+            builder: (_, __) => const SecurityScreen(),
+          ),
+          GoRoute(
+            path: '/subscription',
+            builder: (_, __) => const SubscriptionScreen(),
+          ),
+          GoRoute(path: '/support', builder: (_, __) => const SupportScreen()),
+        ],
+      ),
+
       // Declared BEFORE '/properties/:pid', otherwise the parameterised route
       // matches 'new' as a property id and swallows it.
-      GoRoute(path: '/properties/new', builder: (_, __) => const AddPropertyScreen()),
+      GoRoute(
+        path: '/properties/new',
+        builder: (_, __) => const AddPropertyScreen(),
+      ),
       GoRoute(
         // The property travels as `extra` from the portfolio and property
         // lists; on a cold deep link it is null and the screen looks it up.
@@ -88,15 +121,14 @@ final routerProvider = Provider<GoRouter>((ref) {
           member: s.extra is StaffMember ? s.extra as StaffMember : null,
         ),
       ),
-      // Account, billing and support — all behind the same auth redirect above.
-      GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
-      GoRoute(path: '/security', builder: (_, __) => const SecurityScreen()),
-      GoRoute(path: '/subscription', builder: (_, __) => const SubscriptionScreen()),
-      GoRoute(path: '/support', builder: (_, __) => const SupportScreen()),
-      GoRoute(path: '/support/new', builder: (_, __) => const NewTicketScreen()),
+      GoRoute(
+        path: '/support/new',
+        builder: (_, __) => const NewTicketScreen(),
+      ),
       GoRoute(
         path: '/support/:id',
-        builder: (_, s) => SupportTicketScreen(ticketId: s.pathParameters['id']!),
+        builder: (_, s) =>
+            SupportTicketScreen(ticketId: s.pathParameters['id']!),
       ),
     ],
   );
@@ -125,18 +157,40 @@ class _SplashGateState extends ConsumerState<SplashGate> {
       // Hand off to the real router shell.
       return const _RouterHost();
     }
-    return const Scaffold(
-      backgroundColor: AppColors.primary,
+    final c = context.colors;
+    return Scaffold(
+      backgroundColor: c.background,
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.apartment_rounded, color: Colors.white, size: 48),
-            SizedBox(height: 20),
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: c.primary,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              alignment: Alignment.center,
+              child: Icon(
+                Icons.apartment_rounded,
+                color: c.primaryForeground,
+                size: 30,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Tavelo',
+              style: AppTypography.display(size: 20, color: c.foreground),
+            ),
+            const SizedBox(height: 20),
             SizedBox(
-              width: 26,
-              height: 26,
-              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.6),
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                color: c.primary,
+                strokeWidth: 2.4,
+              ),
             ),
           ],
         ),
@@ -154,6 +208,8 @@ class _RouterHost extends ConsumerWidget {
       title: 'Tavelo Owner',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: ref.watch(themeControllerProvider),
       routerConfig: router,
     );
   }

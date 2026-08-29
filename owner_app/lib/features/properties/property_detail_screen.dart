@@ -5,8 +5,14 @@ import 'package:go_router/go_router.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/data/owner_repository.dart';
 import '../../core/models/owner_models.dart';
-import '../../theme/app_theme.dart';
-import '../../widgets/ui.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/cards.dart';
+import '../../core/widgets/primitives.dart';
+import '../../core/widgets/states.dart';
+import '../../core/widgets/status_badge.dart';
+import 'property_card.dart' show propertyStatusTone;
 import 'property_format.dart';
 
 /// One hotel at a glance.
@@ -37,18 +43,31 @@ class PropertyDetailScreen extends ConsumerWidget {
 
     final props = ref.watch(propertiesProvider);
     return props.when(
-      loading: () => const _Shell(child: LoadingView()),
-      error: (_, __) => _Shell(
-        child: ErrorView(
-          message: 'Could not load this hotel.',
-          onRetry: () => ref.invalidate(propertiesProvider),
+      loading: () =>
+          const _Shell(child: PageBody(children: [ListSkeleton(rows: 3)])),
+      error: (e, __) => _Shell(
+        child: PageBody(
+          children: [
+            ErrorState(
+              error: e,
+              message: 'Could not load this hotel.',
+              onRetry: () => ref.invalidate(propertiesProvider),
+            ),
+          ],
         ),
       ),
       data: (list) {
         final found = list.where((p) => p.id == propertyId).firstOrNull;
         if (found == null) {
           return const _Shell(
-            child: ErrorView(message: 'This hotel is no longer in your portfolio.'),
+            child: PageBody(
+              children: [
+                EmptyState(
+                  icon: Icons.location_off_outlined,
+                  title: 'This hotel is no longer in your portfolio.',
+                ),
+              ],
+            ),
           );
         }
         return _Detail(propertyId: propertyId, property: found);
@@ -64,9 +83,10 @@ class _Shell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Hotel')),
-        body: child,
-      );
+    backgroundColor: context.colors.background,
+    appBar: AppBar(title: const Text('Hotel')),
+    body: child,
+  );
 }
 
 class _Detail extends ConsumerWidget {
@@ -77,28 +97,26 @@ class _Detail extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
+      backgroundColor: context.colors.background,
       appBar: AppBar(title: Text(property.name)),
-      body: RefreshIndicator(
+      body: PageBody(
         onRefresh: () async {
           ref.invalidate(propertiesProvider);
           ref.invalidate(propertyAmenitiesProvider(propertyId));
           ref.invalidate(propertyRoomTypesProvider(propertyId));
           ref.invalidate(propertyRoomsProvider(propertyId));
         },
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
-          children: [
-            _Header(property: property),
-            const SizedBox(height: 20),
-            _ManagersTile(propertyId: propertyId),
-            const SizedBox(height: 24),
-            _Facilities(propertyId: propertyId),
-            const SizedBox(height: 24),
-            _RoomTypes(propertyId: propertyId),
-            const SizedBox(height: 24),
-            _Rooms(propertyId: propertyId),
-          ],
-        ),
+        children: [
+          _Header(property: property),
+          gapMd,
+          _ManagersTile(propertyId: propertyId),
+          gapSection,
+          _Facilities(propertyId: propertyId),
+          gapSection,
+          _RoomTypes(propertyId: propertyId),
+          gapSection,
+          _Rooms(propertyId: propertyId),
+        ],
       ),
     );
   }
@@ -110,15 +128,11 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final p = property;
     final place = [p.city, p.state].where((s) => s.isNotEmpty).join(', ');
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.xl),
-        border: Border.all(color: AppColors.line),
-      ),
+    return SoftCard(
+      padding: const EdgeInsets.all(Sp.xl),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -127,53 +141,60 @@ class _Header extends StatelessWidget {
               Container(
                 width: 52,
                 height: 52,
-                decoration: BoxDecoration(
-                  color: AppColors.primarySoft,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
+                decoration: BoxDecoration(color: c.accent, borderRadius: R.rMd),
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.location_city_rounded,
+                  color: c.accentForeground,
                 ),
-                child: const Icon(Icons.location_city_rounded, color: AppColors.primaryDark),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: Sp.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       p.name,
-                      style: const TextStyle(
-                          fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.ink),
+                      style: AppTypography.display(
+                        size: 19,
+                        color: c.foreground,
+                      ),
                     ),
                     if (place.isNotEmpty) ...[
                       const SizedBox(height: 2),
-                      Text(place,
-                          style: const TextStyle(color: AppColors.inkMuted, fontSize: 13.5)),
+                      Text(
+                        place,
+                        style: AppTypography.body(
+                          size: 13,
+                          color: c.mutedForeground,
+                        ),
+                      ),
                     ],
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              StatusChip(
+              const SizedBox(width: Sp.sm),
+              StatusBadge(
+                tone: propertyStatusTone(p.status),
                 label: p.status.isEmpty ? 'DRAFT' : p.status,
-                color: p.status == 'ACTIVE' ? AppColors.success : AppColors.inkMuted,
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Row(
+          const SizedBox(height: Sp.lg),
+          Wrap(
+            spacing: Sp.sm,
+            runSpacing: Sp.sm,
             children: [
-              const Icon(Icons.bed_outlined, size: 17, color: AppColors.inkFaint),
-              const SizedBox(width: 6),
-              Text(
-                '${p.roomCount} ${p.roomCount == 1 ? 'room' : 'rooms'}',
-                style: const TextStyle(color: AppColors.inkMuted, fontSize: 13.5),
+              MetaPill(
+                icon: Icons.bed_outlined,
+                label: '${p.roomCount} ${p.roomCount == 1 ? 'room' : 'rooms'}',
               ),
-              if (p.starRating > 0) ...[
-                const SizedBox(width: 14),
-                const Icon(Icons.star_rounded, size: 17, color: AppColors.warning),
-                const SizedBox(width: 4),
-                Text('${p.starRating}-star',
-                    style: const TextStyle(color: AppColors.inkMuted, fontSize: 13.5)),
-              ],
+              if (p.starRating > 0)
+                MetaPill(
+                  icon: Icons.star_rounded,
+                  label: '${p.starRating}-star',
+                  tone: c.warning,
+                ),
             ],
           ),
         ],
@@ -188,17 +209,25 @@ class _ManagersTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        onTap: () => context.push('/properties/$propertyId/staff'),
-        leading: const CircleAvatar(
-          backgroundColor: AppColors.primarySoft,
-          child: Icon(Icons.groups_outlined, color: AppColors.primaryDark),
+    final c = context.colors;
+    return SoftCard(
+      padding: EdgeInsets.zero,
+      child: DataRow2(
+        title: 'Managers',
+        subtitle: 'General Managers and Assistant GMs for this hotel',
+        leading: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(color: c.accent, borderRadius: R.rSm),
+          alignment: Alignment.center,
+          child: Icon(
+            Icons.groups_outlined,
+            size: 19,
+            color: c.accentForeground,
+          ),
         ),
-        title: const Text('Managers', style: TextStyle(fontWeight: FontWeight.w700)),
-        subtitle: const Text('General Managers and Assistant GMs for this hotel'),
-        trailing: const Icon(Icons.chevron_right, color: AppColors.inkFaint),
+        trailing: Icon(Icons.chevron_right, size: 18, color: c.mutedForeground),
+        onTap: () => context.push('/properties/$propertyId/staff'),
       ),
     );
   }
@@ -214,73 +243,48 @@ class _Facilities extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
     final amenities = ref.watch(propertyAmenitiesProvider(propertyId));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionTitle(
-          'Facilities',
+        SectionHeader(
+          title: 'Facilities',
+          icon: Icons.pool_outlined,
           trailing: TextButton.icon(
             onPressed: () => context.push('/properties/$propertyId/amenities'),
-            icon: const Icon(Icons.edit_outlined, size: 17),
+            icon: const Icon(Icons.edit_outlined, size: 15),
             label: const Text('Edit'),
           ),
         ),
-        const SizedBox(height: 12),
         amenities.when(
-          loading: () => const LinearProgressIndicator(minHeight: 2),
+          loading: () => const InlineLoader(),
           error: (e, __) => Text(
             e is ApiException && e.code == 'PROPERTY_NOT_FOUND'
                 ? 'This hotel is no longer in your portfolio.'
                 : 'Could not load facilities.',
-            style: const TextStyle(color: AppColors.inkMuted),
+            style: AppTypography.body(size: 13, color: c.mutedForeground),
           ),
           data: (d) => d.selected.isEmpty
-              ? const _EmptyNote(
+              ? const EmptyState(
                   icon: Icons.pool_outlined,
-                  text: 'No facilities listed yet — tap Edit to tell guests what '
-                      'this hotel offers.',
+                  title: 'No facilities listed yet',
+                  hint: 'Tap Edit to tell guests what this hotel offers.',
                 )
               : Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: d.selected.map((a) => _AmenityChip(amenity: a)).toList(),
+                  spacing: Sp.sm,
+                  runSpacing: Sp.sm,
+                  children: [
+                    for (final a in d.selected)
+                      MetaPill(
+                        icon: amenityIcon(a.icon),
+                        label: a.name,
+                        tone: c.primary,
+                      ),
+                  ],
                 ),
         ),
       ],
-    );
-  }
-}
-
-/// Read-only twin of the editor's `FilterChip`. The app declares no `chipTheme`,
-/// so the brand colours are set here rather than inherited.
-class _AmenityChip extends StatelessWidget {
-  const _AmenityChip({required this.amenity});
-  final Amenity amenity;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.primarySoft,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(amenityIcon(amenity.icon), size: 17, color: AppColors.primaryDark),
-          const SizedBox(width: 8),
-          Text(
-            amenity.name,
-            style: const TextStyle(
-              color: AppColors.primaryDark,
-              fontSize: 13.5,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -295,28 +299,31 @@ class _RoomTypes extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
     final types = ref.watch(propertyRoomTypesProvider(propertyId));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SectionTitle('Room types'),
-        const SizedBox(height: 12),
+        const SectionHeader(title: 'Room types', icon: Icons.king_bed_outlined),
         types.when(
-          loading: () => const LinearProgressIndicator(minHeight: 2),
-          error: (_, __) => const Text(
+          loading: () => const InlineLoader(),
+          error: (_, __) => Text(
             'Could not load room types.',
-            style: TextStyle(color: AppColors.inkMuted),
+            style: AppTypography.body(size: 13, color: c.mutedForeground),
           ),
           data: (list) => list.isEmpty
-              ? const _EmptyNote(
+              ? const EmptyState(
                   icon: Icons.king_bed_outlined,
-                  text: 'No room types yet — your General Manager sets these up '
-                      'in the Tavelo staff app.',
+                  title: 'No room types yet',
+                  hint:
+                      'Your General Manager sets these up in the Tavelo staff '
+                      'app.',
                 )
               : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     for (var i = 0; i < list.length; i++) ...[
-                      if (i > 0) const SizedBox(height: 12),
+                      if (i > 0) const SizedBox(height: Sp.md),
                       _RoomTypeCard(type: list[i]),
                     ],
                   ],
@@ -333,15 +340,10 @@ class _RoomTypeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final t = type;
     final bed = bedSummary(t);
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.line),
-      ),
+    return SoftCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -351,68 +353,46 @@ class _RoomTypeCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   t.name.isEmpty ? 'Room type' : t.name,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: 15.5, color: AppColors.ink),
+                  style: AppTypography.body(
+                    size: 14.5,
+                    weight: FontWeight.w700,
+                    color: c.foreground,
+                  ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: Sp.md),
               Text(
                 formatPaise(t.baseRate, t.currency),
-                style: const TextStyle(
-                    fontWeight: FontWeight.w800, fontSize: 15.5, color: AppColors.ink),
+                style: AppTypography.kpi(size: 18, color: c.foreground),
               ),
             ],
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 3),
           Text(
             '${t.roomCount} ${t.roomCount == 1 ? 'room' : 'rooms'} of this type · '
             'base rate per night',
-            style: const TextStyle(color: AppColors.inkFaint, fontSize: 12.5),
+            style: AppTypography.body(size: 12, color: c.mutedForeground),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: Sp.md),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: Sp.sm,
+            runSpacing: Sp.sm,
             children: [
-              if (bed.isNotEmpty) _Fact(icon: Icons.king_bed_outlined, label: bed),
+              if (bed.isNotEmpty)
+                MetaPill(icon: Icons.king_bed_outlined, label: bed),
               if (t.maxOccupancy > 0)
-                _Fact(icon: Icons.people_outline, label: 'Sleeps ${t.maxOccupancy}'),
-              _Fact(
+                MetaPill(
+                  icon: Icons.people_outline,
+                  label: 'Sleeps ${t.maxOccupancy}',
+                ),
+              MetaPill(
                 icon: t.airConditioned ? Icons.ac_unit : Icons.air,
                 label: t.airConditioned ? 'AC' : 'Non-AC',
               ),
               if (t.sizeSqft > 0)
-                _Fact(icon: Icons.straighten, label: '${t.sizeSqft} sq ft'),
+                MetaPill(icon: Icons.straighten, label: '${t.sizeSqft} sq ft'),
             ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-/// One small icon + label pill inside a room-type card.
-class _Fact extends StatelessWidget {
-  const _Fact({required this.icon, required this.label});
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.field,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 15, color: AppColors.inkMuted),
-          const SizedBox(width: 6),
-          Text(label,
-              style: const TextStyle(
-                  color: AppColors.inkMuted, fontSize: 12.5, fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -423,19 +403,20 @@ class _Fact extends StatelessWidget {
 // Rooms — read-only summary
 // ---------------------------------------------------------------------------
 
-/// Housekeeping statuses, in the order a room moves through them. Tone matters
-/// more than the exact word: green is sellable, amber needs work, red is out.
-(String, Color) _roomStatus(String raw) => switch (raw.toUpperCase()) {
-      'AVAILABLE' => ('Available', AppColors.success),
-      'READY' => ('Ready', AppColors.success),
-      'INSPECTED' => ('Inspected', AppColors.success),
-      'OCCUPIED' => ('Occupied', AppColors.info),
-      'DIRTY' => ('Dirty', AppColors.warning),
-      'CLEANING' => ('Cleaning', AppColors.warning),
-      'MAINTENANCE' => ('Maintenance', AppColors.warning),
-      'OUT_OF_ORDER' => ('Out of order', AppColors.danger),
-      _ => (raw.isEmpty ? 'Unknown' : raw, AppColors.inkMuted),
-    };
+/// Housekeeping statuses, in the order a room moves through them. The wording
+/// and the tone both come from the shared status palette, so a room reads the
+/// same here as it does in the staff app.
+(String, StatusTone) roomStatusChip(String raw) => switch (raw.toUpperCase()) {
+  'AVAILABLE' => ('Available', StatusTone.available),
+  'READY' => ('Ready', StatusTone.available),
+  'INSPECTED' => ('Inspected', StatusTone.inspected),
+  'OCCUPIED' => ('Occupied', StatusTone.occupied),
+  'DIRTY' => ('Dirty', StatusTone.dirty),
+  'CLEANING' => ('Cleaning', StatusTone.cleaning),
+  'MAINTENANCE' => ('Maintenance', StatusTone.maintenance),
+  'OUT_OF_ORDER' => ('Out of order', StatusTone.outOfOrder),
+  _ => (raw.isEmpty ? 'Unknown' : raw, StatusTone.neutral),
+};
 
 class _Rooms extends ConsumerWidget {
   const _Rooms({required this.propertyId});
@@ -443,23 +424,24 @@ class _Rooms extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
     final rooms = ref.watch(propertyRoomsProvider(propertyId));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SectionTitle('Rooms'),
-        const SizedBox(height: 12),
+        const SectionHeader(title: 'Rooms', icon: Icons.meeting_room_outlined),
         rooms.when(
-          loading: () => const LinearProgressIndicator(minHeight: 2),
-          error: (_, __) => const Text(
+          loading: () => const InlineLoader(),
+          error: (_, __) => Text(
             'Could not load rooms.',
-            style: TextStyle(color: AppColors.inkMuted),
+            style: AppTypography.body(size: 13, color: c.mutedForeground),
           ),
           data: (list) => list.isEmpty
-              ? const _EmptyNote(
+              ? const EmptyState(
                   icon: Icons.meeting_room_outlined,
-                  text: 'No rooms yet — your General Manager adds them in the '
-                      'Tavelo staff app.',
+                  title: 'No rooms yet',
+                  hint:
+                      'Your General Manager adds them in the Tavelo staff app.',
                 )
               : _RoomsSummary(rooms: list),
         ),
@@ -508,94 +490,60 @@ class _RoomsSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final counts = _byStatus;
     final floors = _byFloor;
 
-    return Container(
+    return SoftCard(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.line),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
                 '${rooms.length}',
-                style: const TextStyle(
-                    fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.ink),
+                style: AppTypography.kpi(size: 24, color: c.foreground),
               ),
-              const SizedBox(width: 8),
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  rooms.length == 1 ? 'room' : 'rooms',
-                  style: const TextStyle(color: AppColors.inkMuted),
-                ),
+              const SizedBox(width: Sp.sm),
+              Text(
+                rooms.length == 1 ? 'room' : 'rooms',
+                style: AppTypography.body(size: 13, color: c.mutedForeground),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: Sp.md),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: counts.entries.map((e) {
-              final (label, color) = _roomStatus(e.key);
-              return StatusChip(label: '${e.value} $label', color: color);
-            }).toList(),
+            spacing: Sp.sm,
+            runSpacing: Sp.sm,
+            children: [
+              for (final e in counts.entries)
+                Builder(
+                  builder: (_) {
+                    final (label, tone) = roomStatusChip(e.key);
+                    return StatusBadge(tone: tone, label: '${e.value} $label');
+                  },
+                ),
+            ],
           ),
           if (floors.isNotEmpty) ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: Sp.md),
             Text(
               floors
-                  .map((e) => e.key.isEmpty
-                      ? 'No floor set: ${e.value}'
-                      : 'Floor ${e.key}: ${e.value}')
+                  .map(
+                    (e) => e.key.isEmpty
+                        ? 'No floor set: ${e.value}'
+                        : 'Floor ${e.key}: ${e.value}',
+                  )
                   .join('  ·  '),
-              style: const TextStyle(color: AppColors.inkMuted, fontSize: 12.5, height: 1.5),
+              style: AppTypography.numeric(size: 12, color: c.mutedForeground),
             ),
           ],
-          const SizedBox(height: 14),
-          const Text(
+          const SizedBox(height: Sp.md),
+          Text(
             'Rooms are managed by your General Manager in the Tavelo staff app.',
-            style: TextStyle(color: AppColors.inkFaint, fontSize: 12.5),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Shared empty state for the inventory sections. One sentence, because each
-/// of these says the same thing: nothing here yet, and here is who adds it.
-class _EmptyNote extends StatelessWidget {
-  const _EmptyNote({required this.icon, required this.text});
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.line),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 22, color: AppColors.inkFaint),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                  color: AppColors.inkMuted, fontSize: 13.5, height: 1.45),
-            ),
+            style: AppTypography.body(size: 12, color: c.mutedForeground),
           ),
         ],
       ),

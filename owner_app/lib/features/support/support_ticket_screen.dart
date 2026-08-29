@@ -5,8 +5,13 @@ import 'package:intl/intl.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/data/owner_repository.dart';
 import '../../core/models/owner_models.dart';
-import '../../theme/app_theme.dart';
-import '../../widgets/ui.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/cards.dart';
+import '../../core/widgets/primitives.dart';
+import '../../core/widgets/states.dart';
+import '../../core/widgets/status_badge.dart';
 import 'support_screen.dart' show ticketPriorityChip, ticketStatusChip;
 
 /// One ticket thread. The backend never sends Tavelo's internal notes, so
@@ -16,7 +21,8 @@ class SupportTicketScreen extends ConsumerStatefulWidget {
   final String ticketId;
 
   @override
-  ConsumerState<SupportTicketScreen> createState() => _SupportTicketScreenState();
+  ConsumerState<SupportTicketScreen> createState() =>
+      _SupportTicketScreenState();
 }
 
 class _SupportTicketScreenState extends ConsumerState<SupportTicketScreen> {
@@ -35,7 +41,9 @@ class _SupportTicketScreenState extends ConsumerState<SupportTicketScreen> {
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _sending = true);
     try {
-      await ref.read(ownerRepositoryProvider).replyToTicket(widget.ticketId, body);
+      await ref
+          .read(ownerRepositoryProvider)
+          .replyToTicket(widget.ticketId, body);
       _reply.clear();
       ref.invalidate(ticketProvider(widget.ticketId));
     } on ApiException catch (e) {
@@ -47,27 +55,43 @@ class _SupportTicketScreenState extends ConsumerState<SupportTicketScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final ticket = ref.watch(ticketProvider(widget.ticketId));
     return Scaffold(
+      backgroundColor: c.background,
       appBar: AppBar(title: const Text('Ticket')),
       body: ticket.when(
-        loading: () => const LoadingView(),
-        error: (_, __) => ErrorView(
-          message: 'Could not load this ticket.',
-          onRetry: () => ref.invalidate(ticketProvider(widget.ticketId)),
+        loading: () => const PageBody(children: [ListSkeleton(rows: 3)]),
+        error: (e, __) => PageBody(
+          children: [
+            ErrorState(
+              error: e,
+              message: 'Could not load this ticket.',
+              onRetry: () => ref.invalidate(ticketProvider(widget.ticketId)),
+            ),
+          ],
         ),
         data: (t) => Column(
           children: [
             _TicketHeader(ticket: t),
-            const Divider(height: 1),
+            Container(height: 1, color: c.border),
             Expanded(
               child: t.messages.isEmpty
-                  ? const Center(
-                      child: Text('No messages yet.',
-                          style: TextStyle(color: AppColors.inkMuted)),
+                  ? const PageBody(
+                      children: [
+                        EmptyState(
+                          icon: Icons.forum_outlined,
+                          title: 'No messages yet.',
+                        ),
+                      ],
                     )
                   : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                      padding: const EdgeInsets.fromLTRB(
+                        Sp.xl,
+                        Sp.xl,
+                        Sp.xl,
+                        Sp.xl,
+                      ),
                       itemCount: t.messages.length,
                       itemBuilder: (_, i) => _Bubble(message: t.messages[i]),
                     ),
@@ -75,11 +99,7 @@ class _SupportTicketScreenState extends ConsumerState<SupportTicketScreen> {
             if (t.isClosed)
               const _ClosedNotice()
             else
-              _ReplyBox(
-                controller: _reply,
-                sending: _sending,
-                onSend: _send,
-              ),
+              _ReplyBox(controller: _reply, sending: _sending, onSend: _send),
           ],
         ),
       ),
@@ -93,37 +113,47 @@ class _TicketHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (statusLabel, statusColor) = ticketStatusChip(ticket.status);
-    final (priorityLabel, priorityColor) = ticketPriorityChip(ticket.priority);
+    final c = context.colors;
+    final (statusLabel, statusTone) = ticketStatusChip(ticket.status);
+    final (priorityLabel, priorityTone) = ticketPriorityChip(ticket.priority);
     final opened = ticket.createdAt;
 
     return Container(
       width: double.infinity,
-      color: AppColors.surface,
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      color: c.card,
+      padding: const EdgeInsets.fromLTRB(Sp.xl, Sp.lg, Sp.xl, Sp.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             ticket.subject,
-            style: const TextStyle(
-                fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.ink),
+            style: AppTypography.display(size: 17, color: c.foreground),
           ),
           const SizedBox(height: 10),
           Wrap(
-            spacing: 8,
+            spacing: Sp.sm,
             runSpacing: 6,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              StatusChip(label: statusLabel, color: statusColor),
-              StatusChip(label: priorityLabel, color: priorityColor),
+              StatusBadge(tone: statusTone, label: statusLabel, dense: true),
+              StatusBadge(
+                tone: priorityTone,
+                label: priorityLabel,
+                icon: Icons.flag_outlined,
+                dense: true,
+              ),
               if (ticket.propertyName.isNotEmpty)
-                Text(ticket.propertyName,
-                    style: const TextStyle(color: AppColors.inkMuted, fontSize: 12.5)),
+                Text(
+                  ticket.propertyName,
+                  style: AppTypography.body(size: 12, color: c.mutedForeground),
+                ),
               if (opened != null)
                 Text(
                   'Opened ${DateFormat.yMMMd().format(opened)}',
-                  style: const TextStyle(color: AppColors.inkFaint, fontSize: 12.5),
+                  style: AppTypography.numeric(
+                    size: 11.5,
+                    color: c.mutedForeground,
+                  ),
                 ),
             ],
           ),
@@ -139,24 +169,33 @@ class _Bubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final mine = message.mine;
     final when = message.createdAt;
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Column(
-        crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: mine
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           Container(
-            constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.82),
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.sizeOf(context).width * 0.82,
+            ),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: mine ? AppColors.primarySoft : AppColors.surface,
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              border: Border.all(color: mine ? AppColors.primarySoft : AppColors.line),
+              // The owner's own messages carry a tint of the primary rather
+              // than a solid pastel, so they stay readable on both themes.
+              color: mine ? c.primary.withValues(alpha: 0.12) : c.card,
+              borderRadius: R.rLg,
+              border: Border.all(
+                color: mine ? c.primary.withValues(alpha: 0.3) : c.border,
+              ),
             ),
             child: Text(
               message.body,
-              style: const TextStyle(color: AppColors.ink, fontSize: 14, height: 1.45),
+              style: AppTypography.body(size: 13.5, color: c.foreground),
             ),
           ),
           const SizedBox(height: 4),
@@ -164,7 +203,7 @@ class _Bubble extends StatelessWidget {
             when == null
                 ? message.authorLabel
                 : '${message.authorLabel} · ${DateFormat.MMMd().add_jm().format(when)}',
-            style: const TextStyle(color: AppColors.inkFaint, fontSize: 11.5),
+            style: AppTypography.body(size: 11, color: c.mutedForeground),
           ),
         ],
       ),
@@ -184,13 +223,14 @@ class _ReplyBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          border: Border(top: BorderSide(color: AppColors.line)),
+        padding: const EdgeInsets.fromLTRB(Sp.lg, Sp.md, Sp.lg, Sp.md),
+        decoration: BoxDecoration(
+          color: c.card,
+          border: Border(top: BorderSide(color: c.border)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -201,10 +241,7 @@ class _ReplyBox extends StatelessWidget {
                 minLines: 1,
                 maxLines: 5,
                 textInputAction: TextInputAction.newline,
-                decoration: const InputDecoration(
-                  hintText: 'Write a reply…',
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                ),
+                decoration: const InputDecoration(hintText: 'Write a reply…'),
               ),
             ),
             const SizedBox(width: 10),
@@ -219,10 +256,15 @@ class _ReplyBox extends StatelessWidget {
                   shape: const CircleBorder(),
                 ),
                 child: sending
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                          valueColor: AlwaysStoppedAnimation(
+                            c.primaryForeground,
+                          ),
+                        ),
                       )
                     : const Icon(Icons.send_rounded, size: 20),
               ),
@@ -241,10 +283,10 @@ class _ClosedNotice extends StatelessWidget {
     return const SafeArea(
       top: false,
       child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Banner2(
+        padding: EdgeInsets.all(Sp.lg),
+        child: NoticeBanner(
           icon: Icons.check_circle_outline,
-          tone: BannerTone.success,
+          tone: NoticeTone.success,
           text: 'This ticket is closed. Open a new one if you need more help.',
         ),
       ),

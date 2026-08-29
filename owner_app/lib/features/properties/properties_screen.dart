@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/data/owner_repository.dart';
-import '../../theme/app_theme.dart';
-import '../../widgets/ui.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/widgets/primitives.dart';
+import '../../core/widgets/states.dart';
+import 'property_card.dart';
 
 class PropertiesScreen extends ConsumerWidget {
   const PropertiesScreen({super.key});
@@ -12,48 +14,56 @@ class PropertiesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final props = ref.watch(propertiesProvider);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Properties')),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        onPressed: () => context.push('/properties/new'),
-        icon: const Icon(Icons.add),
-        label: const Text('Add property'),
-      ),
-      body: props.when(
-        loading: () => const LoadingView(),
-        error: (_, __) => ErrorView(
-          message: 'Could not load properties.',
-          onRetry: () => ref.invalidate(propertiesProvider),
+    return PageBody(
+      onRefresh: () async => ref.invalidate(propertiesProvider),
+      children: [
+        PageHeader(
+          eyebrow: 'Portfolio',
+          title: 'Hotels',
+          subtitle: 'Every property on your account.',
+          actions: [
+            // The add action lives in the header rather than a floating button:
+            // the shell owns the bottom edge of the screen now.
+            FilledButton.icon(
+              onPressed: () => context.push('/properties/new'),
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('Add property'),
+            ),
+          ],
         ),
-        data: (list) => ListView.separated(
-          padding: const EdgeInsets.all(20),
-          itemCount: list.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (_, i) {
-            final p = list[i];
-            return Card(
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                // The record travels with the navigation so the detail
-                // screen renders its header without a second fetch.
-                onTap: () => context.push('/properties/${p.id}', extra: p),
-                leading: const CircleAvatar(
-                  backgroundColor: AppColors.primarySoft,
-                  child: Icon(Icons.location_city, color: AppColors.primaryDark),
+        gapSection,
+        props.when(
+          loading: () => const ListSkeleton(),
+          error: (e, _) => ErrorState(
+            error: e,
+            message: 'Could not load properties.',
+            onRetry: () => ref.invalidate(propertiesProvider),
+          ),
+          data: (list) => list.isEmpty
+              ? EmptyState(
+                  icon: Icons.add_business_outlined,
+                  title: 'No hotels yet',
+                  hint:
+                      'Add your first property to start managing rooms and '
+                      'operations.',
+                  action: FilledButton.icon(
+                    onPressed: () => context.push('/properties/new'),
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('Add property'),
+                  ),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final p in list)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: Sp.md),
+                        child: PropertyCard(property: p),
+                      ),
+                  ],
                 ),
-                title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: Text('${p.city}, ${p.state} · ${p.roomCount} rooms'),
-                trailing: StatusChip(
-                  label: p.status.isEmpty ? 'DRAFT' : p.status,
-                  color: p.status == 'ACTIVE' ? AppColors.success : AppColors.inkMuted,
-                ),
-              ),
-            );
-          },
         ),
-      ),
+      ],
     );
   }
 }

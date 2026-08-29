@@ -7,8 +7,16 @@ import '../../core/api/api_exception.dart';
 import '../../core/data/owner_repository.dart';
 import '../../core/models/owner_models.dart';
 import '../../core/providers.dart';
-import '../../theme/app_theme.dart';
-import '../../widgets/ui.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/theme/theme_controller.dart';
+import '../../core/utils/formatting.dart';
+import '../../core/widgets/auth_scaffold.dart' show ButtonSpinner;
+import '../../core/widgets/cards.dart';
+import '../../core/widgets/primitives.dart';
+import '../../core/widgets/states.dart';
+import '../../core/widgets/status_badge.dart';
 
 /// The owner's own details. Email is shown but never editable — it is the
 /// address the account signs in with, so changing it is a support action.
@@ -18,16 +26,20 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final account = ref.watch(ownerAccountProvider);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
-      body: account.when(
-        loading: () => const LoadingView(),
-        error: (_, __) => ErrorView(
-          message: 'Could not load your profile.',
-          onRetry: () => ref.invalidate(ownerAccountProvider),
-        ),
-        data: (a) => _ProfileForm(account: a),
+    return account.when(
+      loading: () => const PageBody(children: [ListSkeleton(rows: 4)]),
+      error: (e, __) => PageBody(
+        children: [
+          const PageHeader(eyebrow: 'Account', title: 'Profile'),
+          gapSection,
+          ErrorState(
+            error: e,
+            message: 'Could not load your profile.',
+            onRetry: () => ref.invalidate(ownerAccountProvider),
+          ),
+        ],
       ),
+      data: (a) => _ProfileForm(account: a),
     );
   }
 }
@@ -106,7 +118,8 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
       setState(() => _error = 'Nothing has changed yet.');
       return;
     }
-    if (body.containsKey('state') && (_stateId == null || _districtId == null)) {
+    if (body.containsKey('state') &&
+        (_stateId == null || _districtId == null)) {
       setState(() => _error = 'Select a state and district.');
       return;
     }
@@ -117,8 +130,9 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
       ref.invalidate(ownerAccountProvider);
       await ref.read(authControllerProvider.notifier).refreshMe();
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Profile updated.')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Profile updated.')));
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } finally {
@@ -133,17 +147,23 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
 
     return Form(
       key: _form,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+      child: PageBody(
         children: [
+          const PageHeader(eyebrow: 'Account', title: 'Profile'),
+          gapSection,
           _Header(account: a),
-          const SizedBox(height: 24),
+          gapSection,
+          const _Appearance(),
+          gapSection,
           if (_error != null) ...[
-            Banner2(text: _error!, tone: BannerTone.danger, icon: Icons.error_outline),
-            const SizedBox(height: 16),
+            NoticeBanner(
+              text: _error!,
+              tone: NoticeTone.danger,
+              icon: Icons.error_outline,
+            ),
+            gapSection,
           ],
-          const SectionTitle('Account'),
-          const SizedBox(height: 12),
+          const SectionHeader(title: 'Account', icon: Icons.person_outline),
           _ReadOnlyEmail(email: a.email, verified: a.emailVerified),
           const SizedBox(height: 14),
           TextFormField(
@@ -168,9 +188,13 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
               FilteringTextInputFormatter.digitsOnly,
               LengthLimitingTextInputFormatter(10),
             ],
-            decoration: const InputDecoration(labelText: 'Mobile number', prefixText: '+91  '),
-            validator: (v) =>
-                RegExp(r'^[6-9]\d{9}$').hasMatch(v?.trim() ?? '') ? null : 'Valid mobile number',
+            decoration: const InputDecoration(
+              labelText: 'Mobile number',
+              prefixText: '+91  ',
+            ),
+            validator: (v) => RegExp(r'^[6-9]\d{9}$').hasMatch(v?.trim() ?? '')
+                ? null
+                : 'Valid mobile number',
           ),
           const SizedBox(height: 14),
           TextFormField(
@@ -184,57 +208,78 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
             validator: (v) {
               final t = (v ?? '').trim().toUpperCase();
               if (t.isEmpty) return null;
-              return RegExp(r'^\d{2}[A-Z]{5}\d{4}[A-Z]\d[Z][A-Z\d]$').hasMatch(t)
+              return RegExp(
+                    r'^\d{2}[A-Z]{5}\d{4}[A-Z]\d[Z][A-Z\d]$',
+                  ).hasMatch(t)
                   ? null
                   : 'Enter a valid 15-character GSTIN';
             },
           ),
-          const SizedBox(height: 24),
-          const SectionTitle('Address'),
-          const SizedBox(height: 12),
+          gapSection,
+          const SectionHeader(title: 'Address', icon: Icons.place_outlined),
           TextFormField(
             controller: _address,
             decoration: const InputDecoration(labelText: 'Address'),
           ),
           const SizedBox(height: 14),
           catalogue.when(
-            loading: () => const LinearProgressIndicator(minHeight: 2),
-            error: (_, __) => const Text(
+            loading: () => const InlineLoader(),
+            error: (_, __) => Text(
               'Could not load locations',
-              style: TextStyle(color: AppColors.danger),
+              style: AppTypography.body(
+                size: 13,
+                color: context.colors.destructive,
+              ),
             ),
             data: (states) {
-              final districts = states
+              final districts =
+                  states
                       .where((s) => s.id == _stateId)
                       .map((s) => s.districts)
                       .firstOrNull ??
                   const <CatalogueDistrict>[];
-              return Column(children: [
-                DropdownButtonFormField<String>(
-                  initialValue: states.any((s) => s.id == _stateId) ? _stateId : null,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'State'),
-                  items: states
-                      .map((s) => DropdownMenuItem(value: s.id, child: Text(s.name)))
-                      .toList(),
-                  onChanged: (v) => setState(() {
-                    _stateId = v;
-                    _districtId = null;
-                  }),
-                ),
-                const SizedBox(height: 14),
-                DropdownButtonFormField<String>(
-                  initialValue:
-                      districts.any((d) => d.id == _districtId) ? _districtId : null,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'District'),
-                  items: districts
-                      .map((d) => DropdownMenuItem(value: d.id, child: Text(d.name)))
-                      .toList(),
-                  onChanged:
-                      _stateId == null ? null : (v) => setState(() => _districtId = v),
-                ),
-              ]);
+              return Column(
+                children: [
+                  DropdownButtonFormField<String>(
+                    initialValue: states.any((s) => s.id == _stateId)
+                        ? _stateId
+                        : null,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'State'),
+                    items: states
+                        .map(
+                          (s) => DropdownMenuItem(
+                            value: s.id,
+                            child: Text(s.name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => setState(() {
+                      _stateId = v;
+                      _districtId = null;
+                    }),
+                  ),
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    initialValue: districts.any((d) => d.id == _districtId)
+                        ? _districtId
+                        : null,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'District'),
+                    items: districts
+                        .map(
+                          (d) => DropdownMenuItem(
+                            value: d.id,
+                            child: Text(d.name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: _stateId == null
+                        ? null
+                        : (v) => setState(() => _districtId = v),
+                  ),
+                ],
+              );
             },
           ),
           const SizedBox(height: 14),
@@ -255,13 +300,50 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
           const SizedBox(height: 28),
           FilledButton(
             onPressed: _busy ? null : _save,
-            child: _busy
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
-                  )
-                : const Text('Save changes'),
+            child: _busy ? const ButtonSpinner() : const Text('Save changes'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The one setting the owner controls on this device. It lives beside the
+/// profile because the top bar's single button cannot say what the three
+/// choices are.
+class _Appearance extends ConsumerWidget {
+  const _Appearance();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    final mode = ref.watch(themeControllerProvider);
+    return Panel(
+      title: 'Appearance',
+      description: 'Applies to this device only.',
+      child: Row(
+        children: [
+          Icon(Icons.contrast_outlined, size: 18, color: c.mutedForeground),
+          const SizedBox(width: Sp.md),
+          Expanded(
+            child: Text(
+              'Theme',
+              style: AppTypography.body(
+                size: 13.5,
+                weight: FontWeight.w600,
+                color: c.foreground,
+              ),
+            ),
+          ),
+          Segmented<ThemeMode>(
+            options: const [ThemeMode.system, ThemeMode.light, ThemeMode.dark],
+            value: mode,
+            labelOf: (m) => switch (m) {
+              ThemeMode.system => 'Auto',
+              ThemeMode.light => 'Light',
+              ThemeMode.dark => 'Dark',
+            },
+            onChanged: (m) => ref.read(themeControllerProvider.notifier).set(m),
           ),
         ],
       ),
@@ -275,68 +357,66 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final joined = account.createdAt;
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 32,
-          backgroundColor: AppColors.primarySoft,
-          child: Text(
-            _initials(account.name),
-            style: const TextStyle(
-              color: AppColors.primaryDark,
-              fontWeight: FontWeight.w700,
-              fontSize: 22,
+    return SoftCard(
+      child: Row(
+        children: [
+          Monogram(
+            initials: initialsOf(account.name, fallback: 'O'),
+            radius: 28,
+          ),
+          const SizedBox(width: Sp.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  account.name.isEmpty ? 'Owner' : account.name,
+                  style: AppTypography.display(size: 19, color: c.foreground),
+                ),
+                if (account.company.isNotEmpty)
+                  Text(
+                    account.company,
+                    style: AppTypography.body(
+                      size: 13,
+                      color: c.mutedForeground,
+                    ),
+                  ),
+                const SizedBox(height: Sp.sm),
+                Wrap(
+                  spacing: Sp.sm,
+                  runSpacing: 6,
+                  children: [
+                    StatusBadge(
+                      tone: StatusTone.healthy,
+                      icon: Icons.apartment_outlined,
+                      dense: true,
+                      label:
+                          '${account.propertiesCount} '
+                          '${account.propertiesCount == 1 ? 'hotel' : 'hotels'}',
+                    ),
+                    StatusBadge(
+                      tone: StatusTone.info,
+                      icon: Icons.groups_outlined,
+                      dense: true,
+                      label: '${account.staffCount} staff',
+                    ),
+                    if (joined != null)
+                      StatusBadge(
+                        tone: StatusTone.neutral,
+                        icon: Icons.event_outlined,
+                        dense: true,
+                        label: 'Since ${DateFormat.yMMM().format(joined)}',
+                      ),
+                  ],
+                ),
+              ],
             ),
           ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                account.name.isEmpty ? 'Owner' : account.name,
-                style: const TextStyle(
-                    fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.ink),
-              ),
-              if (account.company.isNotEmpty)
-                Text(account.company, style: const TextStyle(color: AppColors.inkMuted)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: [
-                  StatusChip(
-                    label: '${account.propertiesCount} '
-                        '${account.propertiesCount == 1 ? 'hotel' : 'hotels'}',
-                    color: AppColors.primary,
-                  ),
-                  StatusChip(
-                    label: '${account.staffCount} staff',
-                    color: AppColors.info,
-                  ),
-                  if (joined != null)
-                    StatusChip(
-                      label: 'Since ${DateFormat.yMMM().format(joined)}',
-                      color: AppColors.inkMuted,
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
-  }
-
-  static String _initials(String name) {
-    final n = name.trim();
-    if (n.isEmpty) return 'O';
-    final parts = n.split(RegExp(r'\s+'));
-    return parts.length == 1
-        ? parts.first.substring(0, 1).toUpperCase()
-        : (parts.first[0] + parts.last[0]).toUpperCase();
   }
 }
 
@@ -347,32 +427,37 @@ class _ReadOnlyEmail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: Sp.lg, vertical: 14),
       decoration: BoxDecoration(
-        color: AppColors.field,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.line),
+        color: c.muted,
+        borderRadius: R.rMd,
+        border: Border.all(color: c.border),
       ),
       child: Row(
         children: [
-          const Icon(Icons.mail_outline, size: 20, color: AppColors.inkFaint),
-          const SizedBox(width: 12),
+          Icon(Icons.mail_outline, size: 20, color: c.mutedForeground),
+          const SizedBox(width: Sp.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Email',
-                    style: TextStyle(color: AppColors.inkMuted, fontSize: 12)),
+                const LabelXs('Email'),
                 const SizedBox(height: 2),
-                Text(email, style: const TextStyle(color: AppColors.ink, fontSize: 14.5)),
+                Text(
+                  email.isEmpty ? '—' : email,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.body(size: 14, color: c.foreground),
+                ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          StatusChip(
+          const SizedBox(width: Sp.sm),
+          StatusBadge(
+            tone: verified ? StatusTone.healthy : StatusTone.warning,
             label: verified ? 'Verified' : 'Not verified',
-            color: verified ? AppColors.success : AppColors.warning,
+            dense: true,
           ),
         ],
       ),

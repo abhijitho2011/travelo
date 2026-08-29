@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/data/owner_repository.dart';
 import '../../core/models/owner_models.dart';
-import '../../widgets/ui.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/widgets/primitives.dart';
+import '../../core/widgets/states.dart';
 import 'staff_form.dart';
 
 /// Edit an existing manager. The member usually arrives with the navigation as
@@ -24,21 +26,37 @@ class EditStaffScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (member != null) {
-      return _scaffold(StaffForm(propertyId: propertyId, existing: member));
+      return _scaffold(
+        context,
+        StaffForm(propertyId: propertyId, existing: member),
+      );
     }
 
     final staff = ref.watch(staffProvider(propertyId));
     return _scaffold(
+      context,
       staff.when(
-        loading: () => const LoadingView(),
-        error: (_, __) => ErrorView(
-          message: 'Could not load this manager.',
-          onRetry: () => ref.invalidate(staffProvider(propertyId)),
+        loading: () => const PageBody(children: [ListSkeleton(rows: 3)]),
+        error: (e, __) => PageBody(
+          children: [
+            ErrorState(
+              error: e,
+              message: 'Could not load this manager.',
+              onRetry: () => ref.invalidate(staffProvider(propertyId)),
+            ),
+          ],
         ),
         data: (list) {
           final found = list.where((s) => s.id == staffId).firstOrNull;
           if (found == null) {
-            return const ErrorView(message: 'This manager no longer exists.');
+            return const PageBody(
+              children: [
+                EmptyState(
+                  icon: Icons.person_off_outlined,
+                  title: 'This manager no longer exists.',
+                ),
+              ],
+            );
           }
           return StaffForm(propertyId: propertyId, existing: found);
         },
@@ -46,8 +64,9 @@ class EditStaffScreen extends ConsumerWidget {
     );
   }
 
-  Widget _scaffold(Widget body) => Scaffold(
-        appBar: AppBar(title: const Text('Edit manager')),
-        body: body,
-      );
+  Widget _scaffold(BuildContext context, Widget body) => Scaffold(
+    backgroundColor: context.colors.background,
+    appBar: AppBar(title: const Text('Edit manager')),
+    body: body,
+  );
 }

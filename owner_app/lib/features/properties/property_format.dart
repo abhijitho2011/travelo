@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../../core/models/owner_models.dart';
+
+/// Money formatting lives in `core/utils` so the subscription and invoice
+/// screens share one implementation with the room-type cards; it is re-exported
+/// here because this is where the property screens already look for it.
+export '../../core/utils/formatting.dart' show formatPaise;
 
 /// Presentation helpers shared by the property detail screen and the amenities
 /// editor. They live here rather than inside either screen so both render the
@@ -52,13 +56,6 @@ const Map<String, IconData> kAmenityIcons = {
 /// of, so an unknown (or missing) name must still render something.
 IconData amenityIcon(String? name) =>
     kAmenityIcons[name ?? ''] ?? Icons.check_circle_outline;
-
-/// Rates are stored in paise; the owner sees rupees.
-String formatPaise(int paise, [String currency = 'INR']) {
-  final symbol = currency.toUpperCase() == 'INR' ? '₹' : '$currency ';
-  return NumberFormat.currency(locale: 'en_IN', symbol: symbol, decimalDigits: 0)
-      .format(paise / 100);
-}
 
 /// "2 × Queen", or just the bed type when there is one of them. Empty when the
 /// GM has not filled the type in yet.

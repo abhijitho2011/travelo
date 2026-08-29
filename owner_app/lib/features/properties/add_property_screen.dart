@@ -10,8 +10,13 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/data/location_repository.dart';
 import '../../core/data/owner_repository.dart';
-import '../../theme/app_theme.dart';
-import '../../widgets/ui.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/auth_scaffold.dart' show ButtonSpinner;
+import '../../core/widgets/cards.dart';
+import '../../core/widgets/primitives.dart';
+import '../../core/widgets/states.dart';
 
 class AddPropertyScreen extends ConsumerStatefulWidget {
   const AddPropertyScreen({super.key});
@@ -109,9 +114,11 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
       );
       context.pop();
     } on ApiException catch (e) {
-      setState(() => _error = e.code == 'PROPERTY_LIMIT_REACHED'
-          ? 'You have reached the number of properties included in your plan. Contact Tavelo to increase your limit.'
-          : e.message);
+      setState(
+        () => _error = e.code == 'PROPERTY_LIMIT_REACHED'
+            ? 'You have reached the number of properties included in your plan. Contact Tavelo to increase your limit.'
+            : e.message,
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -121,54 +128,72 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
   Widget build(BuildContext context) {
     final locations = ref.watch(locationsProvider);
     return Scaffold(
+      backgroundColor: context.colors.background,
       appBar: AppBar(title: const Text('Add property')),
       body: Form(
         key: _form,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
+        child: PageBody(
           children: [
             if (_error != null) ...[
-              Banner2(text: _error!, tone: BannerTone.danger, icon: Icons.error_outline),
-              const SizedBox(height: 16),
+              NoticeBanner(
+                text: _error!,
+                tone: NoticeTone.danger,
+                icon: Icons.error_outline,
+              ),
+              gapSection,
             ],
-            const SectionTitle('Property details'),
-            const SizedBox(height: 12),
+            const SectionHeader(
+              title: 'Property details',
+              icon: Icons.apartment_outlined,
+            ),
             TextFormField(
               controller: _name,
               decoration: const InputDecoration(labelText: 'Property name'),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter a property name' : null,
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'Enter a property name'
+                  : null,
             ),
-            const SizedBox(height: 24),
-            const SectionTitle('Photos'),
-            const SizedBox(height: 12),
+            gapSection,
+            const SectionHeader(
+              title: 'Photos',
+              icon: Icons.photo_library_outlined,
+            ),
             _PhotoStrip(
               photos: _photos,
               onAdd: _pickPhotos,
               onRemove: (i) => setState(() => _photos.removeAt(i)),
             ),
-            const SizedBox(height: 24),
-            const SectionTitle('Address'),
-            const SizedBox(height: 12),
+            gapSection,
+            const SectionHeader(title: 'Address', icon: Icons.place_outlined),
             TextFormField(
               controller: _line1,
               decoration: const InputDecoration(labelText: 'Address line'),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter the address' : null,
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Enter the address' : null,
             ),
             const SizedBox(height: 14),
             TextFormField(
               controller: _city,
               decoration: const InputDecoration(labelText: 'City / Town'),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter a city' : null,
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Enter a city' : null,
             ),
             const SizedBox(height: 14),
             locations.when(
-              loading: () => const LinearProgressIndicator(minHeight: 2),
-              error: (_, __) => const Text('Could not load locations',
-                  style: TextStyle(color: AppColors.danger)),
+              loading: () => const InlineLoader(),
+              error: (_, __) => Text(
+                'Could not load locations',
+                style: AppTypography.body(
+                  size: 13,
+                  color: context.colors.destructive,
+                ),
+              ),
               data: (map) {
                 final states = map.keys.toList()..sort();
                 // Districts are always those of the selected state.
-                final districts = _state == null ? <String>[] : (map[_state] ?? []);
+                final districts = _state == null
+                    ? <String>[]
+                    : (map[_state] ?? []);
                 return Column(
                   children: [
                     DropdownButtonFormField<String>(
@@ -176,11 +201,14 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
                       isExpanded: true,
                       decoration: const InputDecoration(labelText: 'State'),
                       items: states
-                          .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                          .map(
+                            (s) => DropdownMenuItem(value: s, child: Text(s)),
+                          )
                           .toList(),
                       onChanged: (v) => setState(() {
                         _state = v;
-                        _district = null; // the old district may not belong here
+                        _district =
+                            null; // the old district may not belong here
                       }),
                     ),
                     const SizedBox(height: 14),
@@ -189,7 +217,9 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
                       isExpanded: true,
                       decoration: const InputDecoration(labelText: 'District'),
                       items: districts
-                          .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+                          .map(
+                            (d) => DropdownMenuItem(value: d, child: Text(d)),
+                          )
                           .toList(),
                       onChanged: _state == null
                           ? null
@@ -208,11 +238,11 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
                 LengthLimitingTextInputFormatter(6),
               ],
               decoration: const InputDecoration(labelText: 'PIN code'),
-              validator: (v) => (v == null || v.trim().length != 6) ? '6-digit PIN' : null,
+              validator: (v) =>
+                  (v == null || v.trim().length != 6) ? '6-digit PIN' : null,
             ),
-            const SizedBox(height: 24),
-            const SectionTitle('Contact'),
-            const SizedBox(height: 12),
+            gapSection,
+            const SectionHeader(title: 'Contact', icon: Icons.call_outlined),
             TextFormField(
               controller: _phone,
               keyboardType: TextInputType.phone,
@@ -244,11 +274,7 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
             FilledButton(
               onPressed: _busy ? null : _submit,
               child: _busy
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
-                    )
+                  ? const ButtonSpinner()
                   : const Text('Save property'),
             ),
           ],
@@ -259,13 +285,18 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
 }
 
 class _PhotoStrip extends StatelessWidget {
-  const _PhotoStrip({required this.photos, required this.onAdd, required this.onRemove});
+  const _PhotoStrip({
+    required this.photos,
+    required this.onAdd,
+    required this.onRemove,
+  });
   final List<XFile> photos;
   final VoidCallback onAdd;
   final ValueChanged<int> onRemove;
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return SizedBox(
       height: 96,
       child: ListView(
@@ -278,16 +309,22 @@ class _PhotoStrip extends StatelessWidget {
               height: 96,
               margin: const EdgeInsets.only(right: 10),
               decoration: BoxDecoration(
-                color: AppColors.field,
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                border: Border.all(color: AppColors.line),
+                color: c.muted,
+                borderRadius: R.rMd,
+                border: Border.all(color: c.border),
               ),
-              child: const Column(
+              child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_a_photo_outlined, color: AppColors.inkMuted),
-                  SizedBox(height: 6),
-                  Text('Add', style: TextStyle(fontSize: 12, color: AppColors.inkMuted)),
+                  Icon(Icons.add_a_photo_outlined, color: c.mutedForeground),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Add',
+                    style: AppTypography.body(
+                      size: 12,
+                      color: c.mutedForeground,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -302,7 +339,7 @@ class _PhotoStrip extends StatelessWidget {
                   height: 96,
                   margin: const EdgeInsets.only(right: 10),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    borderRadius: R.rMd,
                     image: DecorationImage(
                       fit: BoxFit.cover,
                       image: kIsWeb
@@ -316,6 +353,8 @@ class _PhotoStrip extends StatelessWidget {
                   top: 4,
                   child: GestureDetector(
                     onTap: () => onRemove(i),
+                    // Fixed, not themed: this scrim sits on the photo itself,
+                    // where the ground is the picture rather than the page.
                     child: const CircleAvatar(
                       radius: 11,
                       backgroundColor: Colors.black54,

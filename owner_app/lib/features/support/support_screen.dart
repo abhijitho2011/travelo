@@ -5,8 +5,12 @@ import 'package:intl/intl.dart';
 
 import '../../core/data/owner_repository.dart';
 import '../../core/models/owner_models.dart';
-import '../../theme/app_theme.dart';
-import '../../widgets/ui.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/primitives.dart';
+import '../../core/widgets/states.dart';
+import '../../core/widgets/status_badge.dart';
 
 /// Status filters offered above the ticket list. '' is "everything".
 const _filters = <(String, String)>[
@@ -26,91 +30,106 @@ class SupportScreen extends ConsumerStatefulWidget {
 class _SupportScreenState extends ConsumerState<SupportScreen> {
   String _status = '';
 
+  Future<void> _newTicket() async {
+    await context.push('/support/new');
+    ref.invalidate(ticketsProvider(_status));
+  }
+
   @override
   Widget build(BuildContext context) {
     final tickets = ref.watch(ticketsProvider(_status));
-    return Scaffold(
-      appBar: AppBar(title: const Text('Support')),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        onPressed: () async {
-          await context.push('/support/new');
-          ref.invalidate(ticketsProvider(_status));
-        },
-        icon: const Icon(Icons.add_comment_outlined),
-        label: const Text('New ticket'),
-      ),
-      body: Column(
-        children: [
-          SizedBox(
-            height: 56,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              children: [
-                for (final (value, label) in _filters)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text(label),
-                      selected: _status == value,
-                      onSelected: (_) => setState(() => _status = value),
-                    ),
-                  ),
-              ],
+
+    return PageBody(
+      onRefresh: () async => ref.invalidate(ticketsProvider(_status)),
+      children: [
+        PageHeader(
+          eyebrow: 'Help',
+          title: 'Support',
+          subtitle: 'Ask Tavelo anything about your hotels or your account.',
+          actions: [
+            FilledButton.icon(
+              onPressed: _newTicket,
+              icon: const Icon(Icons.add_comment_outlined, size: 16),
+              label: const Text('New ticket'),
             ),
-          ),
-          const Divider(height: 1),
-          Expanded(
-            child: tickets.when(
-              loading: () => const LoadingView(),
-              error: (_, __) => ErrorView(
-                message: 'Could not load your tickets.',
-                onRetry: () => ref.invalidate(ticketsProvider(_status)),
+          ],
+        ),
+        gapSection,
+        // A Wrap rather than a horizontal strip: five filters fit on two lines
+        // on the narrowest phone, and none of them scrolls out of sight.
+        Wrap(
+          spacing: Sp.sm,
+          runSpacing: Sp.sm,
+          children: [
+            for (final (value, label) in _filters)
+              ChoiceChip(
+                label: Text(label),
+                selected: _status == value,
+                onSelected: (_) => setState(() => _status = value),
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              data: (list) {
-                if (list.isEmpty) return const _EmptyTickets();
-                return RefreshIndicator(
-                  onRefresh: () async => ref.invalidate(ticketsProvider(_status)),
-                  child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
-                    itemCount: list.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (_, i) => _TicketCard(
-                      ticket: list[i],
-                      onOpen: () async {
-                        await context.push('/support/${list[i].id}');
-                        ref.invalidate(ticketsProvider(_status));
-                      },
-                    ),
-                  ),
-                );
-              },
-            ),
+          ],
+        ),
+        gapMd,
+        tickets.when(
+          loading: () => const ListSkeleton(rows: 3, height: 96),
+          error: (e, _) => ErrorState(
+            error: e,
+            message: 'Could not load your tickets.',
+            onRetry: () => ref.invalidate(ticketsProvider(_status)),
           ),
-        ],
-      ),
+          data: (list) => list.isEmpty
+              ? EmptyState(
+                  icon: Icons.forum_outlined,
+                  title: 'No tickets here',
+                  hint: 'Open a ticket and the Tavelo team will pick it up.',
+                  action: FilledButton.icon(
+                    onPressed: _newTicket,
+                    icon: const Icon(Icons.add_comment_outlined, size: 16),
+                    label: const Text('New ticket'),
+                  ),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final t in list)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: Sp.md),
+                        child: _TicketCard(
+                          ticket: t,
+                          onOpen: () async {
+                            await context.push('/support/${t.id}');
+                            ref.invalidate(ticketsProvider(_status));
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+      ],
     );
   }
 }
 
-/// Shared chip mapping so the list and the thread agree on colour and wording.
-(String, Color) ticketStatusChip(String raw) => switch (raw.toUpperCase()) {
-      'OPEN' => ('Open', AppColors.info),
-      'IN_PROGRESS' => ('In progress', AppColors.primary),
-      'WAITING_FOR_OWNER' => ('Needs your reply', AppColors.warning),
-      'RESOLVED' => ('Resolved', AppColors.success),
-      'CLOSED' => ('Closed', AppColors.inkMuted),
-      _ => (raw.isEmpty ? '—' : raw, AppColors.inkMuted),
+/// Shared chip mapping so the list and the thread agree on tone and wording.
+(String, StatusTone) ticketStatusChip(String raw) =>
+    switch (raw.toUpperCase()) {
+      'OPEN' => ('Open', StatusTone.info),
+      'IN_PROGRESS' => ('In progress', StatusTone.cleaning),
+      'WAITING_FOR_OWNER' => ('Needs your reply', StatusTone.warning),
+      'RESOLVED' => ('Resolved', StatusTone.healthy),
+      'CLOSED' => ('Closed', StatusTone.neutral),
+      _ => (raw.isEmpty ? '—' : raw, StatusTone.neutral),
     };
 
-(String, Color) ticketPriorityChip(String raw) => switch (raw.toUpperCase()) {
-      'CRITICAL' => ('Critical', AppColors.danger),
-      'HIGH' => ('High', AppColors.warning),
-      'NORMAL' => ('Normal', AppColors.inkMuted),
-      'LOW' => ('Low', AppColors.inkFaint),
-      _ => (raw.isEmpty ? 'Normal' : raw, AppColors.inkMuted),
+(String, StatusTone) ticketPriorityChip(String raw) =>
+    switch (raw.toUpperCase()) {
+      'CRITICAL' => ('Critical', StatusTone.critical),
+      'HIGH' => ('High', StatusTone.warning),
+      'NORMAL' => ('Normal', StatusTone.neutral),
+      'LOW' => ('Low', StatusTone.neutral),
+      _ => (raw.isEmpty ? 'Normal' : raw, StatusTone.neutral),
     };
 
 class _TicketCard extends StatelessWidget {
@@ -120,88 +139,67 @@ class _TicketCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (statusLabel, statusColor) = ticketStatusChip(ticket.status);
-    final (priorityLabel, priorityColor) = ticketPriorityChip(ticket.priority);
+    final c = context.colors;
+    final (statusLabel, statusTone) = ticketStatusChip(ticket.status);
+    final (priorityLabel, priorityTone) = ticketPriorityChip(ticket.priority);
     final when = ticket.updatedAt ?? ticket.createdAt;
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(AppRadius.lg),
+    return SoftCard(
       onTap: onOpen,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: AppColors.line),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    ticket.subject,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700, fontSize: 15, color: AppColors.ink),
+      // A ticket waiting on the owner is the one thing on this screen that
+      // needs doing, so it carries the left rule.
+      accent: statusTone == StatusTone.warning ? c.warning : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  ticket.subject,
+                  style: AppTypography.body(
+                    size: 14.5,
+                    weight: FontWeight.w700,
+                    color: c.foreground,
                   ),
                 ),
-                const SizedBox(width: 8),
-                const Icon(Icons.chevron_right, color: AppColors.inkFaint),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                StatusChip(label: statusLabel, color: statusColor),
-                StatusChip(label: priorityLabel, color: priorityColor),
-                if (ticket.propertyName.isNotEmpty)
-                  Text(
-                    ticket.propertyName,
-                    style: const TextStyle(color: AppColors.inkMuted, fontSize: 12.5),
-                  ),
-              ],
-            ),
-            if (when != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Updated ${DateFormat.yMMMd().add_jm().format(when)}',
-                style: const TextStyle(color: AppColors.inkFaint, fontSize: 12),
               ),
+              const SizedBox(width: Sp.sm),
+              Icon(Icons.chevron_right, size: 18, color: c.mutedForeground),
             ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyTickets extends StatelessWidget {
-  const _EmptyTickets();
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.forum_outlined, size: 44, color: AppColors.inkFaint),
-            SizedBox(height: 12),
-            Text('No tickets here',
-                style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.ink)),
-            SizedBox(height: 6),
+          ),
+          const SizedBox(height: Sp.sm),
+          Wrap(
+            spacing: Sp.sm,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              StatusBadge(tone: statusTone, label: statusLabel, dense: true),
+              StatusBadge(
+                tone: priorityTone,
+                label: priorityLabel,
+                icon: Icons.flag_outlined,
+                dense: true,
+              ),
+              if (ticket.propertyName.isNotEmpty)
+                Text(
+                  ticket.propertyName,
+                  style: AppTypography.body(size: 12, color: c.mutedForeground),
+                ),
+            ],
+          ),
+          if (when != null) ...[
+            const SizedBox(height: Sp.sm),
             Text(
-              'Open a ticket and the Tavelo team will pick it up.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.inkMuted),
+              'Updated ${DateFormat.yMMMd().add_jm().format(when)}',
+              style: AppTypography.numeric(
+                size: 11.5,
+                color: c.mutedForeground,
+              ),
             ),
           ],
-        ),
+        ],
       ),
     );
   }

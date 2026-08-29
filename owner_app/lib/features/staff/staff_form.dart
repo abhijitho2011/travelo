@@ -7,8 +7,12 @@ import '../../core/api/api_exception.dart';
 import '../../core/data/location_repository.dart';
 import '../../core/data/owner_repository.dart';
 import '../../core/models/owner_models.dart';
-import '../../theme/app_theme.dart';
-import '../../widgets/ui.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/auth_scaffold.dart' show ButtonSpinner;
+import '../../core/widgets/cards.dart';
+import '../../core/widgets/primitives.dart';
+import '../../core/widgets/states.dart';
 
 /// The one manager form, used for both create and edit.
 ///
@@ -156,44 +160,55 @@ class _StaffFormState extends ConsumerState<StaffForm> {
 
     return Form(
       key: _form,
-      child: ListView(
-        padding: const EdgeInsets.all(20),
+      child: PageBody(
         children: [
           if (_error != null) ...[
-            Banner2(text: _error!, tone: BannerTone.danger, icon: Icons.error_outline),
-            const SizedBox(height: 16),
+            NoticeBanner(
+              text: _error!,
+              tone: NoticeTone.danger,
+              icon: Icons.error_outline,
+            ),
+            gapSection,
           ],
-          const SectionTitle('Role'),
-          const SizedBox(height: 12),
+          const SectionHeader(title: 'Role', icon: Icons.badge_outlined),
           SegmentedButton<StaffRole>(
             segments: const [
-              ButtonSegment(value: StaffRole.generalManager, label: Text('General Manager')),
               ButtonSegment(
-                  value: StaffRole.assistantGeneralManager, label: Text('Assistant GM')),
+                value: StaffRole.generalManager,
+                label: Text('General Manager'),
+              ),
+              ButtonSegment(
+                value: StaffRole.assistantGeneralManager,
+                label: Text('Assistant GM'),
+              ),
             ],
             selected: {_role},
             onSelectionChanged: (s) => setState(() => _role = s.first),
           ),
-          const SizedBox(height: 24),
-          const SectionTitle('Personal details'),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(
-              child: TextFormField(
-                controller: _first,
-                decoration: const InputDecoration(labelText: 'First name'),
-                validator: _required,
+          gapSection,
+          const SectionHeader(
+            title: 'Personal details',
+            icon: Icons.person_outline,
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _first,
+                  decoration: const InputDecoration(labelText: 'First name'),
+                  validator: _required,
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextFormField(
-                controller: _last,
-                decoration: const InputDecoration(labelText: 'Last name'),
-                validator: _required,
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextFormField(
+                  controller: _last,
+                  decoration: const InputDecoration(labelText: 'Last name'),
+                  validator: _required,
+                ),
               ),
-            ),
-          ]),
+            ],
+          ),
           const SizedBox(height: 14),
           TextFormField(
             controller: _mobile,
@@ -202,25 +217,32 @@ class _StaffFormState extends ConsumerState<StaffForm> {
               FilteringTextInputFormatter.digitsOnly,
               LengthLimitingTextInputFormatter(10),
             ],
-            decoration: const InputDecoration(labelText: 'Mobile number', prefixText: '+91  '),
-            validator: (v) =>
-                RegExp(r'^[6-9]\d{9}$').hasMatch(v?.trim() ?? '') ? null : 'Valid mobile number',
+            decoration: const InputDecoration(
+              labelText: 'Mobile number',
+              prefixText: '+91  ',
+            ),
+            validator: (v) => RegExp(r'^[6-9]\d{9}$').hasMatch(v?.trim() ?? '')
+                ? null
+                : 'Valid mobile number',
           ),
           const SizedBox(height: 14),
           TextFormField(
             controller: _email,
             keyboardType: TextInputType.emailAddress,
             decoration: const InputDecoration(labelText: 'Email'),
-            validator: (v) => RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v?.trim() ?? '')
+            validator: (v) =>
+                RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v?.trim() ?? '')
                 ? null
                 : 'Valid email address',
           ),
           // Work details exist only on the edit surface: the create endpoint
           // does not accept them, and the GM fills them in later.
           if (isEdit) ...[
-            const SizedBox(height: 24),
-            const SectionTitle('Work details'),
-            const SizedBox(height: 12),
+            gapSection,
+            const SectionHeader(
+              title: 'Work details',
+              icon: Icons.work_outline,
+            ),
             TextFormField(
               controller: _department,
               decoration: const InputDecoration(
@@ -237,9 +259,8 @@ class _StaffFormState extends ConsumerState<StaffForm> {
               ),
             ),
           ],
-          const SizedBox(height: 24),
-          const SectionTitle('Address'),
-          const SizedBox(height: 12),
+          gapSection,
+          const SectionHeader(title: 'Address', icon: Icons.place_outlined),
           TextFormField(
             controller: _address,
             decoration: const InputDecoration(labelText: 'Address'),
@@ -247,33 +268,49 @@ class _StaffFormState extends ConsumerState<StaffForm> {
           ),
           const SizedBox(height: 14),
           locations.when(
-            loading: () => const LinearProgressIndicator(minHeight: 2),
-            error: (_, __) =>
-                const Text('Could not load locations', style: TextStyle(color: AppColors.danger)),
+            loading: () => const InlineLoader(),
+            error: (_, __) => Text(
+              'Could not load locations',
+              style: AppTypography.body(
+                size: 13,
+                color: context.colors.destructive,
+              ),
+            ),
             data: (map) {
               final states = map.keys.toList()..sort();
-              final districts = _state == null ? <String>[] : (map[_state] ?? []);
-              return Column(children: [
-                DropdownButtonFormField<String>(
-                  initialValue: states.contains(_state) ? _state : null,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'State'),
-                  items: states.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                  onChanged: (v) => setState(() {
-                    _state = v;
-                    _district = null;
-                  }),
-                ),
-                const SizedBox(height: 14),
-                DropdownButtonFormField<String>(
-                  initialValue: districts.contains(_district) ? _district : null,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'District'),
-                  items:
-                      districts.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
-                  onChanged: _state == null ? null : (v) => setState(() => _district = v),
-                ),
-              ]);
+              final districts = _state == null
+                  ? <String>[]
+                  : (map[_state] ?? []);
+              return Column(
+                children: [
+                  DropdownButtonFormField<String>(
+                    initialValue: states.contains(_state) ? _state : null,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'State'),
+                    items: states
+                        .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                        .toList(),
+                    onChanged: (v) => setState(() {
+                      _state = v;
+                      _district = null;
+                    }),
+                  ),
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    initialValue: districts.contains(_district)
+                        ? _district
+                        : null,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'District'),
+                    items: districts
+                        .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+                        .toList(),
+                    onChanged: _state == null
+                        ? null
+                        : (v) => setState(() => _district = v),
+                  ),
+                ],
+              );
             },
           ),
           const SizedBox(height: 14),
@@ -291,11 +328,7 @@ class _StaffFormState extends ConsumerState<StaffForm> {
           FilledButton(
             onPressed: _busy ? null : _submit,
             child: _busy
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
-                  )
+                ? const ButtonSpinner()
                 : Text(isEdit ? 'Save changes' : 'Create ${_role.label}'),
           ),
         ],
@@ -303,5 +336,6 @@ class _StaffFormState extends ConsumerState<StaffForm> {
     );
   }
 
-  String? _required(String? v) => (v == null || v.trim().isEmpty) ? 'Required' : null;
+  String? _required(String? v) =>
+      (v == null || v.trim().isEmpty) ? 'Required' : null;
 }

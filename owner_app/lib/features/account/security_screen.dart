@@ -6,8 +6,13 @@ import '../../core/api/api_exception.dart';
 import '../../core/data/owner_repository.dart';
 import '../../core/models/owner_models.dart';
 import '../../core/providers.dart';
-import '../../theme/app_theme.dart';
-import '../../widgets/ui.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/cards.dart';
+import '../../core/widgets/primitives.dart';
+import '../../core/widgets/states.dart';
+import '../../core/widgets/status_badge.dart';
 
 /// Every device holding a live session, with a way to end any of them.
 class SecurityScreen extends ConsumerWidget {
@@ -15,56 +20,68 @@ class SecurityScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
     final sessions = ref.watch(sessionsProvider);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Security')),
-      body: sessions.when(
-        loading: () => const LoadingView(),
-        error: (_, __) => ErrorView(
-          message: 'Could not load your devices.',
-          onRetry: () => ref.invalidate(sessionsProvider),
+
+    return PageBody(
+      onRefresh: () async => ref.invalidate(sessionsProvider),
+      children: [
+        const PageHeader(
+          eyebrow: 'Account',
+          title: 'Security',
+          subtitle: 'Where your Tavelo account is signed in.',
         ),
-        data: (list) => RefreshIndicator(
-          onRefresh: () async => ref.invalidate(sessionsProvider),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+        gapSection,
+        const NoticeBanner(
+          text:
+              'These are the devices signed in to your Tavelo account. '
+              'If you do not recognise one, sign it out.',
+          icon: Icons.shield_outlined,
+        ),
+        gapSection,
+        sessions.when(
+          loading: () => const ListSkeleton(rows: 3, height: 74),
+          error: (e, _) => ErrorState(
+            error: e,
+            message: 'Could not load your devices.',
+            onRetry: () => ref.invalidate(sessionsProvider),
+          ),
+          data: (list) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Banner2(
-                text:
-                    'These are the devices signed in to your Tavelo account. '
-                    'If you do not recognise one, sign it out.',
-                icon: Icons.shield_outlined,
+              SectionHeader(
+                title: 'Signed-in devices (${list.length})',
+                icon: Icons.devices_other,
               ),
-              const SizedBox(height: 20),
-              SectionTitle('Signed-in devices (${list.length})'),
-              const SizedBox(height: 12),
               if (list.isEmpty)
-                const Text(
-                  'No active devices.',
-                  style: TextStyle(color: AppColors.inkMuted),
+                const EmptyState(
+                  icon: Icons.devices_other,
+                  title: 'No active devices.',
                 )
               else
-                ...list.map(
-                  (s) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
+                for (final s in list)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: Sp.md),
                     child: _SessionCard(session: s),
                   ),
-                ),
-              const SizedBox(height: 12),
-              if (list.where((s) => !s.current).isNotEmpty)
+              if (list.where((s) => !s.current).isNotEmpty) ...[
+                gapSm,
                 OutlinedButton.icon(
                   onPressed: () => _revokeOthers(context, ref),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.danger,
-                    side: const BorderSide(color: AppColors.danger),
+                    foregroundColor: c.destructive,
+                    side: BorderSide(
+                      color: c.destructive.withValues(alpha: 0.5),
+                    ),
                   ),
-                  icon: const Icon(Icons.logout, size: 18),
+                  icon: const Icon(Icons.logout, size: 16),
                   label: const Text('Sign out of all other devices'),
                 ),
+              ],
             ],
           ),
         ),
-      ),
+      ],
     );
   }
 
@@ -73,7 +90,7 @@ class SecurityScreen extends ConsumerWidget {
     final messenger = ScaffoldMessenger.of(context);
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Sign out everywhere else?'),
         content: const Text(
           'Every other device will be signed out immediately. This device stays '
@@ -81,12 +98,15 @@ class SecurityScreen extends ConsumerWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: dialogContext.colors.destructive,
+              foregroundColor: dialogContext.colors.destructiveForeground,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('Sign out others'),
           ),
         ],
@@ -118,57 +138,77 @@ class _SessionCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
     final started = session.createdAt;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: AppColors.primarySoft,
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              ),
-              child: const Icon(Icons.devices_other, color: AppColors.primaryDark, size: 20),
+    return SoftCard(
+      accent: session.current ? c.healthy : null,
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(color: c.accent, borderRadius: R.rSm),
+            alignment: Alignment.center,
+            child: Icon(
+              Icons.devices_other,
+              color: c.accentForeground,
+              size: 19,
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [
+          ),
+          const SizedBox(width: Sp.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
                     Flexible(
                       child: Text(
                         session.deviceLabel,
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.body(
+                          size: 14,
+                          weight: FontWeight.w700,
+                          color: c.foreground,
+                        ),
                       ),
                     ),
                     if (session.current) ...[
-                      const SizedBox(width: 8),
-                      const StatusChip(label: 'This device', color: AppColors.success),
+                      const SizedBox(width: Sp.sm),
+                      // Both halves may shrink: a long device name and the badge
+                      // together outrun a narrow phone otherwise.
+                      const Flexible(
+                        child: StatusBadge(
+                          tone: StatusTone.healthy,
+                          label: 'This device',
+                          dense: true,
+                        ),
+                      ),
                     ],
-                  ]),
-                  const SizedBox(height: 3),
-                  Text(
-                    [
-                      if (session.ip.isNotEmpty) session.ip,
-                      if (started != null)
-                        'Signed in ${DateFormat.yMMMd().add_jm().format(started)}',
-                    ].join(' · '),
-                    style: const TextStyle(color: AppColors.inkMuted, fontSize: 12.5),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  [
+                    if (session.ip.isNotEmpty) session.ip,
+                    if (started != null)
+                      'Signed in ${DateFormat.yMMMd().add_jm().format(started)}',
+                  ].join(' · '),
+                  style: AppTypography.numeric(
+                    size: 12,
+                    color: c.mutedForeground,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            TextButton(
-              onPressed: () => _revoke(context, ref),
-              style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-              child: const Text('Revoke'),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(width: Sp.sm),
+          TextButton(
+            onPressed: () => _revoke(context, ref),
+            style: TextButton.styleFrom(foregroundColor: c.destructive),
+            child: const Text('Revoke'),
+          ),
+        ],
       ),
     );
   }
@@ -177,8 +217,10 @@ class _SessionCard extends ConsumerWidget {
     final messenger = ScaffoldMessenger.of(context);
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text(session.current ? 'Sign out of this device?' : 'Revoke this device?'),
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          session.current ? 'Sign out of this device?' : 'Revoke this device?',
+        ),
         content: Text(
           session.current
               ? 'You are using this device — you will be signed out and have to sign in again.'
@@ -186,12 +228,15 @@ class _SessionCard extends ConsumerWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: dialogContext.colors.destructive,
+              foregroundColor: dialogContext.colors.destructiveForeground,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('Revoke'),
           ),
         ],
@@ -200,7 +245,9 @@ class _SessionCard extends ConsumerWidget {
     if (ok != true) return;
 
     try {
-      final wasCurrent = await ref.read(ownerRepositoryProvider).revokeSession(session.id);
+      final wasCurrent = await ref
+          .read(ownerRepositoryProvider)
+          .revokeSession(session.id);
       if (wasCurrent) {
         // The token behind this app is now dead; drop the local session too so
         // the router sends us to the sign-in screen rather than a 401 loop.
@@ -208,7 +255,9 @@ class _SessionCard extends ConsumerWidget {
         return;
       }
       ref.invalidate(sessionsProvider);
-      messenger.showSnackBar(const SnackBar(content: Text('Device signed out.')));
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Device signed out.')),
+      );
     } on ApiException catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(e.message)));
     }

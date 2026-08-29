@@ -6,6 +6,7 @@ import 'api/token_store.dart';
 import 'auth/auth_controller.dart';
 import 'auth/auth_state.dart';
 import 'auth/google_auth_service.dart';
+import 'storage/local_store.dart';
 
 final secureStorageProvider = Provider<FlutterSecureStorage>(
   (_) => const FlutterSecureStorage(),
@@ -23,11 +24,15 @@ final googleAuthServiceProvider = Provider<GoogleAuthService>(
   (_) => GoogleAuthService(),
 );
 
-final authControllerProvider =
-    StateNotifierProvider<AuthController, AuthState>((ref) {
-  return AuthController(
-    api: ref.watch(apiClientProvider),
-    tokens: ref.watch(tokenStoreProvider),
-    google: ref.watch(googleAuthServiceProvider),
-  );
-});
+/// Non-secret device preferences — today, the chosen theme mode.
+final localStoreProvider = Provider<LocalStore>((_) => LocalStore());
+
+final authControllerProvider = StateNotifierProvider<AuthController, AuthState>(
+  (ref) {
+    return AuthController(
+      api: ref.watch(apiClientProvider),
+      tokens: ref.watch(tokenStoreProvider),
+      google: ref.watch(googleAuthServiceProvider),
+    );
+  },
+);
