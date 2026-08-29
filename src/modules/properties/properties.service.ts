@@ -44,12 +44,20 @@ export class PropertiesService {
     q?: string;
     status?: string;
     ownerId?: string;
+    state?: string;
+    district?: string;
   }) {
     const limit = Math.min(params.limit ?? 50, 200);
     const offset = params.offset ?? 0;
     const conds: SQL[] = [isNull(properties.deletedAt)];
     if (params.status) conds.push(eq(properties.status, params.status as PropertyStatus));
     if (params.ownerId) conds.push(eq(properties.ownerId, params.ownerId));
+    // Properties store their location as text names. `state` is a first-class
+    // column; `district` is not, so it is matched inside the address JSONB.
+    if (params.state) conds.push(ilike(properties.state, params.state));
+    if (params.district) {
+      conds.push(sql`${properties.address}->>'district' ILIKE ${params.district}`);
+    }
     if (params.q) {
       const q = `%${params.q}%`;
       conds.push(or(ilike(properties.name, q), ilike(properties.city, q))!);

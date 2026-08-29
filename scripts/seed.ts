@@ -11,6 +11,7 @@ import { normalizeMobile } from '../src/modules/shared-auth/mobile.util';
 const PERMISSIONS: { key: string; group: string; description: string }[] = [
   ...groupPerms('Owner', 'owner', ['view', 'create', 'edit', 'suspend', 'delete']),
   ...groupPerms('Property', 'property', ['view', 'edit', 'suspend']),
+  ...groupPerms('Staff', 'staff', ['read']),
   ...groupPerms('Subscription', 'subscription', ['view', 'edit', 'cancel']),
   ...groupPerms('Plan', 'plan', ['view', 'edit']),
   ...groupPerms('Billing', 'billing', ['view', 'refund', 'export']),
@@ -58,7 +59,7 @@ const ROLES = [
     isSystem: true,
     permissions: [
       'support.view', 'support.reply', 'support.assign', 'support.resolve',
-      'owner.view', 'property.view', 'subscription.view',
+      'owner.view', 'property.view', 'staff.read', 'subscription.view',
       'impersonation.start', 'impersonation.stop', 'impersonation.view',
       'notification.view', 'search.query',
     ],
@@ -69,7 +70,7 @@ const ROLES = [
     description: 'Operational view + jobs',
     isSystem: true,
     permissions: [
-      'owner.view', 'subscription.view', 'property.view',
+      'owner.view', 'subscription.view', 'property.view', 'staff.read',
       'integration.view', 'job.view', 'job.retry',
       'analytics.view', 'search.query', 'notification.view',
     ],
@@ -81,7 +82,7 @@ const ROLES = [
     isSystem: true,
     permissions: [
       'owner.view', 'owner.create', 'owner.edit',
-      'property.view', 'property.edit',
+      'property.view', 'property.edit', 'staff.read',
       'subscription.view', 'subscription.edit',
       'plan.view', 'plan.edit',
       'announcement.view', 'announcement.edit',

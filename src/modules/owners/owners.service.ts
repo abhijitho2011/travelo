@@ -64,16 +64,25 @@ export class OwnersService {
     private readonly audit: AuditService,
   ) {}
 
-  async list(filter: OwnerFilterDto) {
-    const limit = Math.min(filter.limit ?? 50, 200);
-    const offset = filter.offset ?? 0;
+  /** Filter clauses for `list()`. Extracted so the filter logic is unit-testable. */
+  private listConditions(filter: OwnerFilterDto): SQL[] {
     const conds: SQL[] = [isNull(owners.deletedAt)];
     if (filter.status) conds.push(eq(owners.status, filter.status as OwnerStatus));
+    // Owners store their location as ids (unlike properties/staff, which use
+    // the text names), so filter directly on the id columns.
+    if (filter.stateId) conds.push(eq(owners.stateId, filter.stateId));
+    if (filter.districtId) conds.push(eq(owners.districtId, filter.districtId));
     if (filter.q) {
       const q = `%${filter.q}%`;
       conds.push(or(ilike(owners.name, q), ilike(owners.email, q), ilike(owners.company, q))!);
     }
-    const where = and(...conds);
+    return conds;
+  }
+
+  async list(filter: OwnerFilterDto) {
+    const limit = Math.min(filter.limit ?? 50, 200);
+    const offset = filter.offset ?? 0;
+    const where = and(...this.listConditions(filter));
     const rows = await this.db
       .select()
       .from(owners)
@@ -327,9 +336,85 @@ export class OwnersService {
 
   async update(id: string, dto: UpdateOwnerDto) {
     const before = await this.get(id);
+
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+    if (dto.name !== undefined) patch.name = dto.name;
+    if (dto.company !== undefined) patch.company = dto.company;
+    if (dto.country !== undefined) patch.country = dto.country;
+    if (dto.city !== undefined) patch.city = dto.city;
+    if (dto.status !== undefined) patch.status = dto.status as OwnerStatus;
+    if (dto.phone !== undefined) {
+      const mobile = normalizeIndianMobile(dto.phone);
+      patch.phone = mobile;
+      patch.mobile = mobile;
+    }
+    if (dto.gstNumber !== undefined) patch.gstNumber = normalizeGstin(dto.gstNumber);
+
+    // Location changes are validated against the admin catalogue exactly like
+    // create: the state must exist and the district must sit under it. Both are
+    // required together so the id/name pair can never drift out of sync.
+    const changingLocation = dto.state !== undefined || dto.district !== undefined;
+    let stateName: string | undefined;
+    let districtName: string | undefined;
+    if (changingLocation) {
+      if (!dto.state || !dto.district) {
+        throw new BadRequestException({
+          error: 'INVALID_LOCATION',
+          message: 'Both state and district are required when changing the location',
+        });
+      }
+      const [stateRow] = await this.db
+        .select({ id: locationStates.id, name: locationStates.name })
+        .from(locationStates)
+        .where(eq(locationStates.id, dto.state))
+        .limit(1);
+      if (!stateRow) {
+        throw new BadRequestException({
+          error: 'INVALID_LOCATION',
+          message: 'Unknown state — pick one from Settings → Locations',
+        });
+      }
+      const [districtRow] = await this.db
+        .select({ id: locationDistricts.id, name: locationDistricts.name })
+        .from(locationDistricts)
+        .where(
+          and(eq(locationDistricts.id, dto.district), eq(locationDistricts.stateId, stateRow.id)),
+        )
+        .limit(1);
+      if (!districtRow) {
+        throw new BadRequestException({
+          error: 'INVALID_LOCATION',
+          message: `District does not belong to ${stateRow.name}`,
+        });
+      }
+      stateName = stateRow.name;
+      districtName = districtRow.name;
+      patch.stateId = stateRow.id;
+      patch.districtId = districtRow.id;
+      patch.city = districtRow.name;
+    }
+
+    // Keep the address JSONB block consistent with the flat columns, merging
+    // onto whatever is already stored so untouched keys survive the update.
+    if (dto.address !== undefined || dto.pinCode !== undefined || changingLocation) {
+      const prev = (before.address as Record<string, unknown> | null) ?? {};
+      if (dto.pinCode !== undefined) patch.pinCode = dto.pinCode;
+      patch.address = {
+        ...prev,
+        line1: dto.address ?? prev.line1 ?? null,
+        pinCode: dto.pinCode ?? prev.pinCode ?? before.pinCode ?? null,
+        state: stateName ?? prev.state ?? before.state ?? null,
+        stateId: (patch.stateId as string | undefined) ?? prev.stateId ?? before.stateId ?? null,
+        district: districtName ?? prev.district ?? before.district ?? null,
+        districtId:
+          (patch.districtId as string | undefined) ?? prev.districtId ?? before.districtId ?? null,
+        country: dto.country ?? prev.country ?? before.country ?? null,
+      };
+    }
+
     await this.db
       .update(owners)
-      .set({ ...dto, address: dto.address as never, updatedAt: new Date() })
+      .set(patch as never)
       .where(eq(owners.id, id));
     const after = await this.get(id);
     await this.audit.record({

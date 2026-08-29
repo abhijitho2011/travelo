@@ -34,6 +34,8 @@ export class PropertiesController {
     @Query('q') q?: string,
     @Query('status') status?: string,
     @Query('ownerId') ownerId?: string,
+    @Query('state') state?: string,
+    @Query('district') district?: string,
   ) {
     return this.svc.list({
       limit: limit ? Number(limit) : undefined,
@@ -41,6 +43,8 @@ export class PropertiesController {
       q,
       status,
       ownerId,
+      state,
+      district,
     });
   }
 

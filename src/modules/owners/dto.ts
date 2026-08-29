@@ -3,7 +3,6 @@ import {
   IsEmail,
   IsIn,
   IsInt,
-  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -44,13 +43,22 @@ export class DeleteOwnerDto {
 }
 
 export class UpdateOwnerDto {
-  @IsOptional() @IsString() name?: string;
+  @IsOptional() @IsString() @Length(2, 255) name?: string;
   @IsOptional() @IsString() phone?: string;
-  @IsOptional() @IsString() company?: string;
+  @IsOptional() @IsString() @Length(2, 255) company?: string;
   @IsOptional() @IsString() gstNumber?: string;
   @IsOptional() @IsString() city?: string;
   @IsOptional() @IsString() country?: string;
-  @IsOptional() @IsObject() address?: Record<string, unknown>;
+  /** Street address line (line1). Persisted into the address JSONB block. */
+  @IsOptional() @IsString() @Length(3, 500) address?: string;
+  @IsOptional()
+  @Matches(/^\d{6}$/, { message: 'pinCode must be exactly 6 digits' })
+  pinCode?: string;
+  /** `location_states.id` — validated against the admin catalogue when changed. */
+  @IsOptional() @IsUUID() state?: string;
+  /** `location_districts.id` — must belong to `state`. */
+  @IsOptional() @IsUUID() district?: string;
+  @IsOptional() @IsIn(ownerStatusValues as unknown as string[]) status?: string;
 }
 
 export class SetOwnerStatusDto {
@@ -62,4 +70,8 @@ export class OwnerFilterDto {
   @IsOptional() @IsInt() @Min(1) limit?: number;
   @IsOptional() @IsString() q?: string;
   @IsOptional() @IsIn(ownerStatusValues as unknown as string[]) status?: string;
+  /** `location_states.id` — owners store location as ids. */
+  @IsOptional() @IsUUID() stateId?: string;
+  /** `location_districts.id`. */
+  @IsOptional() @IsUUID() districtId?: string;
 }

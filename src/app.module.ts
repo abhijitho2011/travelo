@@ -15,6 +15,7 @@ import { HealthModule } from './modules/health/health.module';
 import { OwnersModule } from './modules/owners/owners.module';
 import { OwnerAuthModule } from './modules/owner-auth/owner-auth.module';
 import { PropertiesModule } from './modules/properties/properties.module';
+import { StaffModule } from './modules/staff/staff.module';
 import { EntitlementsModule } from './modules/entitlements/entitlements.module';
 import { PlansModule } from './modules/plans/plans.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
@@ -77,6 +78,7 @@ import { ConfigService } from '@nestjs/config';
     OwnerAuthModule,
     EntitlementsModule,
     PropertiesModule,
+    StaffModule,
     PlansModule,
     SubscriptionsModule,
     BillingModule,

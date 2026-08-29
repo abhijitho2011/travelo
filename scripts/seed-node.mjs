@@ -8,6 +8,7 @@ import argon2 from 'argon2';
 const PERMISSIONS = [
   ['Owner', 'owner', ['view', 'create', 'edit', 'suspend', 'delete']],
   ['Property', 'property', ['view', 'edit', 'suspend']],
+  ['Staff', 'staff', ['read']],
   ['Subscription', 'subscription', ['view', 'edit', 'cancel']],
   ['Plan', 'plan', ['view', 'edit']],
   ['Billing', 'billing', ['view', 'refund', 'export']],
@@ -31,9 +32,9 @@ const PERMISSIONS = [
 const ROLES = [
   { key: 'super_admin', name: 'Super Admin', description: 'Unrestricted access', permissions: ['*'] },
   { key: 'finance_admin', name: 'Finance Admin', description: 'Billing / refunds / invoices', permissions: ['billing.view','billing.refund','billing.export','refund.view','refund.create','invoice.view','invoice.create','invoice.edit','subscription.view','subscription.edit','owner.view','analytics.view','search.query','notification.view'] },
-  { key: 'support_admin', name: 'Support Admin', description: 'Support + impersonation', permissions: ['support.view','support.reply','support.assign','support.resolve','owner.view','property.view','subscription.view','impersonation.start','impersonation.stop','impersonation.view','notification.view','search.query'] },
-  { key: 'operations_admin', name: 'Operations Admin', description: 'Operational view + jobs', permissions: ['owner.view','subscription.view','property.view','integration.view','job.view','job.retry','analytics.view','search.query','notification.view','settings.locations.manage'] },
-  { key: 'platform_admin', name: 'Platform Admin', description: 'Plans + announcements', permissions: ['owner.view','owner.create','owner.edit','property.view','property.edit','subscription.view','subscription.edit','plan.view','plan.edit','announcement.view','announcement.edit','notification.view','notification.edit','search.query','analytics.view'] },
+  { key: 'support_admin', name: 'Support Admin', description: 'Support + impersonation', permissions: ['support.view','support.reply','support.assign','support.resolve','owner.view','property.view','staff.read','subscription.view','impersonation.start','impersonation.stop','impersonation.view','notification.view','search.query'] },
+  { key: 'operations_admin', name: 'Operations Admin', description: 'Operational view + jobs', permissions: ['owner.view','subscription.view','property.view','staff.read','integration.view','job.view','job.retry','analytics.view','search.query','notification.view','settings.locations.manage'] },
+  { key: 'platform_admin', name: 'Platform Admin', description: 'Plans + announcements', permissions: ['owner.view','owner.create','owner.edit','property.view','property.edit','staff.read','subscription.view','subscription.edit','plan.view','plan.edit','announcement.view','announcement.edit','notification.view','notification.edit','search.query','analytics.view'] },
 ];
 
 const ADMINS = [

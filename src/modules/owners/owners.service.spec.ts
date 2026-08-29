@@ -1,5 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { OwnersService } from './owners.service';
+import type { OwnerFilterDto } from './dto';
 
 /**
  * These tests exercise the transactional guarantees of owner create/delete with
@@ -360,5 +361,115 @@ describe('OwnersService.create — typed errors are HTTP-shaped', () => {
     await expect(svc.create({ ...VALID, planId: undefined } as never)).rejects.toBeInstanceOf(
       BadRequestException,
     );
+  });
+});
+
+/** Reaches the private filter builder without widening the public surface. */
+function listConditions(svc: OwnersService, filter: OwnerFilterDto): unknown[] {
+  return (svc as unknown as { listConditions: (f: OwnerFilterDto) => unknown[] }).listConditions(
+    filter,
+  );
+}
+
+describe('OwnersService.list — stateId/districtId filtering', () => {
+  const svc = new OwnersService({} as never, audit as never);
+
+  it('always filters out soft-deleted owners', () => {
+    // Baseline: just the `deleted_at IS NULL` guard, no user filters.
+    expect(listConditions(svc, {})).toHaveLength(1);
+  });
+
+  it('adds a clause when a stateId is supplied', () => {
+    expect(listConditions(svc, { stateId: 'state-1' })).toHaveLength(2);
+  });
+
+  it('adds a clause when a districtId is supplied', () => {
+    expect(listConditions(svc, { districtId: 'district-1' })).toHaveLength(2);
+  });
+
+  it('stacks stateId + districtId together', () => {
+    expect(listConditions(svc, { stateId: 'state-1', districtId: 'district-1' })).toHaveLength(3);
+  });
+});
+
+describe('OwnersService.update — location validation', () => {
+  const ownerRow = {
+    id: 'owner-1',
+    name: 'Acme',
+    email: 'a@b.com',
+    phone: '9895077492',
+    company: 'Acme Hospitality',
+    gstNumber: null,
+    address: {
+      line1: '12 Marine Drive',
+      pinCode: '682031',
+      state: STATE.name,
+      stateId: STATE.id,
+      district: DISTRICT.name,
+      districtId: DISTRICT.id,
+      country: 'India',
+    },
+    city: DISTRICT.name,
+    country: 'India',
+    pinCode: '682031',
+    stateId: STATE.id,
+    districtId: DISTRICT.id,
+    status: 'ACTIVE',
+    createdAt: new Date('2026-01-01'),
+    updatedAt: new Date('2026-01-01'),
+    lastActiveAt: null,
+    deletedAt: null,
+  };
+
+  it('rejects a district that does not belong to the selected state', async () => {
+    const db = makeDb({ owner: ownerRow, district: null });
+    const svc = new OwnersService(db as never, audit as never);
+    await expect(
+      svc.update('owner-1', { state: STATE.id, district: 'district-from-another-state' } as never),
+    ).rejects.toMatchObject({ response: { error: 'INVALID_LOCATION' } });
+    expect(db.committed.updates.filter((u) => u.table === 'owners')).toHaveLength(0);
+  });
+
+  it('rejects an unknown state', async () => {
+    const db = makeDb({ owner: ownerRow, state: null });
+    const svc = new OwnersService(db as never, audit as never);
+    await expect(
+      svc.update('owner-1', { state: 'nope', district: DISTRICT.id } as never),
+    ).rejects.toMatchObject({ response: { error: 'INVALID_LOCATION' } });
+  });
+
+  it('requires both state and district when changing the location', async () => {
+    const db = makeDb({ owner: ownerRow });
+    const svc = new OwnersService(db as never, audit as never);
+    await expect(svc.update('owner-1', { state: STATE.id } as never)).rejects.toMatchObject({
+      response: { error: 'INVALID_LOCATION' },
+    });
+    // Bailed out before touching the location catalogue or the owner row.
+    expect(db.committed.updates.filter((u) => u.table === 'owners')).toHaveLength(0);
+  });
+
+  it('validates the pair and writes the resolved names into the address block', async () => {
+    const db = makeDb({ owner: ownerRow });
+    const svc = new OwnersService(db as never, audit as never);
+    await svc.update('owner-1', {
+      name: 'Acme Renamed',
+      state: STATE.id,
+      district: DISTRICT.id,
+      address: '9 New Road',
+    } as never);
+
+    const update = db.committed.updates.find((u) => u.table === 'owners');
+    expect(update?.set).toMatchObject({
+      name: 'Acme Renamed',
+      stateId: STATE.id,
+      districtId: DISTRICT.id,
+      city: DISTRICT.name,
+    });
+    expect(update?.set.address).toMatchObject({
+      line1: '9 New Road',
+      state: STATE.name,
+      district: DISTRICT.name,
+    });
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'owner.updated' }));
   });
 });
