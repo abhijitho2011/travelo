@@ -1,69 +1,147 @@
-# Tavelo Super Admin API — Phase 1
+# Tavelo
 
-NestJS 10 + TypeScript backend for the Tavelo Super Admin control plane. Phase 1 delivers the foundation: config, database (PostgreSQL + Drizzle), Redis, JWT auth with refresh rotation, admins CRUD, roles & permissions with RBAC, audit logging, health checks, Swagger, and container/Railway deploy assets.
+Tavelo is a hotel operations platform. One NestJS backend serves **three
+separate audiences** from one deployment, and two Flutter apps plus a web admin
+panel consume it.
+
+| Surface | Base path | Who | Client |
+| --- | --- | --- | --- |
+| **Admin** | `/api/v1/admin` | Tavelo staff running the platform | Admin panel (TanStack Start, `frontend` branch) |
+| **Owner** | `/api/v1/owner` | Hotel owners — portfolio, staff, subscription, billing | `owner_app/` (Flutter) |
+| **Staff** | `/api/v1/staff` | Hotel employees — front desk, rooms, reservations | `staff_app/` (Flutter) |
+
+Each surface has its **own JWT secret, issuer/audience and session table**. A
+token from one is worthless on the others. See [AUTH.md](./AUTH.md).
+
+## What the backend does
+
+Owners are onboarded by admins, own properties, and pay for a subscription plan
+that caps how many properties they may run. Each property has room types, rooms,
+amenities and staff drawn from a 24-role hierarchy. Staff take reservations,
+assign rooms, check guests in and out. Payments settle through Razorpay or are
+recorded manually; both go through one settlement path that extends the
+subscription and issues an invoice PDF. Everything privileged is written to an
+append-only audit log, including the dual identity recorded when Tavelo Support
+impersonates an owner.
 
 ## Requirements
-- Node.js 20.x
-- PostgreSQL 14+
-- Redis 6+ (optional in dev — the app degrades to in-memory caches with a warning)
 
-## Quick start (local, without Docker)
+- **Node.js 20.x** (`engines: >=20 <21`)
+- **PostgreSQL 14+** (16 in `docker-compose.yml`)
+- **Redis 6+** — optional. Without `REDIS_URL` the permission cache falls back
+  to in-process memory and BullMQ queues are not registered.
+
+## Quick start (local)
 
 ```bash
-cp .env.example .env
+cp .env.example .env          # then fill in DATABASE_URL and the JWT secrets
 npm install
-npm run db:generate        # produce SQL migration from schema (first time only)
-npm run db:migrate         # apply migrations
-npm run db:seed            # seed permissions, roles, super admin
-npm run dev                # http://0.0.0.0:${PORT}${API_PREFIX}
+npm run db:migrate            # apply src/database/migrations/*.sql
+npm run db:seed               # permissions, roles, super admin, plans
+npm run dev                   # http://0.0.0.0:3000
 ```
 
-Swagger UI: `http://0.0.0.0:${PORT}/api/docs` (bind is `0.0.0.0`; connect from your host at the same port).
+- Admin API: `http://0.0.0.0:3000/api/v1/admin`
+- Owner API: `http://0.0.0.0:3000/api/v1/owner`
+- Staff API: `http://0.0.0.0:3000/api/v1/staff`
+- Swagger UI: `http://0.0.0.0:3000/api/docs`
+- Health: `http://0.0.0.0:3000/health/live` (deliberately outside every prefix)
 
-Default super admin: `admin@tavelo.local` / `ChangeMe!12345` (override via `SEED_SUPER_ADMIN_EMAIL` / `SEED_SUPER_ADMIN_PASSWORD`).
+To sign in as an admin you must set `SUPER_ADMIN_EMAIL` and/or
+`SUPER_ADMIN_MOBILE` — **there is no password sign-in.** With neither set the
+app boots and logs a warning saying sign-in is impossible. In development set
+`SMS_PROVIDER=console` so OTP codes appear in the log.
 
 ## Quick start (Docker Compose)
 
 ```bash
 docker compose up --build
-# then, in another shell:
 docker compose exec api npm run db:migrate
 docker compose exec api npm run db:seed
 ```
+
+Brings up `postgres:16-alpine`, `redis:7-alpine` and the API on port 3000.
+
+## Environment
+
+Every variable is declared and validated in [`src/config/env.ts`](./src/config/env.ts)
+with zod; an invalid value aborts boot. The full reference table, including
+which ones must be set before production, is in
+[DEPLOYMENT.md](./DEPLOYMENT.md). The minimum for a working local boot:
+
+| Var | Notes |
+| --- | --- |
+| `DATABASE_URL` | required, must be a URL |
+| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | required, ≥16 chars |
+| `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_MOBILE` | at least one, or nobody can sign in |
+
+`.env.example` is **not** a complete list — it predates MFA, SMTP, Razorpay,
+Channex and the notification SMS template. Treat `src/config/env.ts` as the
+source of truth.
 
 ## Scripts
 
 | script | purpose |
 | --- | --- |
 | `npm run dev` | Nest watch mode |
-| `npm run build` | Compile TypeScript to `dist/` |
-| `npm run start:prod` | Run compiled app |
-| `npm run start:railway` | Run migrations then start (used by Railway) |
-| `npm run db:generate` | Generate SQL from Drizzle schema |
-| `npm run db:migrate` | Apply pending migrations |
-| `npm run db:seed` | Idempotent seed of permissions, roles, admins |
-| `npm run test` | Unit tests (Jest) |
+| `npm run build` | `nest build` → `dist/` |
+| `npm run start:prod` | `node dist/main.js` |
+| `npm run start:railway` | `scripts/railway-boot.mjs` — migrate, optional seed, then start |
+| `npm run db:generate` | drizzle-kit: schema → SQL migration |
+| `npm run db:migrate` | apply migrations (`scripts/migrate.ts`) |
+| `npm run db:seed` | idempotent seed of permissions, roles, super admin |
+| `npm run db:studio` | drizzle studio |
+| `npm test` | Jest unit suite |
 | `npm run lint` | ESLint + Prettier |
 
-## Deploy to Railway
+## Tests
 
-1. Push this repo to GitHub.
-2. Create a new Railway project, add a **PostgreSQL** plugin, and a **Redis** plugin.
-3. Point Railway at your GitHub repo. The included `railway.json` selects the Dockerfile builder, sets the start command to `npm run start:railway` (which runs `db:migrate` then `node dist/main.js`), and points the health check at `/api/v1/admin/health/live`.
-4. Add the environment variables from `.env.example`. `DATABASE_URL` and `REDIS_URL` come from Railway's service references (`${{Postgres.DATABASE_URL}}`, `${{Redis.REDIS_URL}}`). Set strong values for `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET`.
-5. Deploy. On first boot, run the seed once:
-   ```bash
-   railway run npm run db:seed
-   ```
-6. Confirm health: `GET https://<your-app>.up.railway.app/api/v1/admin/health`.
+```bash
+npm test
+```
 
-The app binds to `0.0.0.0:$PORT` as Railway requires.
+The suite is pure unit tests — **no database, Redis or credentials required**.
+`jest` is configured with `rootDir: src` and `testRegex: .*\.spec\.ts$`, so
+tests live next to the code they cover.
 
-## Testing
+One suite is different and worth knowing about:
+[`src/app.bootstrap.spec.ts`](./src/app.bootstrap.spec.ts) compiles the **real
+dependency-injection graph** via `Test.createTestingModule({ imports: [AppModule] })`.
+It exists because `tsc` cannot see DI wiring and every other suite mocks its
+dependencies away — so a provider missing from a module's `imports` passed the
+build *and* the entire test suite, and then took production down at boot. That
+happened twice (`StorageService`, then `NotificationDeliveryService` missing
+from `BillingModule`, fixed in `4280c4f`). `compile()` resolves providers
+without opening a socket, so the check costs nothing. See
+[ARCHITECTURE.md](./ARCHITECTURE.md#why-appbootstrapspects-exists).
 
-`npm run test` runs pure unit tests (no DB required). Integration/e2e tests that need Postgres/Redis are opt-in — set `DATABASE_URL` before running and drop them under `test/*.e2e-spec.ts`.
+## Deploy
 
-## Docs
-- [ARCHITECTURE.md](./ARCHITECTURE.md) — module and layering overview
-- [AUTH.md](./AUTH.md) — JWT, refresh rotation, sessions
-- [RBAC.md](./RBAC.md) — roles, permissions, guard semantics
+Railway, Docker builder, start command `npm run start:railway`. Migrations run
+on boot, tracked in `_boot_migrations`. Full runbook and the env var reference
+are in [DEPLOYMENT.md](./DEPLOYMENT.md).
+
+## Clients
+
+| Path | What |
+| --- | --- |
+| `owner_app/` | Flutter owner app — portfolio, staff, subscription, invoices |
+| `staff_app/` | Flutter staff app — desk, reservations, rooms, team |
+| admin panel | TanStack Start app, lives on the `frontend` branch |
+
+## Documentation
+
+| Doc | Covers |
+| --- | --- |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | modular monolith, module map, request lifecycle, envelope, workers, storage |
+| [DATABASE.md](./DATABASE.md) | every table by domain, relationships, migration discipline |
+| [AUTH.md](./AUTH.md) | three surfaces, token families, MFA, impersonation, recovery |
+| [RBAC.md](./RBAC.md) | admin permissions and the 24 staff roles |
+| [MULTI_TENANCY.md](./MULTI_TENANCY.md) | the Admin→Owner→Property→Staff chain and scoping rules |
+| [SUBSCRIPTIONS.md](./SUBSCRIPTIONS.md) | plans, statuses, lifecycle worker, entitlements |
+| [BILLING.md](./BILLING.md) | settlement, webhooks, idempotency, invoices, refunds |
+| [IMPERSONATION.md](./IMPERSONATION.md) | security model and how to use it |
+| [AUDIT.md](./AUDIT.md) | what is recorded and why it cannot be edited |
+| [ANALYTICS.md](./ANALYTICS.md) | metrics and their documented approximations |
+| [API.md](./API.md) | endpoint reference by surface, with required permissions |
+| [DEPLOYMENT.md](./DEPLOYMENT.md) | Railway services, env reference, production checklist |
