@@ -30,11 +30,7 @@ function callsOf(fn: jest.Mock): [string, RequestInit][] {
   return fn.mock.calls as [string, RequestInit][];
 }
 
-function build(opts: {
-  fetchImpl: jest.Mock;
-  enabled?: boolean;
-  apiKey?: string;
-}) {
+function build(opts: { fetchImpl: jest.Mock; enabled?: boolean; apiKey?: string }) {
   return new ChannexClient({
     baseUrl: 'https://staging.channex.io/api/v1',
     apiKey: opts.apiKey ?? KEY,
