@@ -1,5 +1,43 @@
 # Auth
 
+Tavelo has **three auth surfaces and five token types**. No token from one
+surface is accepted by another; the isolation rests on three independent facts
+per family — a distinct secret, a distinct issuer/audience pair, and a distinct
+session table — and is covered by `owner-token-isolation.spec.ts`.
+
+## Token families at a glance
+
+| Family | Issuer / audience | Signed with | TTL | Session table | Accepted by |
+| --- | --- | --- | --- | --- | --- |
+| Admin access | `tavelo-admin` | `JWT_ACCESS_SECRET` | `JWT_ACCESS_TTL` (15m) | `admin_sessions` | `JwtAuthGuard` |
+| Admin refresh | `tavelo-admin` | `JWT_REFRESH_SECRET` | `JWT_REFRESH_TTL` (30d) | `admin_sessions` (argon2 hash) | `POST /auth/refresh` |
+| Admin MFA challenge | `tavelo-admin-mfa` | `JWT_ACCESS_SECRET` | **5 min**, fixed | none | `POST /auth/mfa` only |
+| Owner access | `tavelo-owner` | `OWNER_JWT_ACCESS_SECRET` | `OWNER_JWT_ACCESS_TTL` (15m) | `owner_sessions` | `OwnerJwtGuard` |
+| Owner refresh | `tavelo-owner` | `OWNER_JWT_REFRESH_SECRET` | `OWNER_JWT_REFRESH_TTL` (30d) | `owner_sessions` (argon2 hash) | `POST /api/v1/owner/auth/refresh` |
+| Staff access | `tavelo-staff` | `STAFF_JWT_ACCESS_SECRET` | `STAFF_JWT_ACCESS_TTL` (15m) | `staff_sessions` | `StaffJwtGuard` |
+| Staff refresh | `tavelo-staff` | `STAFF_JWT_REFRESH_SECRET` | `STAFF_JWT_REFRESH_TTL` (30d) | `staff_sessions` (argon2 hash) | `POST /api/v1/staff/auth/refresh` |
+| Impersonation | `tavelo-impersonation` | `JWT_ACCESS_SECRET` | ~60 min | `impersonation_sessions` | `OwnerJwtGuard` **only**, read-only |
+
+Three properties hold across every family:
+
+- **Refresh tokens are stored only as argon2id hashes.** A leaked database dump
+  does not yield usable sessions.
+- **Rotation on every refresh**, and a hash mismatch (the signature of a replay)
+  revokes the session immediately rather than just failing the call.
+- **Every access token is re-checked against the database on every request.**
+  The account must still be live and active and the session unrevoked, so
+  blocking someone takes effect on their next call — not when their token
+  expires.
+
+⚠️ `OWNER_JWT_*` and `STAFF_JWT_*` have **working placeholder defaults** in
+`src/config/env.ts`. A deployment that never sets them boots silently with
+forgeable owner and staff tokens. See the
+[production checklist](./DEPLOYMENT.md#before-you-call-it-production).
+
+---
+
+# Admin auth (`/api/v1/admin`)
+
 > **Password sign-in has been removed.** The super-admin portal authenticates
 > **only** through mobile OTP and Google, both gated by the environment
 > allowlist below. `POST /auth/login` no longer exists (404). The
@@ -96,6 +134,69 @@ least one and redeploy.
 ## Audit hooks
 - `admin.login.google`, `admin.login.otp` (success) and `admin.login.failed` (failure) are recorded via `AuditService.record` on every attempt, carrying the sign-in `method` and `ip`.
 - `auth.logout` is recorded on sign-out.
+
+---
+
+# Owner auth (`/api/v1/owner`)
+
+The owner surface is mounted at its **literal** `/api/v1/owner/*` paths,
+excluded from the admin global prefix in `main.ts`
+(`owner-route-mounting.spec.ts` guards that).
+
+## Endpoints
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| POST | `/api/v1/owner/auth/otp/request` | body `{ mobile }` → `{ message, expiresAt }` |
+| POST | `/api/v1/owner/auth/otp/verify` | body `{ mobile, otp }` → token pair |
+| POST | `/api/v1/owner/auth/google` | body `{ idToken }` (Firebase ID token) |
+| POST | `/api/v1/owner/auth/refresh` | body `{ refreshToken }`; rotates |
+| POST | `/api/v1/owner/auth/logout` | Bearer owner token |
+| GET | `/api/v1/owner/auth/me` | owner profile, plus the `impersonation` block under a support session |
+| GET / PATCH | `/api/v1/owner/profile` | read / update own profile |
+| GET | `/api/v1/owner/sessions` | own live sessions |
+| POST | `/api/v1/owner/sessions/revoke-all` | sign out everywhere |
+| DELETE | `/api/v1/owner/sessions/:id` | revoke one session |
+
+There is **no owner self-registration.** An owner row is created by an admin
+(`POST /api/v1/admin/owners`); OTP and Google both resolve an *existing* row and
+never auto-create one.
+
+## OTP
+
+- Codes are argon2id-hashed in `owner_otps`, expire after `OTP_TTL_MIN`
+  (default 10) and allow `OTP_MAX_ATTEMPTS` (default 5) verify attempts.
+- Rate limited in Redis per mobile: **1 request / 30s** and **5 / hour**
+  (`owner:otp:req:30s:*`, `owner:otp:req:hr:*`). Without Redis the limiter
+  degrades open rather than failing the request.
+- `POST /otp/request` returns the same `{ message, expiresAt }` whether or not
+  the number belongs to a live ACTIVE owner. Nothing is disclosed until
+  possession of the number is proved.
+
+## Account-status gating
+
+The owner row must be `ACTIVE` and not soft-deleted. Typed codes from
+`src/modules/owner-auth/owner-errors.ts`:
+
+| Code | HTTP | When |
+| --- | --- | --- |
+| `INVALID_OTP` | 401 | wrong code, exhausted attempts, or a non-ACTIVE status that must not be disclosed |
+| `OTP_EXPIRED` | 401 | past `expiresAt` |
+| `OTP_THROTTLED` | 429 | rate limit hit |
+| `ACCOUNT_SUSPENDED` | 403 | `owners.status = SUSPENDED` |
+| `ACCOUNT_BLOCKED` | 403 | `owners.status = BLOCKED` |
+| `OWNER_NOT_FOUND` | 404 | Google email matches no live owner |
+
+## Guard
+
+`OwnerJwtGuard` verifies against `OWNER_JWT_ACCESS_SECRET` with issuer and
+audience `tavelo-owner`, then re-reads the owner and the `owner_sessions` row.
+`refresh` additionally re-checks `owner.status === 'ACTIVE'`, so suspending an
+owner ends their access at the next refresh at the latest.
+
+It has exactly **one** exception: a `tavelo-impersonation` token whose session
+targets an OWNER. That path is read-only and re-authorised on every request —
+see [IMPERSONATION.md](./IMPERSONATION.md).
 
 ---
 
