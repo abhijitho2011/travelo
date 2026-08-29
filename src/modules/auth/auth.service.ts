@@ -15,6 +15,7 @@ import { PermissionsService } from '../permissions/permissions.service';
 import { AuditService } from '../audit/audit.service';
 import { getRequestContext } from '../../common/context/request-context';
 import { AdminMfaService, MfaChallenge } from './admin-mfa.service';
+import { randomUUID } from 'node:crypto';
 
 export interface AdminLoginResult {
   admin: { id: string; email: string; name: string; roles: string[]; permissions: string[] };
@@ -287,9 +288,14 @@ export class AuthService {
   private signRefresh(adminId: string, sessionId: string): Promise<string> {
     return this.jwt.signAsync(
       { sub: adminId, sid: sessionId, typ: 'refresh' },
+      // A unique jti per token. Without it the payload is fully determined by
+      // the session, so two rotations inside the same `iat` second mint
+      // byte-identical tokens: rotation becomes a no-op and the reuse
+      // detector below cannot tell an attacker's replay from the real client.
       {
         secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
         expiresIn: this.config.get<string>('JWT_REFRESH_TTL') ?? '30d',
+        jwtid: randomUUID(),
       },
     );
   }

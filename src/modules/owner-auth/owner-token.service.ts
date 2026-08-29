@@ -7,6 +7,7 @@ import { DRIZZLE, Database } from '../../database/database.module';
 import { owners, ownerSessions } from '../../database/schema';
 import { getRequestContext } from '../../common/context/request-context';
 import { OWNER_AUDIENCE, OWNER_ISSUER } from './owner-jwt.guard';
+import { randomUUID } from 'node:crypto';
 
 export interface OwnerTokenPair {
   accessToken: string;
@@ -130,9 +131,14 @@ export class OwnerTokenService {
   private signRefresh(ownerId: string, sessionId: string): Promise<string> {
     return this.jwt.signAsync(
       { sub: ownerId, sid: sessionId, typ: 'refresh' },
+      // A unique jti per token. Without it the payload is fully determined by
+      // the session, so two rotations inside the same `iat` second mint
+      // byte-identical tokens: rotation becomes a no-op and the reuse
+      // detector below cannot tell an attacker's replay from the real client.
       {
         secret: this.config.getOrThrow<string>('OWNER_JWT_REFRESH_SECRET'),
         expiresIn: this.config.get<string>('OWNER_JWT_REFRESH_TTL') ?? '30d',
+        jwtid: randomUUID(),
         issuer: OWNER_ISSUER,
         audience: OWNER_AUDIENCE,
       },

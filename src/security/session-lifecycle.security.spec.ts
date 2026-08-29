@@ -296,24 +296,19 @@ describe('§64.6 refresh-token rotation and revocation', () => {
    *      legitimate client within the same second gets a working session AND no
    *      alarm.
    *
-   * The fix is one line in each of the three services — a `jwtid: randomUUID()`
-   * — but it changes how production mints credentials, so it is left here as a
-   * failing assertion rather than applied inside a test-only change. Delete the
-   * `.failing` when the claim is added.
+   * FIXED: all three services now sign with `jwtid: randomUUID()`, so every
+   * refresh token is unique regardless of how fast it is rotated, and the reuse
+   * detector can always distinguish a replay from a fresh rotation.
    * ==========================================================================
    */
-  it.failing(
-    'DEFECT: a minted refresh token carries a unique id, so no two are alike',
-    async () => {
-      const res = await request(srv())
-        .post('/api/v1/admin/auth/refresh')
-        .send({ refreshToken: issued });
-      expect(res.status).toBe(200);
-      const decoded = jwt.decode(res.body.data.refreshToken as string) as Record<string, unknown>;
-      expect(decoded.jti).toBeTruthy();
-    },
-    20_000,
-  );
+  it('a minted refresh token carries a unique id, so no two are alike', async () => {
+    const res = await request(srv())
+      .post('/api/v1/admin/auth/refresh')
+      .send({ refreshToken: issued });
+    expect(res.status).toBe(200);
+    const decoded = jwt.decode(res.body.data.refreshToken as string) as Record<string, unknown>;
+    expect(decoded.jti).toBeTruthy();
+  }, 20_000);
 
   it('a revoked session stops the ACCESS token working on the next request', async () => {
     const access = adminToken({ sub: 'admin-1', sid: 'rot-sess' });

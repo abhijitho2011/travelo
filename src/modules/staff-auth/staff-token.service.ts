@@ -7,6 +7,7 @@ import { DRIZZLE, Database } from '../../database/database.module';
 import { hotelStaff, staffSessions } from '../../database/schema';
 import { getRequestContext } from '../../common/context/request-context';
 import { STAFF_AUDIENCE, STAFF_ISSUER } from './staff-jwt.guard';
+import { randomUUID } from 'node:crypto';
 
 export interface StaffTokenPair {
   accessToken: string;
@@ -152,9 +153,14 @@ export class StaffTokenService {
   private signRefresh(staffId: string, sessionId: string): Promise<string> {
     return this.jwt.signAsync(
       { sub: staffId, sid: sessionId, typ: 'refresh' },
+      // A unique jti per token. Without it the payload is fully determined by
+      // the session, so two rotations inside the same `iat` second mint
+      // byte-identical tokens: rotation becomes a no-op and the reuse
+      // detector below cannot tell an attacker's replay from the real client.
       {
         secret: this.config.getOrThrow<string>('STAFF_JWT_REFRESH_SECRET'),
         expiresIn: this.config.get<string>('STAFF_JWT_REFRESH_TTL') ?? '30d',
+        jwtid: randomUUID(),
         issuer: STAFF_ISSUER,
         audience: STAFF_AUDIENCE,
       },
