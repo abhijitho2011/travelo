@@ -65,6 +65,12 @@ export interface QueryInfo {
    * not in the code under test.
    */
   aggregate: boolean;
+  /**
+   * Tables brought in by `*Join`. A joined SELECT projects a NESTED shape
+   * (`{ o: ownersRow, stateName }`), so a fixture has to know which of the two
+   * a given query wants.
+   */
+  joins: string[];
 }
 
 export type Route = Row[] | ((q: QueryInfo) => Row[]);
@@ -144,7 +150,15 @@ export function scriptDb(routes: Routes = {}): FakeDb {
     const index = counters.get(key) ?? 0;
     counters.set(key, index + 1);
     const agg = kind === 'select' ? isAggregate(fields) : null;
-    const info: QueryInfo = { table: name, kind, where: '', index, values, aggregate: !!agg };
+    const info: QueryInfo = {
+      table: name,
+      kind,
+      where: '',
+      index,
+      values,
+      aggregate: !!agg,
+      joins: [],
+    };
     state.log.push(info);
     return chain(info, agg);
   }
@@ -156,11 +170,13 @@ export function scriptDb(routes: Routes = {}): FakeDb {
   function chain(info: QueryInfo, agg: { keys: string[] } | null): Record<string, unknown> {
     const c: Record<string, unknown> = {};
     const pass = () => c;
+    for (const m of ['innerJoin', 'leftJoin', 'rightJoin', 'fullJoin']) {
+      c[m] = (t: unknown) => {
+        info.joins.push(tableName(t));
+        return c;
+      };
+    }
     for (const m of [
-      'innerJoin',
-      'leftJoin',
-      'rightJoin',
-      'fullJoin',
       'orderBy',
       'groupBy',
       'having',

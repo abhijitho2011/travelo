@@ -15,10 +15,7 @@ import {
   IMPERSONATION_ISSUER,
   IMPERSONATION_AUDIENCE,
 } from '../modules/impersonation/impersonation.constants';
-import {
-  MFA_CHALLENGE_ISSUER,
-  MFA_CHALLENGE_AUDIENCE,
-} from '../modules/auth/admin-mfa.service';
+import { MFA_CHALLENGE_ISSUER, MFA_CHALLENGE_AUDIENCE } from '../modules/auth/admin-mfa.service';
 
 const jwt = new JwtService({});
 
@@ -36,7 +33,11 @@ export interface Ids {
 /** Admin access token — deliberately issuer/audience-free, as `AuthService` mints it. */
 export function adminToken(ids: Ids = {}, opts: Record<string, unknown> = {}): string {
   return jwt.sign(
-    { sub: ids.sub ?? 'admin-1', sid: ids.sid ?? 'admin-sess-1', email: ids.email ?? 'a@tavelo.test' },
+    {
+      sub: ids.sub ?? 'admin-1',
+      sid: ids.sid ?? 'admin-sess-1',
+      email: ids.email ?? 'a@tavelo.test',
+    },
     { secret: ADMIN_SECRET, expiresIn: '15m', ...opts },
   );
 }
@@ -140,7 +141,10 @@ export function tamperedPayload(token: string, patch: Record<string, unknown>): 
 }
 
 /** A structurally perfect token signed with the wrong key. */
-export function wrongSecretToken(payload: Record<string, unknown>, header: unknown = { alg: 'HS256', typ: 'JWT' }): string {
+export function wrongSecretToken(
+  payload: Record<string, unknown>,
+  header: unknown = { alg: 'HS256', typ: 'JWT' },
+): string {
   const signingInput = `${b64(header)}.${b64(payload)}`;
   const sig = createHmac('sha256', 'an-attacker-controlled-secret-32chars')
     .update(signingInput)

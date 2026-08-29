@@ -74,14 +74,39 @@ export function adminPermissionRoutes(grants: Record<string, string[]>): Routes 
   };
 }
 
-/** Guard-satisfying rows for one admin, one owner and one staff member. */
+/**
+ * Guard-satisfying rows for one admin, one owner and one staff member.
+ *
+ * Joined SELECTs project a nested shape, so the `owners` and `hotel_staff`
+ * routes answer differently depending on `q.joins` — the flat row the guard
+ * reads, or the `{ o: … }` / `{ s: … }` envelope the profile handlers read.
+ */
 export function authenticatedRoutes(extra: Routes = {}): Routes {
   return {
     admins: (q) => (q.where.includes('admin-1') ? [ACTIVE_ADMIN] : []),
     admin_sessions: (q) => (q.where.includes('admin-sess-1') ? [LIVE_SESSION('admin-sess-1')] : []),
-    owners: (q) => (q.where.includes('owner-1') ? [ACTIVE_OWNER] : []),
+    owners: (q) => {
+      if (!q.where.includes('owner-1')) return [];
+      return q.joins.length > 0
+        ? [{ o: ACTIVE_OWNER, stateName: 'Kerala', districtName: 'Ernakulam' }]
+        : [ACTIVE_OWNER];
+    },
     owner_sessions: (q) => (q.where.includes('owner-sess-1') ? [LIVE_SESSION('owner-sess-1')] : []),
-    hotel_staff: (q) => (q.where.includes('staff-1') ? [ACTIVE_STAFF] : []),
+    hotel_staff: (q) => {
+      if (!q.where.includes('staff-1')) return [];
+      return q.joins.length > 0
+        ? [
+            {
+              s: ACTIVE_STAFF,
+              propertyName: 'Backwater Grand',
+              propertyCity: 'Kochi',
+              propertyState: 'Kerala',
+              ownerName: 'Oona Owner',
+              ownerCompany: 'Oona Hotels',
+            },
+          ]
+        : [ACTIVE_STAFF];
+    },
     staff_sessions: (q) => (q.where.includes('staff-sess-1') ? [LIVE_SESSION('staff-sess-1')] : []),
     ...extra,
   };
