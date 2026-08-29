@@ -6,7 +6,7 @@
  * therefore fully valid — live session, ACTIVE account — so a 401/403/404 can
  * only have come from the rule under test.
  */
-import type { Routes, Row, QueryInfo } from './security-harness';
+import type { Route, Routes, Row, QueryInfo } from './security-harness';
 
 export const FUTURE = () => new Date(Date.now() + 3_600_000);
 
@@ -110,4 +110,29 @@ export function authenticatedRoutes(extra: Routes = {}): Routes {
     staff_sessions: (q) => (q.where.includes('staff-sess-1') ? [LIVE_SESSION('staff-sess-1')] : []),
     ...extra,
   };
+}
+
+/**
+ * Merges route maps so that a table appearing in several of them is answered by
+ * the FIRST map that has rows for the query. Spreading object literals would
+ * instead silently drop the earlier answer — which shows up as an unexplained
+ * 401, because the map that got dropped was usually the one feeding the guard.
+ */
+export function mergeRoutes(...maps: Routes[]): Routes {
+  const out: Routes = {};
+  for (const map of maps) {
+    for (const [table, route] of Object.entries(map)) {
+      const existing = out[table];
+      if (!existing) {
+        out[table] = route;
+        continue;
+      }
+      const run = (r: Route, q: QueryInfo): Row[] => (typeof r === 'function' ? r(q) : r);
+      out[table] = (q: QueryInfo) => {
+        const first = run(existing, q);
+        return first.length > 0 ? first : run(route, q);
+      };
+    }
+  }
+  return out;
 }
