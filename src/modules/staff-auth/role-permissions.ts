@@ -78,7 +78,19 @@ const GENERAL_MANAGER: readonly string[] = [
   'maintenance.read',
   'maintenance.assign',
   'task.read',
+  'task.create',
   'task.assign',
+  'task.start',
+  'task.complete',
+  'task.inspect',
+  // Maintenance work orders — management oversees the full lifecycle.
+  'workorder.read',
+  'workorder.accept',
+  'workorder.start',
+  'workorder.pause',
+  'workorder.resume',
+  'workorder.complete',
+  'workorder.cancel',
   'inventory.read',
   'inventory.approve',
   'procurement.read',
@@ -174,6 +186,9 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
     // That is `room.status.update` — the narrow endpoint — and NOT `room.update`,
     // so the desk can never renumber a room or change its rate.
     'room.status.update',
+    // Reception is often first to hear of a fault ("the AC in 204 is dead") and
+    // may raise a maintenance work order — the same report right attendants get.
+    'maintenance.report',
     'keycard.issue',
     'payment.collect',
   ],
@@ -216,11 +231,19 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
     'task.read',
     'task.create',
     'task.assign',
+    'task.start',
     'task.complete',
+    // The supervisor closes the loop: they inspect a finished clean and pass or
+    // fail it. `task.assign` also marks them as the actor who may act on ANY
+    // task at the property, not only their own.
+    'task.inspect',
     'room.read',
     'room.status.update',
     'maintenance.read',
     'maintenance.report',
+    // Reads the maintenance queue and may cancel a raised work order.
+    'workorder.read',
+    'workorder.cancel',
     'laundry.read',
     'laundry.update',
     'inventory.read',
@@ -247,6 +270,14 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
     'maintenance.start',
     'maintenance.complete',
     'maintenance.report',
+    // The work-order lifecycle the technician drives: accept a job, work it,
+    // pause and resume, and complete it with a resolution.
+    'workorder.read',
+    'workorder.accept',
+    'workorder.start',
+    'workorder.pause',
+    'workorder.resume',
+    'workorder.complete',
     'task.read',
     'task.start',
     'task.complete',

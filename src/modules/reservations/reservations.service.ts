@@ -21,6 +21,7 @@ import {
   UpdateReservationDto,
 } from './dto';
 import { ReservationErrors } from './reservation-errors';
+import { HousekeepingService } from '../housekeeping/housekeeping.service';
 import {
   ASSIGNABLE_ROOM_STATUSES,
   assertDateOrder,
@@ -721,6 +722,17 @@ export class ReservationsService {
           .update(rooms)
           .set({ status: 'DIRTY' as RoomStatus, updatedAt: now })
           .where(eq(rooms.id, before.roomId));
+        // The one cross-module touch: the moment the room goes DIRTY, raise its
+        // turnover clean so the housekeeping board is never out of step with the
+        // rooms that need making up. Same transaction, and a no-op if the room
+        // already has an open task. See HousekeepingService.
+        await HousekeepingService.createCheckoutCleanForRoom(
+          handle,
+          propertyId,
+          before.roomId,
+          actorStaffId,
+          now,
+        );
       }
       await ReservationsService.recordEvent(handle, id, 'checked_out', actorStaffId, {
         roomId: before.roomId,

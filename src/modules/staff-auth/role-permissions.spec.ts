@@ -99,6 +99,8 @@ describe('staff role → permission map', () => {
         'guest.create',
         'room.read',
         'room.status.update',
+        // Reception may raise a maintenance work order for a fault a guest reports.
+        'maintenance.report',
         'keycard.issue',
         'payment.collect',
       ].sort(),
