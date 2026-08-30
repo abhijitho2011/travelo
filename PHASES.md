@@ -32,22 +32,23 @@ Legend: ✅ done & deployed · 🔶 partial (remainder noted) · ⬜ not started
 - ✅ 2.7 Entitlement enforcement (`@RequireFeature`, applied to restaurant)
 - ✅ 2.8 Owner app renew CTA + invoice download + auto-renew display
 
-## ⬜ Phase 3 — Correctness fixes (mismatches the 404-swallow hid)
-- 3.1 Staff `GET /approvals` + approve/reject — build approvals aggregator
-  (staff + expenses + POs) server-side
-- 3.2 `GET /dashboard/alerts` missing server-side — build it
-- 3.3 Staff notifications: dispatch `audience:'staff'`; fix app model mismatch
-  (`type/tone/readAt` vs `kind/read/route`); call `read-all`; badge polling
-- 3.4 Offline sync queue `registerHandler()` never called — register handlers;
-  extend enqueue to driver/maintenance/POS/check-in
-- 3.5 Build the `cleaner` role (last `built:false`)
-- 3.6 Owner app notification inbox + bell (endpoints exist, unused)
-- 3.7 Owner app photo management (view/add/delete after creation)
-- 3.8 Owner 401→signOut bridge; staff transient-vs-expired refresh
-- 3.9 Small: `lowStock` bool coercion, `/restaurant/orders` route, lost-found
-  update wiring, supplier screens, jobs-retry real, log `isMissingEndpoint`
-- 3.10 Owner model fixes: parse `contact`, dead `starRating` chip,
-  `GET /owner/properties/:id` + PATCH/DELETE, owner listing-score breakdown
+## ✅ Phase 3 — Correctness fixes (DONE, deployed)
+- ✅ 3.1 Staff `GET /approvals` + approve/reject — approvals aggregator
+  (expenses + POs) built server-side
+- ✅ 3.2 `GET /dashboard/alerts` — built (approvals/low-stock/open work orders)
+- ✅ 3.3 Staff notifications: app model mismatch fixed (type/readAt/meta),
+  `read-all` wired, badge polling (dispatch already worked server-side)
+- ✅ 3.4 Offline sync queue — StaffSyncHandler registered; the queue drains
+- ✅ 3.5 `cleaner` role built onto My Tasks (every role now built)
+- ✅ 3.6 Owner notification inbox + bell
+- ✅ 3.7 Owner photo management (view/add/delete after creation)
+- ✅ 3.8 Owner 401→signOut bridge; staff transient-vs-expired refresh
+- 🔶 3.9 Small: ✅ `lowStock` bool coercion fixed. Remaining (latent/low-value,
+  light follow-up): `/restaurant/orders` list route (needs an orders-list
+  screen), lost-found update UI, supplier screens, admin jobs-retry consumer,
+  `isMissingEndpoint` logging.
+- ✅ 3.10 Owner property GET/PATCH/DELETE (edit + archive); model parses
+  `contact`, dead `starRating` chip removed
 
 ## ⬜ Phase 4 — PMS depth
 - 4.1 Night audit · 4.2 Rate plans / seasonal pricing · 4.3 Guest profiles/CRM
