@@ -63,6 +63,60 @@ export class FirebaseService {
     }
   }
 
+  /**
+   * Whether push can be sent at all. The PUSH channel checks this so an
+   * unconfigured deployment skips (never fails) push deliveries.
+   */
+  async messagingAvailable(): Promise<boolean> {
+    return (await this.init()) !== null;
+  }
+
+  /**
+   * Fan a single notification out to many device tokens via FCM.
+   *
+   * Returns the subset of `tokens` FCM reported as permanently invalid
+   * (unregistered / malformed) so the caller can revoke them. A configuration
+   * failure throws — the delivery pipeline decides whether to retry — but a
+   * per-token invalid-registration error is data, not an exception.
+   */
+  async sendPush(
+    tokens: string[],
+    message: { title: string; body: string; data?: Record<string, string> },
+  ): Promise<{ successCount: number; failureCount: number; invalidTokens: string[] }> {
+    if (tokens.length === 0) {
+      return { successCount: 0, failureCount: 0, invalidTokens: [] };
+    }
+    const app = await this.init();
+    if (!app) {
+      throw new ServiceUnavailableException('Push messaging is not configured');
+    }
+    const { getMessaging } = await import('firebase-admin/messaging');
+    const response = await getMessaging(app).sendEachForMulticast({
+      tokens,
+      notification: { title: message.title, body: message.body },
+      ...(message.data ? { data: message.data } : {}),
+    });
+
+    const invalidTokens: string[] = [];
+    response.responses.forEach((r, i) => {
+      if (r.success) return;
+      const code = r.error?.code ?? '';
+      if (
+        code === 'messaging/registration-token-not-registered' ||
+        code === 'messaging/invalid-registration-token' ||
+        code === 'messaging/invalid-argument'
+      ) {
+        invalidTokens.push(tokens[i]);
+      }
+    });
+
+    return {
+      successCount: response.successCount,
+      failureCount: response.failureCount,
+      invalidTokens,
+    };
+  }
+
   async verifyIdToken(idToken: string): Promise<VerifiedGoogleUser> {
     const app = await this.init();
     if (!app) {

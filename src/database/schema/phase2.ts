@@ -656,6 +656,38 @@ export const notificationDeliveries = pgTable(
   }),
 );
 
+/**
+ * A push-notification target: one FCM registration token belonging to one
+ * owner OR one staff member (never both — the CHECK enforces it). The owner and
+ * staff apps register their token on sign-in and refresh it when Firebase
+ * rotates it; the PUSH channel resolves a recipient (`owner:<id>` / `staff:<id>`)
+ * to its live tokens here. A token that FCM reports as unregistered is soft
+ * `revoked` rather than deleted, so a device that reinstalls simply re-registers.
+ */
+export const deviceTokens = pgTable(
+  'device_tokens',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    ownerId: uuid('owner_id'),
+    staffId: uuid('staff_id'),
+    token: text('token').notNull(),
+    // android | ios | web — informational; FCM addresses all three the same way.
+    platform: varchar('platform', { length: 16 }).notNull().default('android'),
+    // Which app registered it, so a future targeted broadcast can filter.
+    app: varchar('app', { length: 16 }).notNull(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (t) => ({
+    tokenIdx: uniqueIndex('device_tokens_token_idx').on(t.token),
+    ownerIdx: index('device_tokens_owner_idx').on(t.ownerId, t.revokedAt),
+    staffIdx: index('device_tokens_staff_idx').on(t.staffId, t.revokedAt),
+  }),
+);
+
 // ---------- Integrations ----------
 export const integrationConnections = pgTable(
   'integration_connections',

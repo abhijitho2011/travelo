@@ -71,10 +71,15 @@ describe('NotificationDeliveryService.notify — templates', () => {
       vars: { name: 'Asha' },
     });
     const rows = db.inserts.filter((i) => i.table === 'notification_deliveries');
-    expect(rows).toHaveLength(2);
+    // EMAIL + IN_APP as requested, plus a PUSH row mirrored off the owner IN_APP
+    // target (reusing the IN_APP template body).
+    expect(rows).toHaveLength(3);
     expect(rows.every((r) => (r.values as Row).status === 'PENDING')).toBe(true);
     expect((rows[0].values as Row).subject).toBe('Hello Asha');
     expect((rows[0].values as Row).body).toBe('Hi Asha');
+    const push = rows.map((r) => r.values as Row).find((r) => r.channel === 'PUSH')!;
+    expect(push.recipient).toBe('owner:own-1');
+    expect(push.body).toBe('Hi Asha');
   });
 
   it('SKIPS a channel with no template instead of sending other copy', async () => {

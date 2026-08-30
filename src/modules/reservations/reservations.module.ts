@@ -13,6 +13,7 @@ import { DeskService } from './desk.service';
 import { ReservationsService } from './reservations.service';
 import { ReportsService } from './reports.service';
 import { FolioModule } from '../folio/folio.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 /**
  * The booking engine. One module, one staff surface:
@@ -26,7 +27,7 @@ import { FolioModule } from '../folio/folio.module';
  * exactly one definition of each.
  */
 @Module({
-  imports: [JwtModule.register({}), SharedAuthModule, FolioModule],
+  imports: [JwtModule.register({}), SharedAuthModule, FolioModule, NotificationsModule],
   controllers: [
     StaffReservationsController,
     StaffDeskController,

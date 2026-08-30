@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, ne, or, sql, SQL } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import { FolioService } from '../folio/folio.service';
@@ -24,6 +24,7 @@ import {
 } from './dto';
 import { ReservationErrors } from './reservation-errors';
 import { HousekeepingService } from '../housekeeping/housekeeping.service';
+import { NotificationDeliveryService } from '../notifications/notification-delivery.service';
 import {
   ASSIGNABLE_ROOM_STATUSES,
   addDays,
@@ -68,7 +69,50 @@ export class ReservationsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly folio: FolioService,
+    // Optional so unit tests that construct the service directly stay valid and
+    // so a missing notifications wiring can never block a booking.
+    @Optional() private readonly notifications?: NotificationDeliveryService,
   ) {}
+
+  /**
+   * Tell the guest about their own booking, on their own contact details.
+   *
+   * Guests are not app users, so this is SMS (always — guest_phone is required)
+   * plus email when we have one. Best-effort and post-commit: a notification
+   * failure must never undo a check-in. Templates that don't exist for a
+   * channel simply record a SKIPPED delivery.
+   */
+  private notifyGuestQuietly(
+    key: string,
+    r: {
+      id: string;
+      guestName: string;
+      guestPhone: string | null;
+      guestEmail: string | null;
+      reservationNumber: string;
+      checkIn: string;
+      checkOut: string;
+      propertyName?: string | null;
+    },
+  ): void {
+    if (!this.notifications) return;
+    void this.notifications.notifyQuietly({
+      key,
+      relatedType: 'reservation',
+      relatedId: r.id,
+      targets: [
+        { channel: 'SMS', to: r.guestPhone ?? '' },
+        { channel: 'EMAIL', to: r.guestEmail ?? '' },
+      ],
+      vars: {
+        guestName: r.guestName,
+        reservationNumber: r.reservationNumber,
+        propertyName: r.propertyName ?? 'the hotel',
+        checkIn: r.checkIn,
+        checkOut: r.checkOut,
+      },
+    });
+  }
 
   // ---------- Shared predicates ----------
 
@@ -481,6 +525,11 @@ export class ReservationsService {
         });
 
         const [hydrated] = await this.hydrate([row]);
+        // A booking that lands already CONFIRMED (walk-in, or a synced OTA
+        // booking) is a confirmation the guest should hear about immediately.
+        if (hydrated.status === 'CONFIRMED') {
+          this.notifyGuestQuietly('booking.confirmed', hydrated);
+        }
         return hydrated;
       } catch (err) {
         // Only the reservation-number unique is worth retrying; a concurrent
@@ -762,6 +811,7 @@ export class ReservationsService {
     });
 
     const [after] = await this.hydrate([row]);
+    this.notifyGuestQuietly('booking.confirmed', after);
     return { previousStatus: before.status, ...after };
   }
 
@@ -879,6 +929,7 @@ export class ReservationsService {
     });
 
     const [after] = await this.hydrate([row]);
+    this.notifyGuestQuietly('booking.checked_in', after);
     return { ...after, previousStatus: before.status, roomNumber: room.number };
   }
 

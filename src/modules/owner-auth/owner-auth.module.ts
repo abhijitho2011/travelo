@@ -25,6 +25,7 @@ import { PropertyPhotosService } from './property-photos.service';
 import { OwnerJwtGuard } from './owner-jwt.guard';
 import { SubscriptionStatusGuard } from '../../common/guards/subscription-status.guard';
 import { OwnerNotificationsController } from './owner-notifications.controller';
+import { OwnerDeviceTokensController } from './owner-device-tokens.controller';
 
 @Module({
   // EntitlementsModule supplies the shared feature resolver so the owner's
@@ -48,6 +49,7 @@ import { OwnerNotificationsController } from './owner-notifications.controller';
     OwnerSupportController,
     AdminLocationsController,
     OwnerNotificationsController,
+    OwnerDeviceTokensController,
   ],
   providers: [
     OwnerAuthService,

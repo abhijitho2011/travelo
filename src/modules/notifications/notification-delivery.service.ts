@@ -7,7 +7,12 @@ import {
   type NotificationChannelName,
 } from '../../database/schema';
 import { SmsTextNotConfiguredError } from '../shared-auth/sms/sms-provider.interface';
-import { NOTIFICATION_CHANNELS, type ChannelRegistry } from './channels/channel.interface';
+import { PushDeliverySkipped } from './channels/fcm-push.channel';
+import {
+  NOTIFICATION_CHANNELS,
+  parseInAppRecipient,
+  type ChannelRegistry,
+} from './channels/channel.interface';
 import { isUnavailable } from './channels/console.channel';
 import { renderMessage, type TemplateVars } from './template-renderer';
 
@@ -23,6 +28,29 @@ export interface NotifyTarget {
   channel: NotificationChannelName;
   /** An email address, a mobile number, or `admin|owner|staff:<uuid>`. */
   to: string;
+}
+
+/**
+ * Every owner/staff IN_APP target implies a PUSH target to the same principal —
+ * the app inbox and the phone's notification tray are two faces of one event.
+ * Admins have no mobile app, so they are not mirrored. A PUSH target already
+ * present is never duplicated. This is why call sites only list IN_APP: push
+ * follows automatically wherever a device is registered, and skips silently
+ * where none is.
+ */
+export function withMirroredPush(targets: NotifyTarget[]): NotifyTarget[] {
+  const seen = new Set(targets.map((t) => `${t.channel}:${t.to}`));
+  const mirrored: NotifyTarget[] = [];
+  for (const target of targets) {
+    if (target.channel !== 'IN_APP') continue;
+    const principal = parseInAppRecipient(target.to);
+    if (!principal || (principal.audience !== 'owner' && principal.audience !== 'staff')) continue;
+    const pushKey = `PUSH:${target.to}`;
+    if (seen.has(pushKey)) continue;
+    seen.add(pushKey);
+    mirrored.push({ channel: 'PUSH', to: target.to });
+  }
+  return [...targets, ...mirrored];
 }
 
 export interface NotifyRequest {
@@ -57,7 +85,7 @@ export class NotificationDeliveryService {
    * email in a text message.
    */
   async notify(req: NotifyRequest): Promise<void> {
-    const targets = req.targets.filter((t) => t.to && t.to.trim().length > 0);
+    const targets = withMirroredPush(req.targets.filter((t) => t.to && t.to.trim().length > 0));
     if (targets.length === 0) return;
 
     const templates = await this.db
@@ -72,7 +100,12 @@ export class NotificationDeliveryService {
     const byChannel = new Map(templates.map((t) => [t.channel, t]));
 
     for (const target of targets) {
-      const template = byChannel.get(target.channel);
+      // PUSH reuses the IN_APP copy (short title + body) when it has no
+      // dedicated template, so every in-app event reaches devices without a
+      // parallel set of PUSH templates to maintain.
+      const template =
+        byChannel.get(target.channel) ??
+        (target.channel === 'PUSH' ? byChannel.get('IN_APP') : undefined);
       if (!template) {
         await this.db.insert(notificationDeliveries).values({
           notificationKey: req.key,
@@ -252,7 +285,7 @@ export class NotificationDeliveryService {
         const message = ((err as Error)?.message ?? String(err)).slice(0, 2000);
 
         // No DLT template registered is a permanent condition, not a blip.
-        if (err instanceof SmsTextNotConfiguredError) {
+        if (err instanceof SmsTextNotConfiguredError || err instanceof PushDeliverySkipped) {
           await this.mark(row.id, { status: 'SKIPPED', attempts, lastError: message });
           stats.skipped++;
           continue;
