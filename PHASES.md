@@ -94,11 +94,23 @@ shared-folio + allotment blocks.
 - 🔶 6.5 WhatsApp — deferred (optional). Channel stays UnavailableChannel;
   needs a WhatsApp Business API provider + credentials.
 
-## ⬜ Phase 7 — Security & compliance hardening
-- 7.1 Owner/staff MFA / step-up · 7.2 Sign-out-all + admin staff session revoke
-- 7.3 Tiered rate limiting · 7.4 Require `CHANNEX_WEBHOOK_SECRET` in prod
-- 7.5 GST engine (slabs/CGST-SGST/HSN) · 7.6 Audit/delivery retention + cursor pagination
-- 7.7 Pagination consistency + load-more
+## ✅ Phase 7 — Security & compliance hardening (DONE, deployed, migrations 0027–0028)
+- ✅ 7.1 Owner + staff TOTP MFA — mirrors admin MFA (enroll/verify/disable/status,
+  challenge-gated login, recovery codes, AES-256-GCM secret). Needs
+  `MFA_SECRET_KEY`. Backend done; Flutter enroll/challenge UI is a follow-up.
+- ✅ 7.2 Staff sign-out-all + session listing (`/staff/sessions`) and
+  admin-driven staff revoke (`staff.manage`).
+- ✅ 7.3 Tiered rate limiting — strict `auth` tier (10/min) on login/OTP/MFA via
+  `@AuthThrottle()`; broad `default` (120/min) elsewhere.
+- ✅ 7.4 `CHANNEX_WEBHOOK_SECRET` required in production (env + handler).
+- ✅ 7.5 GST engine — CGST/SGST/IGST slabs (accommodation/restaurant/service),
+  exact paise split, invoice tax breakdown, subscriptions at 18%. Folio tax
+  columns added; folio-line GST is a future step.
+- ✅ 7.6 Retention worker — daily prune of audit logs + settled deliveries
+  (AUDIT_RETENTION_DAYS / DELIVERY_RETENTION_DAYS; 0 disables). Cursor pagination
+  deferred — offset is sufficient at current scale.
+- ✅ 7.7 Shared `Paginated<T>` + `resolvePage` helper; unbounded session lists
+  now capped at MAX_PAGE_LIMIT.
 
 ## ⬜ Phase 8 — Infrastructure & quality
 - 8.1 GitHub Actions CI · 8.2 Sentry + `/metrics` + correlation IDs
