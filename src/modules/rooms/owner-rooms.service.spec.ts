@@ -13,7 +13,16 @@ function svc(db: MockDb) {
   const d = db as unknown as Database;
   const amenities = new AmenitiesService(d);
   const roomTypes = new RoomTypesService(d, amenities);
-  return new OwnerRoomsService(d, amenities, roomTypes, new RoomsService(d, roomTypes, amenities));
+  // OwnerRoomsService recomputes the listing score after amenity changes; the
+  // amenity tests don't assert on scoring, so a no-op stub suffices.
+  const propertiesService = { recomputeCompleteness: async () => 0 } as never;
+  return new OwnerRoomsService(
+    d,
+    amenities,
+    roomTypes,
+    new RoomsService(d, roomTypes, amenities),
+    propertiesService,
+  );
 }
 
 const propertyRow = { id: PROPERTY, name: 'Kochi Grand', roomCount: 40 };

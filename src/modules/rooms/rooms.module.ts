@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { SharedAuthModule } from '../shared-auth/shared-auth.module';
+import { PropertiesModule } from '../properties/properties.module';
 import { StaffJwtGuard } from '../staff-auth/staff-jwt.guard';
 import { StaffPermissionsGuard } from '../staff-auth/staff-permissions.guard';
 import { OwnerJwtGuard } from '../owner-auth/owner-jwt.guard';
@@ -29,7 +30,7 @@ import { OwnerRoomsService } from './owner-rooms.service';
  * reachable from more than one of them.
  */
 @Module({
-  imports: [JwtModule.register({}), SharedAuthModule],
+  imports: [JwtModule.register({}), SharedAuthModule, PropertiesModule],
   controllers: [
     AdminAmenitiesController,
     StaffRoomTypesController,

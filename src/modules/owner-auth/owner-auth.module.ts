@@ -3,6 +3,8 @@ import { JwtModule } from '@nestjs/jwt';
 import { SharedAuthModule } from '../shared-auth/shared-auth.module';
 import { EntitlementsModule } from '../entitlements/entitlements.module';
 import { ImpersonationModule } from '../impersonation/impersonation.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { PropertiesModule } from '../properties/properties.module';
 import { OwnerAuthController } from './owner-auth.controller';
 import { OwnerPortalController } from './owner-portal.controller';
 import { OwnerAccountController } from './owner-account.controller';
@@ -20,13 +22,21 @@ import { OwnerSupportService } from './owner-support.service';
 import { LocationsService } from './locations.service';
 import { PropertyPhotosService } from './property-photos.service';
 import { OwnerJwtGuard } from './owner-jwt.guard';
+import { OwnerNotificationsController } from './owner-notifications.controller';
 
 @Module({
   // EntitlementsModule supplies the shared feature resolver so the owner's
   // subscription page reports exactly what the admin console resolves.
   // ImpersonationModule supplies ImpersonationAccessService: the owner guard
   // honours a live `tavelo-impersonation` token as the owner it targets.
-  imports: [JwtModule.register({}), SharedAuthModule, EntitlementsModule, ImpersonationModule],
+  imports: [
+    JwtModule.register({}),
+    SharedAuthModule,
+    EntitlementsModule,
+    ImpersonationModule,
+    NotificationsModule,
+    PropertiesModule,
+  ],
   controllers: [
     OwnerAuthController,
     OwnerPortalController,
@@ -34,6 +44,7 @@ import { OwnerJwtGuard } from './owner-jwt.guard';
     OwnerSubscriptionController,
     OwnerSupportController,
     AdminLocationsController,
+    OwnerNotificationsController,
   ],
   providers: [
     OwnerAuthService,

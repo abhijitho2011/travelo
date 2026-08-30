@@ -1,9 +1,21 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, desc, eq, ilike, isNull, or, sql, SQL } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
-import { integrationConnections, owners, properties, PropertyStatus } from '../../database/schema';
+import {
+  integrationConnections,
+  owners,
+  properties,
+  propertyAmenities,
+  propertyPhotos,
+  PropertyStatus,
+} from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { EntitlementsService } from '../entitlements/entitlements.service';
+
+export interface ListingCounts {
+  photoCount: number;
+  amenityCount: number;
+}
 
 export interface CreatePropertyInput {
   ownerId: string;
@@ -110,11 +122,10 @@ export class PropertiesService {
         address: dto.address as never,
       })
       .returning();
-    row.listingCompleteness = this.scoreListing(row);
-    await this.db
-      .update(properties)
-      .set({ listingCompleteness: row.listingCompleteness })
-      .where(eq(properties.id, row.id));
+    // A brand-new property has no photos or amenities yet, so this persists a
+    // score computed from real (zero) counts. It is recomputed against live
+    // counts whenever photos or amenities change, and on every overview read.
+    row.listingCompleteness = await this.recomputeCompleteness(row.id);
     await this.audit.record({
       action: 'property.created',
       entity: 'property',
@@ -136,7 +147,17 @@ export class PropertiesService {
       .select()
       .from(integrationConnections)
       .where(eq(integrationConnections.propertyId, id));
-    const score = this.scoreListingBreakdown(prop);
+    const counts = await this.listingCounts(id);
+    const score = this.scoreListingBreakdown(prop, counts);
+    // Keep the persisted column (shown in the portfolio list) in step with what
+    // the detailed breakdown reports here.
+    if (prop.listingCompleteness !== score.overall) {
+      await this.db
+        .update(properties)
+        .set({ listingCompleteness: score.overall })
+        .where(eq(properties.id, id));
+      prop.listingCompleteness = score.overall;
+    }
     return {
       property: prop,
       integrations,
@@ -151,16 +172,54 @@ export class PropertiesService {
       .where(eq(integrationConnections.propertyId, propertyId));
   }
 
-  scoreListing(p: typeof properties.$inferSelect): number {
-    return this.scoreListingBreakdown(p).overall;
+  /** Live photo and amenity counts backing the listing score. */
+  async listingCounts(propertyId: string): Promise<ListingCounts> {
+    const [[photos], [amenitiesRow]] = await Promise.all([
+      this.db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(propertyPhotos)
+        .where(eq(propertyPhotos.propertyId, propertyId)),
+      this.db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(propertyAmenities)
+        .where(eq(propertyAmenities.propertyId, propertyId)),
+    ]);
+    return { photoCount: photos?.n ?? 0, amenityCount: amenitiesRow?.n ?? 0 };
   }
 
-  scoreListingBreakdown(p: typeof properties.$inferSelect) {
+  /**
+   * Recomputes the listing score from live photo/amenity counts and persists
+   * it. Call after anything that changes those inputs (photo upload/remove,
+   * amenity set) so the portfolio list never shows a stale score. Tolerant of
+   * a missing property (returns 0) so callers need not pre-check.
+   */
+  async recomputeCompleteness(propertyId: string): Promise<number> {
+    const [prop] = await this.db
+      .select()
+      .from(properties)
+      .where(eq(properties.id, propertyId))
+      .limit(1);
+    if (!prop) return 0;
+    const counts = await this.listingCounts(propertyId);
+    const overall = this.scoreListingBreakdown(prop, counts).overall;
+    await this.db
+      .update(properties)
+      .set({ listingCompleteness: overall })
+      .where(eq(properties.id, propertyId));
+    return overall;
+  }
+
+  scoreListingBreakdown(p: typeof properties.$inferSelect, counts?: ListingCounts) {
+    const photoCount = counts?.photoCount ?? 0;
+    const amenityCount = counts?.amenityCount ?? 0;
     const sections: Record<string, number> = {
       basic: p.name && p.starRating && p.category ? 1 : 0.3,
-      photos: 0.5,
+      // Real coverage from property_photos: none scores nothing, a full gallery
+      // scores full, with a partial credit in between.
+      photos: photoCount >= 5 ? 1 : photoCount >= 3 ? 0.8 : photoCount >= 1 ? 0.5 : 0,
       rooms: p.roomCount > 0 ? 1 : 0,
-      amenities: 0.7,
+      // Real coverage from property_amenities.
+      amenities: amenityCount >= 10 ? 1 : amenityCount >= 5 ? 0.8 : amenityCount >= 1 ? 0.5 : 0,
       policies: 0.6,
       contact: p.contact ? 1 : 0,
       location: p.city && p.country && p.address ? 1 : p.city ? 0.5 : 0,

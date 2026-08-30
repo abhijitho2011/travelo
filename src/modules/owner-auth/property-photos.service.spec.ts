@@ -10,6 +10,9 @@ import {
 const OWNER_A = 'owner-a';
 const OWNER_B = 'owner-b';
 const PROPERTY_A = 'property-a'; // belongs to OWNER_A
+// PropertyPhotosService now recomputes the listing score after mutations; the
+// photo tests don't exercise scoring, so a no-op stub is enough.
+const propsStub = { recomputeCompleteness: async () => 0 };
 
 function png(bytes = 64): UploadedPhoto {
   return { mimetype: 'image/png', size: bytes, buffer: Buffer.alloc(bytes, 1) };
@@ -99,7 +102,7 @@ describe('PropertyPhotosService', () => {
     const db = mkDb();
     db.setOwner(OWNER_A);
     const storage = mkStorage('s3');
-    const svc = new PropertyPhotosService(db as never, storage as never);
+    const svc = new PropertyPhotosService(db as never, storage as never, propsStub as never);
 
     const [photo] = await svc.upload(OWNER_A, PROPERTY_A, [png()]);
 
@@ -116,7 +119,7 @@ describe('PropertyPhotosService', () => {
   it('points at the owner-scoped raw route under the local driver', async () => {
     const db = mkDb();
     db.setOwner(OWNER_A);
-    const svc = new PropertyPhotosService(db as never, mkStorage('local') as never);
+    const svc = new PropertyPhotosService(db as never, mkStorage('local') as never, propsStub as never);
     const [photo] = await svc.upload(OWNER_A, PROPERTY_A, [png()]);
     expect(photo.url).toBe(`/api/v1/owner/properties/${PROPERTY_A}/photos/${photo.id}/raw`);
   });
@@ -125,7 +128,7 @@ describe('PropertyPhotosService', () => {
     const db = mkDb();
     db.setOwner(OWNER_A);
     const storage = mkStorage();
-    const svc = new PropertyPhotosService(db as never, storage as never);
+    const svc = new PropertyPhotosService(db as never, storage as never, propsStub as never);
     await expect(
       svc.upload(OWNER_A, PROPERTY_A, [{ ...png(1), size: MAX_PHOTO_BYTES + 1 }]),
     ).rejects.toMatchObject({ response: { error: 'FILE_TOO_LARGE' } });
@@ -136,7 +139,7 @@ describe('PropertyPhotosService', () => {
   it('rejects a non-image mime type', async () => {
     const db = mkDb();
     db.setOwner(OWNER_A);
-    const svc = new PropertyPhotosService(db as never, mkStorage() as never);
+    const svc = new PropertyPhotosService(db as never, mkStorage() as never, propsStub as never);
     await expect(
       svc.upload(OWNER_A, PROPERTY_A, [{ ...png(), mimetype: 'application/pdf' }]),
     ).rejects.toBeInstanceOf(BadRequestException);
@@ -152,7 +155,7 @@ describe('PropertyPhotosService', () => {
     }));
     const db = mkDb(existing);
     db.setOwner(OWNER_A);
-    const svc = new PropertyPhotosService(db as never, mkStorage() as never);
+    const svc = new PropertyPhotosService(db as never, mkStorage() as never, propsStub as never);
     await expect(svc.upload(OWNER_A, PROPERTY_A, [png()])).rejects.toMatchObject({
       response: { error: 'PHOTO_LIMIT_REACHED' },
     });
@@ -161,7 +164,7 @@ describe('PropertyPhotosService', () => {
   it('rejects an empty upload', async () => {
     const db = mkDb();
     db.setOwner(OWNER_A);
-    const svc = new PropertyPhotosService(db as never, mkStorage() as never);
+    const svc = new PropertyPhotosService(db as never, mkStorage() as never, propsStub as never);
     await expect(svc.upload(OWNER_A, PROPERTY_A, [])).rejects.toMatchObject({
       response: { error: 'NO_FILE' },
     });
@@ -171,7 +174,7 @@ describe('PropertyPhotosService', () => {
     const db = mkDb([{ id: 'photo-1', propertyId: PROPERTY_A, storageKey: 'properties/p/a.png' }]);
     db.setOwner(OWNER_A);
     const storage = mkStorage();
-    const svc = new PropertyPhotosService(db as never, storage as never);
+    const svc = new PropertyPhotosService(db as never, storage as never, propsStub as never);
     await expect(svc.remove(OWNER_A, PROPERTY_A, 'photo-1')).resolves.toMatchObject({
       deleted: true,
     });
@@ -185,7 +188,7 @@ describe('PropertyPhotosService', () => {
       ]);
       db.setOwner(OWNER_B); // every lookup is now scoped to the wrong tenant
       const storage = mkStorage();
-      const svc = new PropertyPhotosService(db as never, storage as never);
+      const svc = new PropertyPhotosService(db as never, storage as never, propsStub as never);
 
       await expect(svc.list(OWNER_B, PROPERTY_A)).rejects.toMatchObject({
         response: { error: 'OWNER_NOT_FOUND' },
@@ -211,7 +214,7 @@ describe('PropertyPhotosService', () => {
         { id: 'photo-1', propertyId: PROPERTY_A, storageKey: 'properties/p/a.png' },
       ]);
       db.setOwner(OWNER_A);
-      const svc = new PropertyPhotosService(db as never, mkStorage() as never);
+      const svc = new PropertyPhotosService(db as never, mkStorage() as never, propsStub as never);
       await expect(svc.list(OWNER_A, PROPERTY_A)).resolves.toHaveLength(1);
     });
   });
@@ -221,7 +224,7 @@ describe('PropertyPhotosService', () => {
       { id: 'photo-1', propertyId: PROPERTY_A, sortOrder: 0, storageKey: 'properties/p/1.png' },
       { id: 'photo-2', propertyId: PROPERTY_A, sortOrder: 1, storageKey: 'properties/p/2.png' },
     ]);
-    const svc = new PropertyPhotosService(db as never, mkStorage() as never);
+    const svc = new PropertyPhotosService(db as never, mkStorage() as never, propsStub as never);
     const covers = await svc.coverUrls([PROPERTY_A]);
     expect(covers.get(PROPERTY_A)).toContain('properties/p/1.png');
   });

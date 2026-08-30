@@ -145,7 +145,33 @@ const envSchema = z.object({
     .string()
     .default('false')
     .transform((v) => v === 'true'),
-});
+})
+  // In production, the owner and staff token secrets must be real. They carry
+  // working placeholder defaults so a dev or test run boots with zero config —
+  // but those defaults are in the source tree, so anyone could forge an owner
+  // or staff token against a deployment that never overrode them. Admin secrets
+  // have no default and are already required; these two families are the gap.
+  // Fail the boot loudly rather than sign sessions with a public secret.
+  .superRefine((env, ctx) => {
+    if (env.NODE_ENV !== 'production') return;
+    const placeholders: Array<[keyof typeof env, string]> = [
+      ['OWNER_JWT_ACCESS_SECRET', 'owner-access-secret-change-me-32chars'],
+      ['OWNER_JWT_REFRESH_SECRET', 'owner-refresh-secret-change-me-32chars'],
+      ['STAFF_JWT_ACCESS_SECRET', 'staff-access-secret-change-me-32chars'],
+      ['STAFF_JWT_REFRESH_SECRET', 'staff-refresh-secret-change-me-32chars'],
+    ];
+    for (const [key, placeholder] of placeholders) {
+      if (env[key] === placeholder) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key as string],
+          message:
+            `${key} is still the built-in placeholder. Set a real secret in ` +
+            'production — the default is public and would make tokens forgeable.',
+        });
+      }
+    }
+  });
 
 export type AppEnv = z.infer<typeof envSchema>;
 

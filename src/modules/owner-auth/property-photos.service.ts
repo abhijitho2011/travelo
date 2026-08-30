@@ -4,6 +4,7 @@ import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import { properties, propertyPhotos } from '../../database/schema';
 import { StorageService } from '../storage/storage.service';
+import { PropertiesService } from '../properties/properties.service';
 import { OwnerErrors } from './owner-errors';
 
 export const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5 MB per file
@@ -36,6 +37,7 @@ export class PropertyPhotosService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly storage: StorageService,
+    private readonly propertiesService: PropertiesService,
   ) {}
 
   static objectKey(propertyId: string, ext: string): string {
@@ -113,6 +115,8 @@ export class PropertyPhotosService {
         .returning();
       saved.push(await this.serialize(row));
     }
+    // Photo count feeds the listing-completeness score.
+    await this.propertiesService.recomputeCompleteness(propertyId);
     return saved;
   }
 
@@ -126,6 +130,7 @@ export class PropertyPhotosService {
     // The row is the source of truth; a leftover object is harmless, and a
     // missing one must not turn a successful delete into a 500.
     await this.storage.delete(row.storageKey).catch(() => undefined);
+    await this.propertiesService.recomputeCompleteness(propertyId);
     return { deleted: true, photoId };
   }
 

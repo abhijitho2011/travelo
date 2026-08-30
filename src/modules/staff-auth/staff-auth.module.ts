@@ -4,6 +4,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { SharedAuthModule } from '../shared-auth/shared-auth.module';
 import { StaffAuthController } from './staff-auth.controller';
 import { StaffTeamController } from './staff-team.controller';
+import { StaffNotificationsController } from './staff-notifications.controller';
 import { StaffAuthService } from './staff-auth.service';
 import { StaffOtpService } from './staff-otp.service';
 import { StaffTokenService } from './staff-token.service';
@@ -18,7 +19,7 @@ import { StaffPermissionsGuard } from './staff-permissions.guard';
  */
 @Module({
   imports: [JwtModule.register({}), SharedAuthModule, NotificationsModule],
-  controllers: [StaffAuthController, StaffTeamController],
+  controllers: [StaffAuthController, StaffTeamController, StaffNotificationsController],
   providers: [
     StaffAuthService,
     StaffOtpService,

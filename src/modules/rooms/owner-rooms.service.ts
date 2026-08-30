@@ -7,6 +7,7 @@ import { RoomTypesService } from './room-types.service';
 import { RoomsService } from './rooms.service';
 import { RoomFilterDto, RoomTypeFilterDto } from './dto';
 import { RoomErrors } from './room-errors';
+import { PropertiesService } from '../properties/properties.service';
 
 /**
  * The owner's view of their own hotels' inventory.
@@ -30,6 +31,7 @@ export class OwnerRoomsService {
     private readonly amenityCatalogue: AmenitiesService,
     private readonly roomTypes: RoomTypesService,
     private readonly rooms: RoomsService,
+    private readonly propertiesService: PropertiesService,
   ) {}
 
   private async requireOwnedProperty(ownerId: string, propertyId: string) {
@@ -87,6 +89,9 @@ export class OwnerRoomsService {
           .values(resolved.map((a) => ({ propertyId, amenityId: a.id })));
       }
     });
+
+    // The amenity count feeds the listing-completeness score; keep it current.
+    await this.propertiesService.recomputeCompleteness(propertyId);
 
     return {
       propertyId,

@@ -53,6 +53,62 @@ export class NotificationsService {
     return { read: true };
   }
 
+  // ------------------------------------------------------------------ owner / staff inboxes ---
+  // The IN_APP channel writes notifications for owners and staff too (their id
+  // lands in `owner_id` / `staff_id`), but only admins had read endpoints, so
+  // those rows were unreachable. These recipient-generic helpers back the owner
+  // and staff portal inboxes; the column is chosen by audience so an owner can
+  // never read a staff member's — or another owner's — notifications.
+  private recipientColumn(audience: 'owner' | 'staff') {
+    return audience === 'owner' ? notifications.ownerId : notifications.staffId;
+  }
+
+  async listForRecipient(
+    audience: 'owner' | 'staff',
+    recipientId: string,
+    params: { limit?: number; offset?: number; unread?: boolean },
+  ) {
+    const col = this.recipientColumn(audience);
+    const limit = Math.min(params.limit ?? 50, 200);
+    const offset = params.offset ?? 0;
+    const where = params.unread
+      ? and(eq(col, recipientId), isNull(notifications.readAt))
+      : eq(col, recipientId);
+    const rows = await this.db
+      .select()
+      .from(notifications)
+      .where(where)
+      .orderBy(desc(notifications.createdAt))
+      .limit(limit)
+      .offset(offset);
+    const [{ unread }] = await this.db
+      .select({ unread: sql<number>`count(*)::int` })
+      .from(notifications)
+      .where(and(eq(col, recipientId), isNull(notifications.readAt)));
+    return { items: rows, unread, limit, offset };
+  }
+
+  async markReadForRecipient(audience: 'owner' | 'staff', recipientId: string, id: string) {
+    const col = this.recipientColumn(audience);
+    const [row] = await this.db
+      .select()
+      .from(notifications)
+      .where(and(eq(notifications.id, id), eq(col, recipientId)))
+      .limit(1);
+    if (!row) throw new NotFoundException('Notification not found');
+    await this.db.update(notifications).set({ readAt: new Date() }).where(eq(notifications.id, id));
+    return { read: true };
+  }
+
+  async markAllReadForRecipient(audience: 'owner' | 'staff', recipientId: string) {
+    const col = this.recipientColumn(audience);
+    await this.db
+      .update(notifications)
+      .set({ readAt: new Date() })
+      .where(and(eq(col, recipientId), isNull(notifications.readAt)));
+    return { read: true };
+  }
+
   async createForAdmin(
     adminId: string,
     payload: {

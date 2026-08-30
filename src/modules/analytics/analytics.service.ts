@@ -40,9 +40,8 @@ export class AnalyticsService {
       .from(subscriptions);
     const mrrRows = await this.db
       .select({
-        cycle: subscriptions.billingCycle,
         monthly: subscriptionPlans.monthlyPrice,
-        annual: subscriptionPlans.annualPrice,
+        durationMonths: subscriptionPlans.durationMonths,
         override: subscriptions.priceOverride,
       })
       .from(subscriptions)
@@ -50,10 +49,14 @@ export class AnalyticsService {
       .where(eq(subscriptions.status, 'ACTIVE'));
     let mrr = 0;
     for (const r of mrrRows) {
+      // Monthly-recurring contribution = period total / period length. The
+      // period total is what billing actually charges (see BillingService):
+      // an override is the whole-period price; otherwise monthlyPrice pays for
+      // each of the durationMonths. The legacy annual_price column is NOT the
+      // source of truth and is deliberately not read here.
+      const months = r.durationMonths > 0 ? r.durationMonths : 1;
       const base =
-        r.cycle === 'ANNUAL'
-          ? Math.round((r.override ?? r.annual) / 12)
-          : (r.override ?? r.monthly);
+        r.override != null ? Math.round(r.override / months) : r.monthly;
       mrr += base;
     }
     const arr = mrr * 12;
