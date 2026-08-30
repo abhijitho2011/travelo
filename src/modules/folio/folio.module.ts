@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { FolioService } from './folio.service';
+import { FolioReceiptService } from './folio-receipt.service';
 
 /**
  * The guest folio — the running bill for a stay. Exported so reservations
@@ -7,7 +8,7 @@ import { FolioService } from './folio.service';
  * and write exactly one folio implementation.
  */
 @Module({
-  providers: [FolioService],
-  exports: [FolioService],
+  providers: [FolioService, FolioReceiptService],
+  exports: [FolioService, FolioReceiptService],
 })
 export class FolioModule {}

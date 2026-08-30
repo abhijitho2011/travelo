@@ -6,9 +6,11 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
   VERSION_NEUTRAL,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { StaffJwtGuard } from '../staff-auth/staff-jwt.guard';
 import {
@@ -19,6 +21,7 @@ import { CurrentStaff, AuthenticatedStaff } from '../staff-auth/current-staff.de
 import { AuditService } from '../audit/audit.service';
 import { DeskService } from './desk.service';
 import { ReservationsService } from './reservations.service';
+import { FolioReceiptService } from '../folio/folio-receipt.service';
 import {
   AssignRoomDto,
   AvailabilityQueryDto,
@@ -57,6 +60,7 @@ export class StaffReservationsController {
     private readonly reservations: ReservationsService,
     private readonly desk: DeskService,
     private readonly audit: AuditService,
+    private readonly receipts: FolioReceiptService,
   ) {}
 
   @Get()
@@ -206,6 +210,24 @@ export class StaffReservationsController {
   @RequireStaffPermissions('folio.read')
   folio(@CurrentStaff() me: AuthenticatedStaff, @Param('id') id: string) {
     return this.reservations.folioFor(me.propertyId, id);
+  }
+
+  /**
+   * The guest's stay receipt as a PDF, generated on demand and streamed. `@Res()`
+   * takes this route out of the JSON envelope so the raw bytes reach the client.
+   */
+  @Get(':id/folio/receipt')
+  @RequireStaffPermissions('folio.read')
+  async receipt(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.receipts.pdf(me.propertyId, id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="receipt-${id}.pdf"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.send(buffer);
   }
 
   /**
