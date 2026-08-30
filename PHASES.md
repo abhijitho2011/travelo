@@ -67,13 +67,16 @@ re-pricing + BAR/OTA plans; reservation-time guest auto-link + blacklist
 enforcement; recipe-driven depletion is done but a fuller BOM is future; group
 shared-folio + allotment blocks.
 
-## ⬜ Phase 5 — Admin console write-paths (`frontend` branch)
-- 5.1 Notification deliveries + templates · 5.2 Channex sync/logs/mapping
-- 5.3 Gateway-order UI · 5.4 Roles/permissions editor, admin CRUD, session revoke
-- 5.5 Plan + feature-matrix editor, subscription detail/extend
-- 5.6 Invoice/payment detail, property/announcement/ticket create
-- 5.7 Analytics panels + audit filters · 5.8 UI permission gating; kill `/discounts`
-- 5.9 Delete dead `web/` on main; merge branch strategy
+## ✅ Phase 5 — Admin console write-paths (DONE, deployed, `frontend` branch)
+- ✅ 5.1 Notification deliveries + templates · ✅ 5.2 Channex sync/logs/mapping
+- ✅ 5.3 Gateway-order UI (Razorpay/Cashfree selector on each subscription)
+- ✅ 5.4 Roles/permissions editor (matrix), admin create/edit, session revoke
+- ✅ 5.5 Plan + feature-matrix editor; subscription extend (already wired)
+- ✅ 5.6 Payment/invoice detail; invoice/property/announcement/ticket create;
+  ticket assign
+- ✅ 5.7 Audit actor/entity-id filters (analytics panels already on dashboard)
+- ✅ 5.8 Permission-gated navigation; dead `/discounts` removed
+- ✅ 5.9 Dead `web/` deleted on main; admin console lives on `frontend`
 
 ## ⬜ Phase 6 — Notifications & engagement
 - 6.1 FCM push (both apps) · 6.2 Guest-facing notifications
