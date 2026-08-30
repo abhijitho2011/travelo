@@ -12,6 +12,8 @@ import {
 import { ChannexSyncService } from '../integrations/channex-sync.service';
 import { IntegrationsModule } from '../integrations/integrations.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { BillingModule } from '../billing/billing.module';
+import { BillingService } from '../billing/billing.service';
 import {
   NotificationDeliveryService,
   type NotifyTarget,
@@ -355,6 +357,7 @@ export class WorkerSchedulerService {
     private readonly announcements: AnnouncementPublisherWorker,
     private readonly notifications: NotificationDispatchWorker,
     private readonly channex: ChannexSyncWorker,
+    private readonly billing: BillingService,
   ) {}
 
   /** Queued notifications are user-visible, so they drain often. */
@@ -373,6 +376,16 @@ export class WorkerSchedulerService {
   @Cron(CronExpression.EVERY_10_MINUTES)
   syncChannex(): Promise<void> {
     return this.guard('channex', () => this.channex.run());
+  }
+
+  /**
+   * Retries refunds that are still PENDING because the gateway call failed at
+   * refund time (item 1.7). Without this a transient gateway blip would strand
+   * a refund forever, with the admin told it was "in progress".
+   */
+  @Cron(CronExpression.EVERY_10_MINUTES)
+  retryRefunds(): Promise<void> {
+    return this.guard('refund-retry', () => this.billing.retryPendingRefunds());
   }
 
   /**
@@ -407,7 +420,7 @@ export class WorkerSchedulerService {
 }
 
 @Module({
-  imports: [IntegrationsModule, NotificationsModule],
+  imports: [IntegrationsModule, NotificationsModule, BillingModule],
   providers: [
     WorkerSchedulerService,
     ChannexSyncWorker,

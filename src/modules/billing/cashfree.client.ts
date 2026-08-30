@@ -27,6 +27,14 @@ export interface CashfreeOrder {
   order_currency: string;
 }
 
+export interface CashfreeRefund {
+  cf_refund_id: string;
+  refund_id: string;
+  /** SUCCESS | PENDING | ONHOLD | CANCELLED — Cashfree refunds settle async. */
+  refund_status: string;
+  refund_amount: number;
+}
+
 @Injectable()
 export class CashfreeClient {
   private readonly log = new Logger(CashfreeClient.name);
@@ -78,6 +86,25 @@ export class CashfreeClient {
         customer_phone: '9999999999',
       },
       order_note: input.notes ? JSON.stringify(input.notes).slice(0, 200) : undefined,
+    });
+  }
+
+  /**
+   * Refunds against a Cashfree ORDER (not a payment id — that is the Razorpay
+   * shape). `refundId` must be unique per order; we pass our own refund row id,
+   * which also makes the call idempotent gateway-side. Cashfree works in major
+   * units, so paise is converted here.
+   */
+  async createRefund(input: {
+    orderId: string;
+    amountPaise: number;
+    refundId: string;
+    note?: string;
+  }): Promise<CashfreeRefund> {
+    return this.post<CashfreeRefund>(`/pg/orders/${encodeURIComponent(input.orderId)}/refunds`, {
+      refund_amount: Math.round(input.amountPaise) / 100,
+      refund_id: input.refundId,
+      refund_note: input.note?.slice(0, 200),
     });
   }
 

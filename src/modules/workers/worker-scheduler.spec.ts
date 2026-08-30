@@ -18,14 +18,16 @@ describe('WorkerSchedulerService', () => {
     const announcements = over.announcements ?? worker();
     const notifications = over.notifications ?? worker();
     const channex = over.channex ?? worker();
+    const billing = over.billing ?? { retryPendingRefunds: jest.fn(async () => ({ retried: 0, processed: 0 })) };
     const svc = new WorkerSchedulerService(
       lifecycle as never,
       metrics as never,
       announcements as never,
       notifications as never,
       channex as never,
+      billing as never,
     );
-    return { svc, lifecycle, metrics, announcements, notifications, channex };
+    return { svc, lifecycle, metrics, announcements, notifications, channex, billing };
   };
 
   it('runs each worker on its tick', async () => {

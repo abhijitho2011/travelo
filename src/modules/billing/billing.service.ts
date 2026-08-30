@@ -592,10 +592,30 @@ export class BillingService {
    */
   async refundPayment(paymentId: string, dto: { amount: number; reason?: string }) {
     const { refund, pay } = await this.refundInTx(paymentId, dto);
+    return this.attemptGatewayRefund(refund, pay);
+  }
 
-    const canCallGateway =
-      this.razorpay.configured && pay.gateway === 'RAZORPAY' && !!pay.gatewayRef;
-    if (!canCallGateway) {
+  /**
+   * The gateway leg of a refund, shared by the initial call and the retry
+   * worker. Routes to the right gateway by `pay.gateway`:
+   *   RAZORPAY  — refund the payment id.
+   *   CASHFREE  — refund the ORDER id (recovered from the settlement `raw`),
+   *               with our refund row id as the gateway-idempotent refund id.
+   * Anything unconfigured or non-gateway degrades to MANUAL. A gateway failure
+   * leaves the row PENDING for the retry worker — never a false "refunded".
+   */
+  private async attemptGatewayRefund(
+    refund: typeof refunds.$inferSelect,
+    pay: typeof payments.$inferSelect,
+  ) {
+    const gateway = pay.gateway as string;
+    const razorpayReady =
+      gateway === 'RAZORPAY' && this.razorpay.configured && !!pay.gatewayRef;
+    const cashfreeOrderId = this.cashfreeOrderIdFor(pay);
+    const cashfreeReady =
+      gateway === 'CASHFREE' && this.cashfree.configured && !!cashfreeOrderId;
+
+    if (!razorpayReady && !cashfreeReady) {
       const [manual] = await this.db
         .update(refunds)
         .set({ status: 'MANUAL' })
@@ -605,32 +625,94 @@ export class BillingService {
     }
 
     try {
-      const gwRefund = await this.razorpay.createRefund(pay.gatewayRef!, dto.amount);
+      const gatewayRefId = razorpayReady
+        ? (await this.razorpay.createRefund(pay.gatewayRef!, refund.amount)).id
+        : (
+            await this.cashfree.createRefund({
+              orderId: cashfreeOrderId!,
+              amountPaise: refund.amount,
+              refundId: refund.id,
+              note: refund.reason ?? undefined,
+            })
+          ).cf_refund_id;
       const [processed] = await this.db
         .update(refunds)
-        .set({ status: 'PROCESSED', gatewayRef: gwRefund.id })
+        .set({ status: 'PROCESSED', gatewayRef: gatewayRefId })
         .where(eq(refunds.id, refund.id))
         .returning();
       await this.audit.record({
         action: 'billing.refund.gateway.succeeded',
         entity: 'refund',
         entityId: refund.id,
-        after: { gatewayRefundId: gwRefund.id, amount: dto.amount },
+        after: { gateway, gatewayRefundId: gatewayRefId, amount: refund.amount },
       });
       return processed;
     } catch (err) {
       this.logger.error(
-        `Razorpay refund failed for payment ${paymentId}; the refund row stays PENDING for retry`,
+        `${gateway} refund failed for payment ${pay.id}; the refund row stays PENDING for retry`,
         err as Error,
       );
       await this.audit.record({
         action: 'billing.refund.gateway.failed',
         entity: 'refund',
         entityId: refund.id,
-        after: { error: (err as Error).message },
+        after: { gateway, error: (err as Error).message },
       });
       return refund;
     }
+  }
+
+  /**
+   * The Cashfree ORDER id for a payment. Order creation parks the PENDING row
+   * with `gatewayRef = orderId`; settlement then overwrites `gatewayRef` with
+   * the cf_payment_id, so the durable copy of the order id is the `orderRef` on
+   * the stored settlement hint (`raw`). Falls back to `gatewayRef` for a row
+   * that was never settled through the webhook.
+   */
+  private cashfreeOrderIdFor(pay: typeof payments.$inferSelect): string | null {
+    const rawOrderRef = (pay.raw as { orderRef?: unknown } | null)?.orderRef;
+    if (typeof rawOrderRef === 'string' && rawOrderRef) return rawOrderRef;
+    return pay.gatewayRef ?? null;
+  }
+
+  /**
+   * Retries every refund still PENDING against its gateway — the safety net for
+   * a gateway call that failed at refund time (item 1.7). Driven by the worker
+   * scheduler; also callable by an admin. Returns a per-refund outcome.
+   */
+  async retryPendingRefunds(limit = 25): Promise<{ retried: number; processed: number }> {
+    const pending = await this.db
+      .select()
+      .from(refunds)
+      .where(eq(refunds.status, 'PENDING'))
+      .orderBy(refunds.createdAt)
+      .limit(limit);
+    let processed = 0;
+    for (const refund of pending) {
+      const [pay] = await this.db
+        .select()
+        .from(payments)
+        .where(eq(payments.id, refund.paymentId))
+        .limit(1);
+      if (!pay) continue;
+      const result = await this.attemptGatewayRefund(refund, pay);
+      if (result?.status === 'PROCESSED') processed += 1;
+    }
+    return { retried: pending.length, processed };
+  }
+
+  /** Retries one refund by id — the admin re-trigger for item 1.7. */
+  async retryRefund(refundId: string) {
+    const [refund] = await this.db.select().from(refunds).where(eq(refunds.id, refundId)).limit(1);
+    if (!refund) throw new NotFoundException('Refund not found');
+    if (refund.status === 'PROCESSED') return refund;
+    const [pay] = await this.db
+      .select()
+      .from(payments)
+      .where(eq(payments.id, refund.paymentId))
+      .limit(1);
+    if (!pay) throw new NotFoundException('Payment not found');
+    return this.attemptGatewayRefund(refund, pay);
   }
 
   private async refundInTx(paymentId: string, dto: { amount: number; reason?: string }) {
@@ -981,6 +1063,29 @@ export class BillingService {
       this.logger.warn(
         `No PENDING payment matched webhook refs (${hint.orderRef ?? '-'} / ${hint.paymentRef ?? '-'}); recorded without settling`,
       );
+      return false;
+    }
+
+    // RECONCILE. The webhook's captured amount must match the amount the PENDING
+    // order was created for. Without this a webhook (spoofed, misrouted, or a
+    // gateway currency/units bug) claiming a captured ₹1 would settle a ₹10,000
+    // subscription in full. On a mismatch we refuse to settle and record the
+    // discrepancy; the payment stays PENDING for a human to resolve.
+    if (typeof hint.amountPaise === 'number' && hint.amountPaise !== pending.amount) {
+      this.logger.error(
+        `Webhook amount mismatch on payment ${pending.id}: captured ${hint.amountPaise} vs ordered ${pending.amount}; NOT settling`,
+      );
+      await this.audit.record({
+        action: 'billing.webhook.amount_mismatch',
+        entity: 'payment',
+        entityId: pending.id,
+        after: {
+          capturedPaise: hint.amountPaise,
+          orderedPaise: pending.amount,
+          provider: providerKey,
+          orderRef: hint.orderRef ?? null,
+        },
+      });
       return false;
     }
 

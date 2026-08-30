@@ -110,6 +110,16 @@ export class BillingController {
     });
   }
 
+  /**
+   * Re-drive a refund that is still PENDING because the gateway call failed. The
+   * worker retries these on a schedule; this is the admin's manual re-trigger.
+   */
+  @Post('refunds/:id/retry')
+  @RequirePermissions('billing.refund')
+  retryRefund(@Param('id') id: string) {
+    return this.svc.retryRefund(id);
+  }
+
   @Get('invoices')
   @RequirePermissions('billing.view')
   invoices(

@@ -464,6 +464,122 @@ describe('BillingService.handleWebhook idempotency', () => {
     });
     expect(cashfree).toMatchObject({ replayed: false });
   });
+
+  it('refuses to settle when the captured amount does not match the order', async () => {
+    const { svc, settled } = webhookSvc();
+    // The pending order is for 3,000,000; this webhook claims only 100 captured.
+    const res = await svc.handleWebhook('razorpay', {
+      headers: {},
+      rawBody: '',
+      parsedBody: {
+        event: 'payment.captured',
+        payload: {
+          payment: {
+            entity: { id: 'pay_ABC', order_id: 'order_XYZ', amount: 100, currency: 'INR' },
+          },
+        },
+      },
+    });
+    expect(res).toMatchObject({ ok: true, settled: false });
+    expect(settled).toHaveLength(0);
+  });
+});
+
+/**
+ * The refund gateway leg — Cashfree parity, and the retry safety net.
+ */
+describe('BillingService — gateway refunds', () => {
+  const payRow = (over = {}) => ({
+    id: 'pay-1',
+    ownerId: 'own-1',
+    subscriptionId: 'sub-1',
+    gateway: 'CASHFREE',
+    gatewayRef: 'order_1',
+    amount: 250_000,
+    currency: 'INR',
+    status: 'SUCCESS',
+    raw: { orderRef: 'order_1' },
+    ...over,
+  });
+
+  it('refunds a Cashfree payment against its ORDER id and marks it PROCESSED', async () => {
+    const db = mockDb({
+      select: {
+        payments: [[payRow()]],
+        refunds: [[{ sum: 0 }]],
+      },
+      insert: {
+        refunds: [{ id: 'ref-1', paymentId: 'pay-1', amount: 250_000, status: 'PENDING', reason: 'guest left' }],
+      },
+      update: {
+        payments: [{ id: 'pay-1' }],
+        refunds: [{ id: 'ref-1', status: 'PROCESSED', gatewayRef: 'cfr_1' }],
+      },
+    });
+    const cashfree = { configured: true, createRefund: jest.fn(async () => ({ cf_refund_id: 'cfr_1', refund_id: 'ref-1', refund_status: 'SUCCESS', refund_amount: 2500 })) };
+    const svc = new BillingService(
+      db as never,
+      mockAudit() as never,
+      { next: async () => 'INV' } as never,
+      { get: () => undefined } as never,
+      {} as never,
+      { generateQuietly: async () => undefined } as never,
+      { configured: false } as never,
+      cashfree as never,
+      mockNotifications() as never,
+    );
+    const out = await svc.refundPayment('pay-1', { amount: 250_000, reason: 'guest left' });
+    expect(cashfree.createRefund).toHaveBeenCalledWith(
+      expect.objectContaining({ orderId: 'order_1', amountPaise: 250_000, refundId: 'ref-1' }),
+    );
+    expect(out).toMatchObject({ status: 'PROCESSED', gatewayRef: 'cfr_1' });
+  });
+
+  it('degrades to MANUAL when Cashfree is not configured', async () => {
+    const db = mockDb({
+      select: { payments: [[payRow()]], refunds: [[{ sum: 0 }]] },
+      insert: { refunds: [{ id: 'ref-1', paymentId: 'pay-1', amount: 250_000, status: 'PENDING' }] },
+      update: { payments: [{ id: 'pay-1' }], refunds: [{ id: 'ref-1', status: 'MANUAL' }] },
+    });
+    const svc = new BillingService(
+      db as never,
+      mockAudit() as never,
+      { next: async () => 'INV' } as never,
+      { get: () => undefined } as never,
+      {} as never,
+      { generateQuietly: async () => undefined } as never,
+      { configured: false } as never,
+      { configured: false } as never,
+      mockNotifications() as never,
+    );
+    const out = await svc.refundPayment('pay-1', { amount: 250_000 });
+    expect(out).toMatchObject({ status: 'MANUAL' });
+  });
+
+  it('retryPendingRefunds re-drives a PENDING refund through the gateway', async () => {
+    const db = mockDb({
+      select: {
+        refunds: [[{ id: 'ref-1', paymentId: 'pay-1', amount: 250_000, status: 'PENDING', reason: null }]],
+        payments: [[payRow()]],
+      },
+      update: { refunds: [{ id: 'ref-1', status: 'PROCESSED', gatewayRef: 'cfr_9' }] },
+    });
+    const cashfree = { configured: true, createRefund: jest.fn(async () => ({ cf_refund_id: 'cfr_9', refund_id: 'ref-1', refund_status: 'SUCCESS', refund_amount: 2500 })) };
+    const svc = new BillingService(
+      db as never,
+      mockAudit() as never,
+      { next: async () => 'INV' } as never,
+      { get: () => undefined } as never,
+      {} as never,
+      { generateQuietly: async () => undefined } as never,
+      { configured: false } as never,
+      cashfree as never,
+      mockNotifications() as never,
+    );
+    const out = await svc.retryPendingRefunds();
+    expect(cashfree.createRefund).toHaveBeenCalledTimes(1);
+    expect(out).toMatchObject({ retried: 1, processed: 1 });
+  });
 });
 
 /**
