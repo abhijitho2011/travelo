@@ -1,19 +1,137 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Send, Trash2 } from "lucide-react";
+import { Loader2, Plus, Send, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { DataTable, type Column } from "@/components/admin/data-table";
 import { PageHeader, StatusBadge } from "@/components/admin/primitives";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import type { Announcement } from "@/hooks/api/types";
 import {
   useAnnouncements,
+  useCreateAnnouncement,
   useDeleteAnnouncement,
   usePublishAnnouncement,
 } from "@/hooks/api/use-operations";
 import { errorMessage } from "@/lib/api";
 import { formatDateTime, humanise } from "@/lib/format";
+
+const PRIORITIES = ["LOW", "NORMAL", "HIGH", "CRITICAL"];
+
+function CreateAnnouncementDialog() {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [message, setMessage] = useState("");
+  const [priority, setPriority] = useState("NORMAL");
+  const create = useCreateAnnouncement();
+
+  const invalid = title.trim().length < 3 || message.trim().length < 3;
+
+  const reset = () => {
+    setTitle("");
+    setMessage("");
+    setPriority("NORMAL");
+  };
+
+  const submit = async () => {
+    try {
+      await create.mutateAsync({
+        title: title.trim(),
+        message: message.trim(),
+        priority,
+        // A platform-wide broadcast; the audience editor is a later refinement.
+        audience: { all: true },
+      });
+      toast.success("Announcement drafted", { description: "Publish it when ready." });
+      setOpen(false);
+      reset();
+    } catch (error) {
+      toast.error("Could not create announcement", { description: errorMessage(error) });
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) reset();
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button size="sm" className="h-8">
+          <Plus aria-hidden className="mr-1.5 size-3.5" /> New announcement
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>New announcement</DialogTitle>
+          <DialogDescription>
+            Saved as a draft and broadcast to every owner. Publish it from the list when ready.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="ann-title">Title</Label>
+            <Input id="ann-title" value={title} onChange={(e) => setTitle(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ann-message">Message</Label>
+            <Textarea
+              id="ann-message"
+              rows={4}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ann-priority">Priority</Label>
+            <Select value={priority} onValueChange={setPriority}>
+              <SelectTrigger id="ann-priority">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PRIORITIES.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {humanise(p)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={create.isPending}>
+            Cancel
+          </Button>
+          <Button disabled={invalid || create.isPending} onClick={() => void submit()}>
+            {create.isPending && <Loader2 aria-hidden className="mr-2 size-4 animate-spin" />}
+            Create draft
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export const Route = createFileRoute("/announcements")({
   head: () => ({
@@ -78,6 +196,7 @@ function AnnouncementsPage() {
       <PageHeader
         title="Announcements"
         description="Broadcast platform news to every owner, or to a selected audience."
+        actions={<CreateAnnouncementDialog />}
       />
 
       <DataTable

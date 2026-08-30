@@ -1,12 +1,159 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Loader2, Plus } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
 import { DataTable, type Column } from "@/components/admin/data-table";
 import { SearchBox, StatusFilter, ToolbarActions } from "@/components/admin/list-toolbar";
 import { PageHeader, StatusBadge } from "@/components/admin/primitives";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import type { Ticket } from "@/hooks/api/types";
-import { useTickets } from "@/hooks/api/use-support";
+import { useOwners } from "@/hooks/api/use-owners";
+import { useCreateTicket, useTickets } from "@/hooks/api/use-support";
 import { useListParams } from "@/hooks/use-list-params";
+import { errorMessage } from "@/lib/api";
 import { humanise, relativeTime } from "@/lib/format";
+
+const TICKET_PRIORITIES = ["LOW", "NORMAL", "HIGH", "CRITICAL"] as const;
+const NO_OWNER = "__none__";
+
+function CreateTicketDialog() {
+  const [open, setOpen] = useState(false);
+  const [ownerId, setOwnerId] = useState(NO_OWNER);
+  const [subject, setSubject] = useState("");
+  const [category, setCategory] = useState("");
+  const [priority, setPriority] = useState<(typeof TICKET_PRIORITIES)[number]>("NORMAL");
+  const [body, setBody] = useState("");
+
+  const owners = useOwners({ limit: 200, offset: 0 });
+  const create = useCreateTicket();
+
+  const invalid = subject.trim().length < 3;
+
+  const reset = () => {
+    setOwnerId(NO_OWNER);
+    setSubject("");
+    setCategory("");
+    setPriority("NORMAL");
+    setBody("");
+  };
+
+  const submit = async () => {
+    try {
+      await create.mutateAsync({
+        ownerId: ownerId === NO_OWNER ? undefined : ownerId,
+        subject: subject.trim(),
+        category: category.trim() || undefined,
+        priority,
+        body: body.trim() || undefined,
+      });
+      toast.success("Ticket created");
+      setOpen(false);
+      reset();
+    } catch (error) {
+      toast.error("Could not create ticket", { description: errorMessage(error) });
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) reset();
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button size="sm" className="h-8">
+          <Plus aria-hidden className="mr-1.5 size-3.5" /> New ticket
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>New ticket</DialogTitle>
+          <DialogDescription>
+            Log a support request on an owner's behalf, or an internal follow-up.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="tk-owner">Owner (optional)</Label>
+            <Select value={ownerId} onValueChange={setOwnerId}>
+              <SelectTrigger id="tk-owner">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_OWNER}>No owner — internal</SelectItem>
+                {(owners.data?.items ?? []).map((owner) => (
+                  <SelectItem key={owner.id} value={owner.id}>
+                    {owner.company ?? owner.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="tk-subject">Subject</Label>
+            <Input id="tk-subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="tk-category">Category</Label>
+              <Input id="tk-category" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="billing, technical…" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="tk-priority">Priority</Label>
+              <Select value={priority} onValueChange={(v) => setPriority(v as (typeof TICKET_PRIORITIES)[number])}>
+                <SelectTrigger id="tk-priority">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TICKET_PRIORITIES.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {humanise(p)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="tk-body">Description (optional)</Label>
+            <Textarea id="tk-body" rows={3} value={body} onChange={(e) => setBody(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={create.isPending}>
+            Cancel
+          </Button>
+          <Button disabled={invalid || create.isPending} onClick={() => void submit()}>
+            {create.isPending && <Loader2 aria-hidden className="mr-2 size-4 animate-spin" />}
+            Create ticket
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export const Route = createFileRoute("/support/")({
   head: () => ({
@@ -67,6 +214,7 @@ function SupportPage() {
         eyebrow="Support"
         title="Support tickets"
         description="Owner requests, their priority and resolution state."
+        actions={<CreateTicketDialog />}
       />
       <div className="p-5 lg:p-6">
         <DataTable

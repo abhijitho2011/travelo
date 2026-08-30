@@ -69,7 +69,10 @@ export function useAssignTicket(ticketId: string) {
         method: "POST",
         body: { adminId },
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.support.all }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.support.detail(ticketId) });
+      qc.invalidateQueries({ queryKey: qk.support.all });
+    },
   });
 }
 

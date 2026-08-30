@@ -5,8 +5,24 @@ import { toast } from "sonner";
 
 import { AsyncSection, DetailGrid, PageHeader, StatusBadge } from "@/components/admin/primitives";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useReplyToTicket, useTicket, useTicketStatusAction } from "@/hooks/api/use-support";
+import { useAdminUsers } from "@/hooks/api/use-access";
+import {
+  useAssignTicket,
+  useReplyToTicket,
+  useTicket,
+  useTicketStatusAction,
+} from "@/hooks/api/use-support";
 import { errorMessage } from "@/lib/api";
 import { formatDateTime, humanise } from "@/lib/format";
 
@@ -56,6 +72,7 @@ function TicketPage() {
         actions={
           ticket && ticket.status !== "CLOSED" ? (
             <div className="flex gap-2">
+              <AssignTicketDialog ticketId={ticketId} assigned={ticket.assigned} />
               {ticket.status !== "RESOLVED" && (
                 <Button
                   size="sm"
@@ -162,5 +179,69 @@ function TicketPage() {
         )}
       </AsyncSection>
     </div>
+  );
+}
+
+function AssignTicketDialog({ ticketId, assigned }: { ticketId: string; assigned: string }) {
+  const [open, setOpen] = useState(false);
+  const [adminId, setAdminId] = useState("");
+  const admins = useAdminUsers({ limit: 100 });
+  const assign = useAssignTicket(ticketId);
+
+  const submit = () => {
+    if (!adminId) return;
+    assign.mutate(adminId, {
+      onSuccess: () => {
+        toast.success("Ticket assigned");
+        setOpen(false);
+        setAdminId("");
+      },
+      onError: (error) => toast.error(errorMessage(error)),
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline">
+          {assigned ? "Reassign" : "Assign"}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Assign ticket</DialogTitle>
+          <DialogDescription>
+            {assigned ? `Currently assigned to ${assigned}.` : "This ticket is unassigned."}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-1.5">
+          <Label htmlFor="assignee">Assignee</Label>
+          <select
+            id="assignee"
+            value={adminId}
+            onChange={(event) => setAdminId(event.target.value)}
+            className="h-9 w-full rounded-md border border-border bg-surface px-2 text-sm"
+          >
+            <option value="">Select an admin…</option>
+            {(admins.data?.items ?? [])
+              .filter((a) => a.status !== "Suspended")
+              .map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name} · {a.email}
+                </option>
+              ))}
+          </select>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={assign.isPending}>
+            Cancel
+          </Button>
+          <Button disabled={!adminId || assign.isPending} onClick={submit}>
+            {assign.isPending && <Loader2 aria-hidden className="mr-2 size-4 animate-spin" />}
+            Assign
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

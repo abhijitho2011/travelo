@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { DataTable, type Column } from "@/components/admin/data-table";
 import { ExportButton } from "@/components/admin/export-button";
 import { StatusFilter, ToolbarActions } from "@/components/admin/list-toolbar";
-import { PageHeader, StatusBadge } from "@/components/admin/primitives";
+import { MetricRow, PageHeader, StatusBadge } from "@/components/admin/primitives";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,6 +30,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { Payment } from "@/hooks/api/types";
 import {
   MANUAL_PAYMENT_METHODS,
+  usePayment,
   usePayments,
   useRecordManualPayment,
   useRefundPayment,
@@ -312,6 +313,65 @@ function ManualPaymentDialog() {
   );
 }
 
+function PaymentDetailDialog({ payment }: { payment: Payment }) {
+  const [open, setOpen] = useState(false);
+  const detail = usePayment(open ? payment.id : "");
+  const refunds = detail.data?.refunds ?? [];
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-7 text-xs">
+          Details
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Payment</DialogTitle>
+          <DialogDescription>{payment.owner ?? "Unknown owner"}</DialogDescription>
+        </DialogHeader>
+        <dl className="rounded-md border border-border bg-surface-muted px-3 py-1">
+          <MetricRow label="Amount" value={inr(payment.amount)} />
+          <MetricRow label="Status" value={humanise(payment.status)} />
+          <MetricRow label="Provider" value={payment.provider ?? "—"} />
+          <MetricRow label="Method" value={humanise(payment.method)} />
+          {payment.failureReason && (
+            <MetricRow label="Failure" value={payment.failureReason} />
+          )}
+          <MetricRow label="Date" value={formatDateTime(payment.createdAt)} />
+        </dl>
+        <div>
+          <p className="mb-1.5 text-sm font-semibold">Refunds</p>
+          {detail.isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : refunds.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No refunds against this payment.</p>
+          ) : (
+            <ul className="divide-y divide-border rounded-md border border-border">
+              {refunds.map((r) => (
+                <li key={r.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                  <span>
+                    <StatusBadge status={r.status} />{" "}
+                    <span className="text-xs text-muted-foreground">
+                      {formatDateTime(r.createdAt)}
+                    </span>
+                  </span>
+                  <span className="tnum font-semibold">{inr(r.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function PaymentsPage() {
   const list = useListParams();
   const query = usePayments({
@@ -364,11 +424,14 @@ function PaymentsPage() {
           loading={query.isLoading}
           error={query.error}
           onRetry={() => query.refetch()}
-          rowActions={(p) =>
-            p.status === "SUCCESS" || p.status === "PARTIALLY_REFUNDED" ? (
-              <RefundDialog payment={p} />
-            ) : null
-          }
+          rowActions={(p) => (
+            <div className="flex items-center justify-end gap-1">
+              <PaymentDetailDialog payment={p} />
+              {(p.status === "SUCCESS" || p.status === "PARTIALLY_REFUNDED") && (
+                <RefundDialog payment={p} />
+              )}
+            </div>
+          )}
           emptyTitle="No payments match this view"
           emptyDescription="Change the status filter, or wait for the first charge to settle."
           pagination={{

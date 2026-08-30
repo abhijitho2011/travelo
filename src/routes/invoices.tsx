@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { FileText } from "lucide-react";
+import { FileText, Loader2, Plus } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { DataTable, type Column } from "@/components/admin/data-table";
@@ -7,17 +8,161 @@ import { ExportButton } from "@/components/admin/export-button";
 import { StatusFilter, ToolbarActions } from "@/components/admin/list-toolbar";
 import { PageHeader, StatusBadge } from "@/components/admin/primitives";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { Invoice } from "@/hooks/api/types";
 import {
+  useCreateInvoice,
   useGenerateInvoicePdf,
   useInvoiceAction,
   useInvoiceDocumentUrl,
   useInvoices,
   type InvoiceAction,
 } from "@/hooks/api/use-billing";
+import { useOwners } from "@/hooks/api/use-owners";
 import { useListParams } from "@/hooks/use-list-params";
 import { errorMessage } from "@/lib/api";
 import { formatDate, inr } from "@/lib/format";
+
+function CreateInvoiceDialog() {
+  const [open, setOpen] = useState(false);
+  const [ownerId, setOwnerId] = useState("");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const [subtotal, setSubtotal] = useState("");
+  const [tax, setTax] = useState("");
+  const [discount, setDiscount] = useState("");
+  const [dueDate, setDueDate] = useState("");
+
+  const owners = useOwners({ limit: 200, offset: 0 });
+  const create = useCreateInvoice();
+
+  const subtotalPaise = Math.round(Number(subtotal) * 100);
+  const invalid = !ownerId || !start || !end || !(subtotalPaise >= 0 && Number.isFinite(subtotalPaise)) || !subtotal;
+
+  const reset = () => {
+    setOwnerId("");
+    setStart("");
+    setEnd("");
+    setSubtotal("");
+    setTax("");
+    setDiscount("");
+    setDueDate("");
+  };
+
+  const submit = async () => {
+    try {
+      await create.mutateAsync({
+        ownerId,
+        billingPeriodStart: start,
+        billingPeriodEnd: end,
+        subtotal: subtotalPaise,
+        tax: tax ? Math.round(Number(tax) * 100) : undefined,
+        discount: discount ? Math.round(Number(discount) * 100) : undefined,
+        dueDate: dueDate || undefined,
+      });
+      toast.success("Invoice created", { description: "Saved as a draft." });
+      setOpen(false);
+      reset();
+    } catch (error) {
+      toast.error("Could not create invoice", { description: errorMessage(error) });
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) reset();
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button size="sm" className="h-8">
+          <Plus aria-hidden className="mr-1.5 size-3.5" /> New invoice
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>New invoice</DialogTitle>
+          <DialogDescription>
+            Creates a draft invoice. Issue it from the list once the details are right.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="inv-owner">Owner</Label>
+            <Select value={ownerId} onValueChange={setOwnerId}>
+              <SelectTrigger id="inv-owner">
+                <SelectValue placeholder={owners.isLoading ? "Loading…" : "Select an owner"} />
+              </SelectTrigger>
+              <SelectContent>
+                {(owners.data?.items ?? []).map((owner) => (
+                  <SelectItem key={owner.id} value={owner.id}>
+                    {owner.company ?? owner.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="inv-start">Period start</Label>
+              <Input id="inv-start" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="inv-end">Period end</Label>
+              <Input id="inv-end" type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="inv-subtotal">Subtotal (₹)</Label>
+              <Input id="inv-subtotal" type="number" min={0} step="0.01" value={subtotal} onChange={(e) => setSubtotal(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="inv-tax">Tax (₹)</Label>
+              <Input id="inv-tax" type="number" min={0} step="0.01" value={tax} onChange={(e) => setTax(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="inv-discount">Discount (₹)</Label>
+              <Input id="inv-discount" type="number" min={0} step="0.01" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="inv-due">Due date (optional)</Label>
+            <Input id="inv-due" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={create.isPending}>
+            Cancel
+          </Button>
+          <Button disabled={invalid || create.isPending} onClick={() => void submit()}>
+            {create.isPending && <Loader2 aria-hidden className="mr-2 size-4 animate-spin" />}
+            Create draft
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export const Route = createFileRoute("/invoices")({
   head: () => ({
@@ -176,6 +321,7 @@ function InvoicesPage() {
         eyebrow="Monetization"
         title="Invoices"
         description="Issue, settle or cancel subscription invoices."
+        actions={<CreateInvoiceDialog />}
       />
       <div className="p-5 lg:p-6">
         <DataTable
