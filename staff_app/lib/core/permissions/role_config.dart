@@ -321,11 +321,11 @@ class RoleConfig {
     route: Routes.events,
     requires: [P.eventRead],
   );
-  static const _spaBookingsMore = NavItem(
-    label: 'Spa bookings',
-    icon: Icons.event_available_outlined,
+  static const _spaBillingMore = NavItem(
+    label: 'Billing',
+    icon: Icons.receipt_long_outlined,
     route: Routes.spaBookings,
-    requires: [P.spaBookingRead],
+    requires: [P.spaBillRead],
   );
   static const _spaMore = NavItem(
     label: 'Spa',
@@ -788,14 +788,32 @@ class RoleConfig {
       ],
       moreMenu: const [_roomsMore, _myTasksMore, ..._commonMore],
     ),
-    StaffRole.spaManager: _simple(
-      StaffRole.spaManager,
-      Routes.spa,
-      'Spa Dashboard',
-      'Spa',
-      Icons.spa_outlined,
-      requires: [P.spaRead],
-      more: const [_spaBookingsMore, _myTasksMore, _inventoryMore],
+    StaffRole.spaManager: RoleConfig(
+      role: StaffRole.spaManager,
+      homeRoute: Routes.spa,
+      homeModuleLabel: 'Spa Dashboard',
+      built: true,
+      bottomNav: const [
+        NavItem(
+          label: 'Dashboard',
+          icon: Icons.spa_outlined,
+          route: Routes.spa,
+          requires: [P.spaRead],
+        ),
+        NavItem(
+          label: 'Appointments',
+          icon: Icons.event_available_outlined,
+          route: Routes.spaAppointments,
+          requires: [P.spaBookingRead],
+        ),
+        NavItem(
+          label: 'Services',
+          icon: Icons.menu_book_outlined,
+          route: Routes.spaServices,
+          requires: [P.spaServiceRead],
+        ),
+      ],
+      moreMenu: const [_spaBillingMore, _myTasksMore, _inventoryMore, ..._commonMore],
     ),
     StaffRole.spaAccounts: _simple(
       StaffRole.spaAccounts,
@@ -803,7 +821,8 @@ class RoleConfig {
       'Spa Accounts',
       'Spa billing',
       Icons.receipt_long_outlined,
-      requires: [P.spaBookingRead],
+      requires: [P.spaBillRead],
+      built: true,
       more: const [_spaMore],
     ),
     StaffRole.spaStaff: _simple(
@@ -813,6 +832,7 @@ class RoleConfig {
       'Appointments',
       Icons.event_available_outlined,
       requires: [P.spaBookingRead],
+      built: true,
       more: const [_myTasksMore],
     ),
     StaffRole.restaurantManager: _simple(
@@ -890,7 +910,20 @@ class RoleConfig {
       'Security',
       Icons.shield_outlined,
       requires: [P.incidentRead],
+      built: true,
       more: const [
+        NavItem(
+          label: 'Incidents',
+          icon: Icons.report_gmailerrorred_outlined,
+          route: Routes.securityIncidents,
+          requires: [P.incidentRead],
+        ),
+        NavItem(
+          label: 'Roster',
+          icon: Icons.groups_outlined,
+          route: Routes.securityRoster,
+          requires: [P.shiftRead],
+        ),
         NavItem(
           label: 'Gate',
           icon: Icons.sensor_door_outlined,
@@ -902,12 +935,6 @@ class RoleConfig {
           icon: Icons.badge_outlined,
           route: Routes.securityVisitors,
           requires: [P.visitorRead],
-        ),
-        NavItem(
-          label: 'Incidents',
-          icon: Icons.report_gmailerrorred_outlined,
-          route: Routes.securityIncidents,
-          requires: [P.incidentRead],
         ),
         NavItem(
           label: 'Vehicle log',
@@ -940,7 +967,10 @@ class RoleConfig {
       'Events',
       Icons.celebration_outlined,
       requires: [P.eventRead],
+      built: true,
       more: const [_bookingsMore, _myTasksMore],
+      // The event detail (tasks + status) opened from the list.
+      extraRoutes: const {Routes.eventPattern},
     ),
 
     // ============================== Fallback ==============================

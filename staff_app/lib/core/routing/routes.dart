@@ -92,6 +92,7 @@ class Routes {
   static const spa = '/spa';
   static const spaAppointments = '/spa/my-appointments';
   static const spaBookings = '/spa/bookings';
+  static const spaServices = '/spa/services';
   static const restaurant = '/restaurant';
   static const pos = '/restaurant/pos';
   static const myTables = '/restaurant/my-tables';
@@ -106,6 +107,12 @@ class Routes {
   static String restaurantOrder(String id) => '/restaurant/orders/$id';
   static const inventory = '/inventory';
   static const securityManager = '/security/manager';
+  static const securityRoster = '/security/roster';
   static const driver = '/driver';
   static const events = '/events';
+
+  /// The event detail (tasks checklist + status). Registered after any static
+  /// `/events/...` route so a static path is never matched as an event id.
+  static String event(String id) => '/events/$id';
+  static const eventPattern = '/events/:id';
 }

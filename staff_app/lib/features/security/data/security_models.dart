@@ -146,32 +146,156 @@ enum IncidentSeverity {
       );
 }
 
+/// The lifecycle the manager drives: reported → assigned → resolved.
+enum IncidentStatus {
+  open('OPEN', 'Open', StatusTone.warning),
+  assigned('ASSIGNED', 'Assigned', StatusTone.occupied),
+  resolved('RESOLVED', 'Resolved', StatusTone.healthy);
+
+  const IncidentStatus(this.wire, this.label, this.tone);
+
+  final String wire;
+  final String label;
+  final StatusTone tone;
+
+  bool get isResolved => this == IncidentStatus.resolved;
+
+  static IncidentStatus fromWire(String? v) => IncidentStatus.values.firstWhere(
+    (s) => s.wire == v?.toUpperCase(),
+    orElse: () => IncidentStatus.open,
+  );
+}
+
 @immutable
 class Incident {
   const Incident({
     required this.id,
     required this.summary,
     required this.severity,
+    required this.status,
     required this.reportedAt,
     this.location,
+    this.assignedTo,
+    this.resolution,
     this.pendingSync = false,
   });
 
   final String id;
   final String summary;
   final IncidentSeverity severity;
+  final IncidentStatus status;
   final DateTime reportedAt;
   final String? location;
+  final String? assignedTo;
+  final String? resolution;
   final bool pendingSync;
 
   factory Incident.fromJson(Map j) => Incident(
     id: (j['id'] ?? '').toString(),
     summary: (j['summary'] as String?) ?? (j['description'] as String?) ?? '—',
     severity: IncidentSeverity.fromWire(j['severity'] as String?),
+    status: IncidentStatus.fromWire(j['status'] as String?),
     reportedAt:
         DateTime.tryParse((j['reportedAt'] ?? j['createdAt'] ?? '').toString())
             ?.toLocal() ??
         DateTime.now(),
     location: j['location'] as String?,
+    assignedTo: j['assignedTo'] as String?,
+    resolution: j['resolution'] as String?,
+  );
+}
+
+/// A guard's shift on the manager's roster.
+enum SecurityShiftStatus {
+  scheduled('SCHEDULED', 'Scheduled', StatusTone.info),
+  active('ACTIVE', 'On duty', StatusTone.available),
+  ended('ENDED', 'Ended', StatusTone.neutral);
+
+  const SecurityShiftStatus(this.wire, this.label, this.tone);
+
+  final String wire;
+  final String label;
+  final StatusTone tone;
+
+  static SecurityShiftStatus fromWire(String? v) =>
+      SecurityShiftStatus.values.firstWhere(
+        (s) => s.wire == v?.toUpperCase(),
+        orElse: () => SecurityShiftStatus.scheduled,
+      );
+}
+
+@immutable
+class SecurityShift {
+  const SecurityShift({
+    required this.id,
+    required this.staffId,
+    required this.area,
+    required this.status,
+    this.startAt,
+    this.endAt,
+  });
+
+  final String id;
+  final String staffId;
+  final String area;
+  final SecurityShiftStatus status;
+  final DateTime? startAt;
+  final DateTime? endAt;
+
+  factory SecurityShift.fromJson(Map j) => SecurityShift(
+    id: (j['id'] ?? '').toString(),
+    staffId: (j['staffId'] ?? '').toString(),
+    area: (j['area'] as String?) ?? '—',
+    status: SecurityShiftStatus.fromWire(j['status'] as String?),
+    startAt: DateTime.tryParse((j['startAt'] ?? '').toString())?.toLocal(),
+    endAt: DateTime.tryParse((j['endAt'] ?? '').toString())?.toLocal(),
+  );
+}
+
+@immutable
+class RosterMember {
+  const RosterMember({required this.id, required this.name, required this.role});
+
+  final String id;
+  final String name;
+  final String role;
+
+  factory RosterMember.fromJson(Map j) => RosterMember(
+    id: (j['id'] ?? '').toString(),
+    name: [j['firstName'], j['lastName']]
+        .where((p) => p != null && p.toString().trim().isNotEmpty)
+        .join(' ')
+        .trim()
+        .isEmpty
+        ? 'Staff'
+        : [j['firstName'], j['lastName']]
+            .where((p) => p != null && p.toString().trim().isNotEmpty)
+            .join(' '),
+    role: (j['role'] as String?) ?? '',
+  );
+}
+
+@immutable
+class SecurityDashboard {
+  const SecurityDashboard({
+    required this.activeStaff,
+    required this.visitorsOnSite,
+    required this.openIncidents,
+    required this.openBySeverity,
+  });
+
+  final int activeStaff;
+  final int visitorsOnSite;
+  final int openIncidents;
+  final Map<String, int> openBySeverity;
+
+  factory SecurityDashboard.fromJson(Map j) => SecurityDashboard(
+    activeStaff: (j['activeStaff'] as num?)?.toInt() ?? 0,
+    visitorsOnSite: (j['visitorsOnSite'] as num?)?.toInt() ?? 0,
+    openIncidents: (j['openIncidents'] as num?)?.toInt() ?? 0,
+    openBySeverity: {
+      for (final e in (j['openBySeverity'] as Map? ?? {}).entries)
+        e.key.toString(): (e.value as num?)?.toInt() ?? 0,
+    },
   );
 }

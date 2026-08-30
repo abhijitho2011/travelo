@@ -81,18 +81,7 @@ class IncidentsScreen extends ConsumerWidget {
                       children: [
                         for (var i = 0; i < items.length; i++) ...[
                           if (i > 0) const RowDivider(),
-                          DataRow2(
-                            title: items[i].summary,
-                            subtitle: [
-                              if (items[i].location != null) items[i].location!,
-                              Fmt.dateTime(items[i].reportedAt),
-                            ].join(' · '),
-                            badge: StatusBadge(
-                              tone: items[i].severity.tone,
-                              label: items[i].severity.label,
-                              dense: true,
-                            ),
-                          ),
+                          _IncidentRow(incident: items[i]),
                         ],
                       ],
                     ),
@@ -100,6 +89,115 @@ class IncidentsScreen extends ConsumerWidget {
           ),
       ],
     );
+  }
+}
+
+/// One incident in the manager's log, with assign / resolve actions gated on
+/// `incident.update`. A guard, lacking that permission, sees the row read-only.
+class _IncidentRow extends ConsumerStatefulWidget {
+  const _IncidentRow({required this.incident});
+
+  final Incident incident;
+
+  @override
+  ConsumerState<_IncidentRow> createState() => _IncidentRowState();
+}
+
+class _IncidentRowState extends ConsumerState<_IncidentRow> {
+  bool _busy = false;
+
+  Future<void> _run(Future<void> Function() action) async {
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await action();
+      ref.invalidate(incidentsProvider);
+      ref.invalidate(securityDashboardProvider);
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final inc = widget.incident;
+    return DataRow2(
+      title: inc.summary,
+      subtitle: [
+        if (inc.location != null) inc.location!,
+        inc.severity.label,
+        Fmt.dateTime(inc.reportedAt),
+        if (inc.resolution != null) 'Resolved: ${inc.resolution}',
+      ].join(' · '),
+      badge: StatusBadge(tone: inc.status.tone, label: inc.status.label, dense: true),
+      trailing: inc.status.isResolved
+          ? null
+          : _busy
+              ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : PermissionGate(
+                  permission: P.incidentUpdate,
+                  child: PopupMenuButton<String>(
+                    onSelected: (v) {
+                      if (v == 'assign') _assign(inc);
+                      if (v == 'resolve') _resolve(inc);
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'assign', child: Text('Assign')),
+                      PopupMenuItem(value: 'resolve', child: Text('Resolve')),
+                    ],
+                  ),
+                ),
+    );
+  }
+
+  Future<void> _assign(Incident inc) async {
+    final controller = TextEditingController();
+    final id = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Assign incident'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: 'Guard staff id'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Assign'),
+          ),
+        ],
+      ),
+    );
+    if (id != null && id.isNotEmpty) {
+      await _run(() => ref.read(securityRepositoryProvider).assignIncident(inc.id, id));
+    }
+  }
+
+  Future<void> _resolve(Incident inc) async {
+    final controller = TextEditingController();
+    final res = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Resolve incident'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: 'Resolution'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Resolve'),
+          ),
+        ],
+      ),
+    );
+    if (res != null && res.isNotEmpty) {
+      await _run(() => ref.read(securityRepositoryProvider).resolveIncident(inc.id, res));
+    }
   }
 }
 

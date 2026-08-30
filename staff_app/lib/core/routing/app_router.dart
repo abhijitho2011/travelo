@@ -12,6 +12,7 @@ import '../../features/auth/presentation/welcome_screen.dart';
 import '../../features/dashboard/presentation/home_redirect.dart';
 import '../../features/driver/presentation/driver_screen.dart';
 import '../../features/events/presentation/events_screen.dart';
+import '../../features/events/presentation/event_detail_screen.dart';
 import '../../features/housekeeping/presentation/housekeeping_board_screen.dart';
 import '../../features/housekeeping/presentation/housekeeping_tasks_screen.dart';
 import '../../features/housekeeping/presentation/my_tasks_screen.dart';
@@ -51,10 +52,12 @@ import '../../features/security/presentation/gate_screen.dart';
 import '../../features/security/presentation/incidents_screen.dart';
 import '../../features/security/presentation/lost_found_screen.dart';
 import '../../features/security/presentation/security_manager_screen.dart';
+import '../../features/security/presentation/security_roster_screen.dart';
 import '../../features/security/presentation/visitors_screen.dart';
 import '../../features/spa/presentation/spa_appointments_screen.dart';
 import '../../features/spa/presentation/spa_bookings_screen.dart';
 import '../../features/spa/presentation/spa_screen.dart';
+import '../../features/spa/presentation/spa_services_screen.dart';
 import '../../features/support/presentation/support_screen.dart';
 import '../../features/travel_desk/presentation/travel_desk_screen.dart';
 import '../providers.dart';
@@ -286,6 +289,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, _) => const SpaBookingsScreen(),
           ),
           GoRoute(
+            path: Routes.spaServices,
+            builder: (_, _) => const SpaServicesScreen(),
+          ),
+          GoRoute(
             path: Routes.restaurant,
             builder: (_, _) => const RestaurantScreen(),
           ),
@@ -320,8 +327,17 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: Routes.securityManager,
             builder: (_, _) => const SecurityManagerScreen(),
           ),
+          GoRoute(
+            path: Routes.securityRoster,
+            builder: (_, _) => const SecurityRosterScreen(),
+          ),
           GoRoute(path: Routes.driver, builder: (_, _) => const DriverScreen()),
           GoRoute(path: Routes.events, builder: (_, _) => const EventsScreen()),
+          GoRoute(
+            path: Routes.eventPattern,
+            builder: (_, state) =>
+                EventDetailScreen(eventId: state.pathParameters['id'] ?? ''),
+          ),
         ],
       ),
     ],

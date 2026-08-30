@@ -103,10 +103,26 @@ class P {
   static const billSettle = 'bill.settle';
   static const spaRead = 'spa.read';
   static const spaBookingRead = 'spa.booking.read';
+  static const spaBookingCreate = 'spa.booking.create';
+  static const spaBookingUpdate = 'spa.booking.update';
+  static const spaRosterUpdate = 'spa.roster.update';
+  static const spaServiceRead = 'spa.service.read';
+  static const spaServiceCreate = 'spa.service.create';
+  static const spaServiceUpdate = 'spa.service.update';
+  static const spaServiceDelete = 'spa.service.delete';
+  static const spaBillRead = 'spa.bill.read';
+  static const spaBillCreate = 'spa.bill.create';
+  static const spaBillSettle = 'spa.bill.settle';
+  static const spaBillRefund = 'spa.bill.refund';
+  static const spaRevenueRead = 'spa.revenue.read';
   static const eventRead = 'event.read';
+  static const eventCreate = 'event.create';
+  static const eventUpdate = 'event.update';
+  static const eventCancel = 'event.cancel';
 
   // --------------------------------------------------------- safety / gate --
   static const gateRead = 'gate.read';
+  static const gateRecord = 'gate.record';
   static const vehicleEntry = 'vehicle.entry';
   static const vehicleExit = 'vehicle.exit';
   static const staffEntry = 'staff.entry';
@@ -114,8 +130,12 @@ class P {
   static const visitorRecord = 'visitor.record';
   static const lostFoundRead = 'lostfound.read';
   static const lostFoundCreate = 'lostfound.create';
+  static const lostFoundUpdate = 'lostfound.update';
   static const incidentRead = 'incident.read';
   static const incidentCreate = 'incident.create';
+  static const incidentUpdate = 'incident.update';
+  static const shiftRead = 'shift.read';
+  static const shiftAssign = 'shift.assign';
 
   // ------------------------------------------------------------ transport --
   static const tripRead = 'trip.read';

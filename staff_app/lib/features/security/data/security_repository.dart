@@ -84,6 +84,43 @@ class SecurityRepository {
     },
   );
 
+  // ---- Manager oversight (assign / resolve, roster, dashboard) ----
+
+  Future<void> assignIncident(String id, String staffId) =>
+      _api.post('/security/incidents/$id/assign', body: {'staffId': staffId});
+
+  Future<void> resolveIncident(String id, String resolution) =>
+      _api.post('/security/incidents/$id/resolve', body: {'resolution': resolution});
+
+  Future<SecurityDashboard?> dashboard() async {
+    try {
+      final data = await _api.get('/security/dashboard');
+      return data is Map ? SecurityDashboard.fromJson(data) : null;
+    } on ApiException catch (e) {
+      if (e.isMissingEndpoint || e.code == ApiErrorCodes.forbidden) return null;
+      rethrow;
+    }
+  }
+
+  Future<List<SecurityShift>> shifts() =>
+      _read('/security/shifts', SecurityShift.fromJson);
+
+  Future<List<RosterMember>> roster() =>
+      _read('/security/roster', RosterMember.fromJson);
+
+  Future<void> createShift({
+    required String staffId,
+    required String area,
+    required DateTime startAt,
+  }) => _api.post('/security/shifts', body: {
+        'staffId': staffId,
+        'area': area,
+        'startAt': startAt.toUtc().toIso8601String(),
+      });
+
+  Future<void> setShiftStatus(String id, SecurityShiftStatus status) =>
+      _api.patch('/security/shifts/$id', body: {'status': status.wire});
+
   Future<List<T>> _read<T>(
     String path,
     T Function(Map) parse, {
@@ -129,4 +166,16 @@ final lostFoundProvider = FutureProvider.autoDispose<List<LostFoundItem>>(
 
 final incidentsProvider = FutureProvider.autoDispose<List<Incident>>(
   (ref) => ref.watch(securityRepositoryProvider).incidents(),
+);
+
+final securityDashboardProvider = FutureProvider.autoDispose<SecurityDashboard?>(
+  (ref) => ref.watch(securityRepositoryProvider).dashboard(),
+);
+
+final securityShiftsProvider = FutureProvider.autoDispose<List<SecurityShift>>(
+  (ref) => ref.watch(securityRepositoryProvider).shifts(),
+);
+
+final securityRosterProvider = FutureProvider.autoDispose<List<RosterMember>>(
+  (ref) => ref.watch(securityRepositoryProvider).roster(),
 );
