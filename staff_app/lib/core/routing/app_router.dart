@@ -35,6 +35,9 @@ import '../../features/restaurant/presentation/my_tables_screen.dart';
 import '../../features/restaurant/presentation/pos_screen.dart';
 import '../../features/restaurant/presentation/restaurant_cleaning_screen.dart';
 import '../../features/restaurant/presentation/restaurant_screen.dart';
+import '../../features/restaurant/presentation/order_screen.dart';
+import '../../features/restaurant/presentation/menu_management_screen.dart';
+import '../../features/restaurant/presentation/tables_management_screen.dart';
 import '../../features/rooms/presentation/bulk_rooms_screen.dart';
 import '../../features/rooms/presentation/room_form_screen.dart';
 import '../../features/rooms/presentation/room_type_form_screen.dart';
@@ -277,6 +280,19 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, _) => const MyTablesScreen(),
           ),
           GoRoute(path: Routes.kitchen, builder: (_, _) => const KitchenScreen()),
+          GoRoute(
+            path: Routes.restaurantMenu,
+            builder: (_, _) => const MenuManagementScreen(),
+          ),
+          GoRoute(
+            path: Routes.restaurantTables,
+            builder: (_, _) => const TablesManagementScreen(),
+          ),
+          GoRoute(
+            path: Routes.restaurantOrderPattern,
+            builder: (_, state) =>
+                OrderScreen(orderId: state.pathParameters['id'] ?? ''),
+          ),
           GoRoute(
             path: Routes.restaurantCleaning,
             builder: (_, _) => const RestaurantCleaningScreen(),

@@ -93,6 +93,13 @@ class Routes {
   static const myTables = '/restaurant/my-tables';
   static const kitchen = '/restaurant/kitchen';
   static const restaurantCleaning = '/restaurant/cleaning';
+  // Menu and floor management (manager). Declared as top-level restaurant
+  // sub-paths; the order screen takes an :id, registered after the static ones.
+  static const restaurantMenu = '/restaurant/menu';
+  static const restaurantTables = '/restaurant/tables';
+  static const restaurantOrders = '/restaurant/orders';
+  static const restaurantOrderPattern = '/restaurant/orders/:id';
+  static String restaurantOrder(String id) => '/restaurant/orders/$id';
   static const inventory = '/inventory';
   static const securityManager = '/security/manager';
   static const driver = '/driver';
