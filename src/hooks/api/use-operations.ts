@@ -10,6 +10,7 @@ import type {
   BackgroundJob,
   ImpersonationSession,
   IntegrationConnection,
+  IntegrationLog,
   NotificationDelivery,
   NotificationTemplate,
 } from "@/hooks/api/types";
@@ -267,6 +268,22 @@ export function useRetryJob() {
   return useMutation({
     mutationFn: (id: string) => apiFetch<BackgroundJob>(`/jobs/${id}/retry`, { method: "POST" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.jobs.all }),
+  });
+}
+
+export function useSyncIntegration() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch(`/integrations/${id}/sync`, { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["integrations"] }),
+  });
+}
+
+export function useIntegrationLogs(id: string | null) {
+  return useQuery({
+    queryKey: id ? qk.integrations.logs(id) : ["integrations", "logs", "none"],
+    queryFn: () => apiFetch<IntegrationLog[]>(`/integrations/${id}/logs`),
+    enabled: !!id,
   });
 }
 

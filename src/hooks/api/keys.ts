@@ -71,6 +71,7 @@ export const qk = {
     deliveries: (params: unknown) => ["notifications", "deliveries", params] as const,
   },
   integrations: {
+    logs: (id: string) => ["integrations", id, "logs"] as const,
     all: ["integrations"] as const,
     list: (params: unknown) => ["integrations", "list", params] as const,
     detail: (id: string) => ["integrations", "detail", id] as const,

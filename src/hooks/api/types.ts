@@ -56,6 +56,14 @@ export type Property = {
   updatedAt: string;
 };
 
+export type IntegrationLog = {
+  id: string;
+  event: string;
+  status: string;
+  message: string | null;
+  createdAt: string;
+};
+
 export type IntegrationConnection = {
   id: string;
   ownerId: string | null;
