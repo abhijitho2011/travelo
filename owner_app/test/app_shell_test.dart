@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:tavelo_owner/core/theme/app_colors.dart';
 import 'package:tavelo_owner/core/widgets/app_shell.dart';
+import 'package:tavelo_owner/core/widgets/tavelo_sidebar.dart';
 import 'package:tavelo_owner/core/widgets/primitives.dart';
 
 /// The shell is the one piece of chrome every signed-in screen depends on, and
@@ -82,19 +83,20 @@ void main() {
     expect(find.text('Subscription'), findsNothing);
   });
 
-  testWidgets('a tablet gets a rail carrying every destination directly', (
+  testWidgets('a tablet gets the sidebar carrying every destination directly', (
     tester,
   ) async {
     await pumpShell(tester, const Size(1024, 768));
 
-    expect(find.byType(NavigationRail), findsOneWidget);
+    // The design's light left sidebar replaces the Material rail on a tablet.
+    expect(find.byType(TaveloSidebar), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
 
-    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(rail.destinations.length, 7);
-    // No More on a tablet: the rail scrolls, so nothing needs hiding.
+    // Every destination is listed directly — no More to tap through.
     expect(find.text('More'), findsNothing);
     expect(find.text('Subscription'), findsOneWidget);
+    expect(find.text('Dashboard'), findsOneWidget);
+    expect(find.text('Profile'), findsOneWidget);
   });
 
   testWidgets('the top bar carries sign-out and profile, and no bell', (

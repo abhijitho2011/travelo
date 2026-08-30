@@ -10,6 +10,7 @@ import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import '../theme/theme_controller.dart';
 import 'tavelo_logo.dart';
+import 'tavelo_sidebar.dart';
 import '../utils/formatting.dart';
 
 /// One destination in the owner portal's navigation.
@@ -117,6 +118,8 @@ class AppShell extends ConsumerWidget {
     // The rail branch below reuses everything above, so the two layouts can
     // never disagree about what is selected or where a tap goes.
     if (isTablet) {
+      // The full destination list, as the design's light left sidebar.
+      final allItems = [..._phoneNav, ..._overflowNav];
       return Scaffold(
         backgroundColor: c.background,
         appBar: const OwnerTopBar(),
@@ -124,38 +127,22 @@ class AppShell extends ConsumerWidget {
           top: false,
           child: Row(
             children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  border: Border(right: BorderSide(color: c.border)),
-                ),
-                // A NavigationRail does not scroll on its own: seven
-                // destinations would overflow a short landscape tablet and take
-                // the last one off screen with it. Wrapping it in a min-height
-                // scroll view keeps every destination reachable.
-                child: LayoutBuilder(
-                  builder: (context, constraints) => SingleChildScrollView(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight,
-                      ),
-                      child: IntrinsicHeight(
-                        child: NavigationRail(
-                          selectedIndex: index,
-                          onDestinationSelected: onSelect,
-                          labelType: NavigationRailLabelType.all,
-                          backgroundColor: c.surface,
-                          destinations: [
-                            for (final d in destinations)
-                              NavigationRailDestination(
-                                icon: d.icon,
-                                label: Text(d.label),
-                              ),
-                          ],
+              TaveloSidebar(
+                currentLocation: location,
+                isActive: (route) => _routeActive(route, location),
+                sections: [
+                  SidebarSection(
+                    entries: [
+                      for (final item in allItems)
+                        SidebarEntry(
+                          label: item.label,
+                          icon: item.icon,
+                          route: item.route,
+                          onTap: () => context.go(item.route),
                         ),
-                      ),
-                    ),
+                    ],
                   ),
-                ),
+                ],
               ),
               // Keep line length readable rather than letting a list span the
               // full width of a landscape tablet.
@@ -192,6 +179,17 @@ class AppShell extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Whether [route] is the active sidebar row for [location] — an exact match,
+/// or [location] sitting on one of its sub-paths (so a detail screen keeps its
+/// parent lit). `/` only matches the dashboard itself.
+bool _routeActive(String route, String location) {
+  if (route == '/') return location == '/';
+  return location == route ||
+      (location.startsWith(route) &&
+          location.length > route.length &&
+          location[route.length] == '/');
 }
 
 /// Index of the destination whose route is the longest prefix of the current
@@ -264,6 +262,7 @@ class OwnerTopBar extends ConsumerWidget implements PreferredSizeWidget {
         _NotificationBell(unread: ref.watch(ownerUnreadCountProvider)),
         IconButton(
           onPressed: () => ref.read(themeControllerProvider.notifier).cycle(),
+          color: c.foreground,
           tooltip: switch (themeMode) {
             ThemeMode.system => 'Theme: follows device',
             ThemeMode.light => 'Theme: light',
@@ -277,6 +276,7 @@ class OwnerTopBar extends ConsumerWidget implements PreferredSizeWidget {
         ),
         IconButton(
           tooltip: 'Sign out',
+          color: c.foreground,
           onPressed: () => confirmSignOut(context, ref),
           icon: const Icon(Icons.logout_rounded, size: 20),
         ),
@@ -423,6 +423,7 @@ class _NotificationBell extends StatelessWidget {
       children: [
         IconButton(
           tooltip: 'Notifications',
+          color: c.foreground,
           onPressed: () => context.go('/notifications'),
           icon: const Icon(Icons.notifications_none_rounded, size: 20),
         ),
