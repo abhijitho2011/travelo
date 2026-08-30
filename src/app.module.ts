@@ -24,6 +24,11 @@ import { RestaurantModule } from './modules/restaurant/restaurant.module';
 import { SpaModule } from './modules/spa/spa.module';
 import { SecurityModule } from './modules/security/security.module';
 import { EventsModule } from './modules/events/events.module';
+import { AccountsModule } from './modules/accounts/accounts.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
+import { SalesModule } from './modules/sales/sales.module';
+import { TravelDeskModule } from './modules/travel-desk/travel-desk.module';
+import { DriverModule } from './modules/driver/driver.module';
 import { EntitlementsModule } from './modules/entitlements/entitlements.module';
 import { PlansModule } from './modules/plans/plans.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
@@ -101,6 +106,11 @@ import { ScheduleModule } from '@nestjs/schedule';
     SpaModule,
     SecurityModule,
     EventsModule,
+    AccountsModule,
+    InventoryModule,
+    SalesModule,
+    TravelDeskModule,
+    DriverModule,
     PlansModule,
     SubscriptionsModule,
     BillingModule,

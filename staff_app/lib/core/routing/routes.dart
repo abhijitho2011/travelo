@@ -80,8 +80,12 @@ class Routes {
 
   // --- deferred modules (honest placeholders) ---
   static const accounts = '/accounts';
+  static const accountsExpenses = '/accounts/expenses';
   static const sales = '/sales';
+  static const salesLeadPattern = '/sales/leads/:id';
+  static String salesLead(String id) => '/sales/leads/$id';
   static const travelDesk = '/travel-desk';
+  static const travelDeskVehicles = '/travel-desk/vehicles';
   static const housekeeping = '/housekeeping';
   static const housekeepingTasks = '/housekeeping/tasks';
   static const maintenance = '/maintenance';
@@ -106,9 +110,16 @@ class Routes {
   static const restaurantOrderPattern = '/restaurant/orders/:id';
   static String restaurantOrder(String id) => '/restaurant/orders/$id';
   static const inventory = '/inventory';
+  static const inventoryItems = '/inventory/items';
+  static const inventoryMovements = '/inventory/movements';
+  static const inventoryPurchaseOrders = '/inventory/purchase-orders';
+  static const inventoryPoPattern = '/inventory/purchase-orders/:id';
+  static String inventoryPo(String id) => '/inventory/purchase-orders/$id';
   static const securityManager = '/security/manager';
   static const securityRoster = '/security/roster';
   static const driver = '/driver';
+  static const driverTripPattern = '/driver/trips/:id';
+  static String driverTrip(String id) => '/driver/trips/$id';
   static const events = '/events';
 
   /// The event detail (tasks checklist + status). Registered after any static

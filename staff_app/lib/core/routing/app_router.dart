@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/accounts/presentation/accounts_screen.dart';
+import '../../features/accounts/presentation/expenses_screen.dart';
 import '../../features/auth/presentation/access_denied_screen.dart';
 import '../../features/auth/presentation/account_status_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
@@ -11,6 +12,7 @@ import '../../features/auth/presentation/session_expired_screen.dart';
 import '../../features/auth/presentation/welcome_screen.dart';
 import '../../features/dashboard/presentation/home_redirect.dart';
 import '../../features/driver/presentation/driver_screen.dart';
+import '../../features/driver/presentation/driver_trip_screen.dart';
 import '../../features/events/presentation/events_screen.dart';
 import '../../features/events/presentation/event_detail_screen.dart';
 import '../../features/housekeeping/presentation/housekeeping_board_screen.dart';
@@ -18,6 +20,10 @@ import '../../features/housekeeping/presentation/housekeeping_tasks_screen.dart'
 import '../../features/housekeeping/presentation/my_tasks_screen.dart';
 import '../../features/housekeeping/presentation/task_detail_screen.dart';
 import '../../features/inventory/presentation/inventory_screen.dart';
+import '../../features/inventory/presentation/inventory_items_screen.dart';
+import '../../features/inventory/presentation/stock_movements_screen.dart';
+import '../../features/inventory/presentation/purchase_orders_screen.dart';
+import '../../features/inventory/presentation/purchase_order_detail_screen.dart';
 import '../../features/maintenance/presentation/my_work_orders_screen.dart';
 import '../../features/maintenance/presentation/work_orders_screen.dart';
 import '../../features/maintenance/presentation/work_order_detail_screen.dart';
@@ -47,6 +53,7 @@ import '../../features/rooms/presentation/room_type_form_screen.dart';
 import '../../features/rooms/presentation/room_types_screen.dart';
 import '../../features/rooms/presentation/rooms_screen.dart';
 import '../../features/sales/presentation/sales_screen.dart';
+import '../../features/sales/presentation/lead_detail_screen.dart';
 import '../../features/security/presentation/gate_log_screen.dart';
 import '../../features/security/presentation/gate_screen.dart';
 import '../../features/security/presentation/incidents_screen.dart';
@@ -60,6 +67,7 @@ import '../../features/spa/presentation/spa_screen.dart';
 import '../../features/spa/presentation/spa_services_screen.dart';
 import '../../features/support/presentation/support_screen.dart';
 import '../../features/travel_desk/presentation/travel_desk_screen.dart';
+import '../../features/travel_desk/presentation/vehicles_screen.dart';
 import '../providers.dart';
 import '../widgets/app_shell.dart';
 import 'guards.dart';
@@ -247,12 +255,25 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(path: Routes.support, builder: (_, _) => const SupportScreen()),
 
-          // ------------------- deferred modules (honest placeholders) -------
+          // ------------------- operations domains ---------------------------
           GoRoute(path: Routes.accounts, builder: (_, _) => const AccountsScreen()),
+          GoRoute(
+            path: Routes.accountsExpenses,
+            builder: (_, _) => const ExpensesScreen(),
+          ),
           GoRoute(path: Routes.sales, builder: (_, _) => const SalesScreen()),
+          GoRoute(
+            path: Routes.salesLeadPattern,
+            builder: (_, state) =>
+                LeadDetailScreen(leadId: state.pathParameters['id'] ?? ''),
+          ),
           GoRoute(
             path: Routes.travelDesk,
             builder: (_, _) => const TravelDeskScreen(),
+          ),
+          GoRoute(
+            path: Routes.travelDeskVehicles,
+            builder: (_, _) => const VehiclesScreen(),
           ),
           GoRoute(
             path: Routes.housekeeping,
@@ -324,6 +345,23 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, _) => const InventoryScreen(),
           ),
           GoRoute(
+            path: Routes.inventoryItems,
+            builder: (_, _) => const InventoryItemsScreen(),
+          ),
+          GoRoute(
+            path: Routes.inventoryMovements,
+            builder: (_, _) => const StockMovementsScreen(),
+          ),
+          GoRoute(
+            path: Routes.inventoryPurchaseOrders,
+            builder: (_, _) => const PurchaseOrdersScreen(),
+          ),
+          GoRoute(
+            path: Routes.inventoryPoPattern,
+            builder: (_, state) =>
+                PurchaseOrderDetailScreen(poId: state.pathParameters['id'] ?? ''),
+          ),
+          GoRoute(
             path: Routes.securityManager,
             builder: (_, _) => const SecurityManagerScreen(),
           ),
@@ -332,6 +370,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, _) => const SecurityRosterScreen(),
           ),
           GoRoute(path: Routes.driver, builder: (_, _) => const DriverScreen()),
+          GoRoute(
+            path: Routes.driverTripPattern,
+            builder: (_, state) =>
+                DriverTripScreen(tripId: state.pathParameters['id'] ?? ''),
+          ),
           GoRoute(path: Routes.events, builder: (_, _) => const EventsScreen()),
           GoRoute(
             path: Routes.eventPattern,

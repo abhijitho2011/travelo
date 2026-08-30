@@ -20,6 +20,11 @@ import {
   resolveMfaKey,
 } from './mfa-crypto';
 
+// Every test here hashes recovery codes with argon2, which is deliberately
+// slow; under a fully parallel suite run it can exceed Jest's 5s default and
+// flake. The work is real, so the timeout is raised rather than the cost cut.
+jest.setTimeout(30_000);
+
 const ADMIN_SECRET = 'admin-access-secret-for-tests-32chars';
 const KEY_B64 = randomBytes(32).toString('base64');
 

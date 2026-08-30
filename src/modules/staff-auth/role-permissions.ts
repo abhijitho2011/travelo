@@ -150,6 +150,7 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
     'revenue.read',
     'expense.read',
     'expense.create',
+    'expense.update',
     'invoice.read',
     'invoice.create',
     'invoice.update',
@@ -197,6 +198,9 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
     'lead.read',
     'lead.create',
     'lead.update',
+    // The activity timeline logged against a lead.
+    'activity.read',
+    'activity.create',
     'corporate.read',
     'corporate.create',
     'corporate.update',
@@ -219,10 +223,21 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
     'tour.book',
     'transport.read',
     'transport.book',
+    // The transport-request lifecycle the desk owns: raise it, assign a driver
+    // and vehicle, and cancel/complete it. NOT `transport.drive` — the desk
+    // dispatches, the driver drives.
+    'transport.create',
+    'transport.update',
+    'transport.assign',
+    // The vehicle fleet.
+    'vehicle.read',
+    'vehicle.create',
+    'vehicle.update',
     'guest.read',
     'reservation.read',
     'vendor.read',
     'task.read',
+    'dashboard.read',
   ],
 
   HOUSEKEEPING_SUPERVISOR: [
@@ -450,6 +465,14 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
     'grn.create',
     'purchase.request.read',
     'purchase.request.create',
+    // Suppliers and the purchase-order lifecycle the store manager owns.
+    'supplier.read',
+    'supplier.create',
+    'supplier.update',
+    'po.read',
+    'po.create',
+    'po.update',
+    'po.receive',
     'procurement.read',
     'vendor.read',
     'reports.read',
@@ -504,6 +527,9 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
     'trip.start',
     'trip.complete',
     'transport.read',
+    // Drive an assigned trip through its doorstep steps (accept → on-the-way →
+    // arrived → picked-up → completed). Dispatch stays with the travel desk.
+    'transport.drive',
     'vehicle.log.read',
     'vehicle.log.create',
     'task.read',

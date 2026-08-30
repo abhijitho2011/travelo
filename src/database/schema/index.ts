@@ -12,3 +12,4 @@ export * from './restaurant';
 export * from './spa';
 export * from './security';
 export * from './events';
+export * from './ops';
