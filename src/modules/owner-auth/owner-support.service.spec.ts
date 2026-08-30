@@ -1,6 +1,19 @@
 import { OwnerSupportService } from './owner-support.service';
 import { mockAudit, mockDb, sqlText, type Row } from './testing/db.mock';
 
+/** A StorageService stand-in: records puts and hands back a predictable URL. */
+function mockStorage() {
+  const puts: Array<{ key: string; contentType: string; size: number }> = [];
+  return {
+    puts,
+    driver: 's3' as const,
+    put: async (key: string, body: Buffer, contentType: string) => {
+      puts.push({ key, contentType, size: body.length });
+    },
+    getSignedUrl: async (key: string) => `https://signed.example/${key}`,
+  };
+}
+
 const TICKET: Row = {
   id: 'tkt-1',
   ownerId: 'own-1',
@@ -46,7 +59,13 @@ function svcWith(
     },
   });
   const audit = mockAudit();
-  return { db, audit, svc: new OwnerSupportService(db as never, audit as never) };
+  const storage = mockStorage();
+  return {
+    db,
+    audit,
+    storage,
+    svc: new OwnerSupportService(db as never, audit as never, storage as never),
+  };
 }
 
 /**
@@ -128,6 +147,89 @@ describe('OwnerSupportService — tenant scoping', () => {
   });
 });
 
+describe('OwnerSupportService.addAttachment', () => {
+  function file(over: Partial<{ originalname: string; mimetype: string; size: number }> = {}) {
+    return {
+      originalname: 'receipt.png',
+      mimetype: 'image/png',
+      size: 1024,
+      buffer: Buffer.from('x'.repeat(over.size ?? 1024)),
+      ...over,
+    };
+  }
+
+  function svc() {
+    const db = mockDb({
+      select: { support_tickets: [[TICKET]] },
+      insert: {
+        support_messages: [msg({ authorType: 'OWNER', body: 'Shared an attachment: receipt.png' })],
+        support_attachments: [
+          {
+            id: 'att-1',
+            messageId: 'msg-1',
+            filename: 'receipt.png',
+            mimeType: 'image/png',
+            size: 1024,
+          },
+        ],
+      },
+      update: { support_tickets: [TICKET] },
+    });
+    const storage = mockStorage();
+    return {
+      db,
+      storage,
+      svc: new OwnerSupportService(db as never, mockAudit() as never, storage as never),
+    };
+  }
+
+  it('creates a message + attachment row with the right key and returns a presigned url', async () => {
+    const { svc: s, db, storage } = svc();
+    const res = await s.addAttachment('own-1', 'tkt-1', file() as never);
+
+    expect(db.inserts.map((i) => i.table)).toEqual(['support_messages', 'support_attachments']);
+    const attInsert = db.inserts.find((i) => i.table === 'support_attachments')!;
+    // url column carries the STORAGE KEY, not a URL.
+    expect(attInsert.values!.url).toMatch(/^support\/tkt-1\/msg-1\/.+-receipt\.png$/);
+    expect(storage.puts).toHaveLength(1);
+    expect(storage.puts[0].key).toBe(attInsert.values!.url);
+    expect(res.url).toBe(`https://signed.example/${storage.puts[0].key}`);
+    expect(res).toMatchObject({
+      id: 'att-1',
+      filename: 'receipt.png',
+      mimeType: 'image/png',
+      size: 1024,
+    });
+  });
+
+  it('rejects a disallowed mime type before writing anything', async () => {
+    const { svc: s, db, storage } = svc();
+    await expect(
+      s.addAttachment('own-1', 'tkt-1', file({ mimetype: 'application/zip' }) as never),
+    ).rejects.toMatchObject({ status: 400, response: { error: 'UNSUPPORTED_MEDIA_TYPE' } });
+    expect(db.inserts).toHaveLength(0);
+    expect(storage.puts).toHaveLength(0);
+  });
+
+  it('rejects an oversized file', async () => {
+    const { svc: s } = svc();
+    await expect(
+      s.addAttachment('own-1', 'tkt-1', file({ size: 11 * 1024 * 1024 }) as never),
+    ).rejects.toMatchObject({ status: 400, response: { error: 'FILE_TOO_LARGE' } });
+  });
+
+  it('404s rather than attaching to another owner’s ticket', async () => {
+    const db = mockDb({ select: { support_tickets: [[]] } });
+    const storage = mockStorage();
+    const s = new OwnerSupportService(db as never, mockAudit() as never, storage as never);
+    await expect(
+      s.addAttachment('own-1', 'someone-elses-ticket', file() as never),
+    ).rejects.toMatchObject({ status: 404 });
+    expect(db.inserts).toHaveLength(0);
+    expect(storage.puts).toHaveLength(0);
+  });
+});
+
 describe('OwnerSupportService.list', () => {
   it('applies status and text filters', async () => {
     const { svc, db } = svcWith({ tickets: LIST_ROWS });
@@ -143,7 +245,7 @@ describe('OwnerSupportService.list', () => {
         support_tickets: [[{ t: TICKET, propertyName: 'Sea Breeze Resort' }], [{ count: 1 }]],
       },
     });
-    const svc = new OwnerSupportService(db as never, mockAudit() as never);
+    const svc = new OwnerSupportService(db as never, mockAudit() as never, mockStorage() as never);
     const res = await svc.list('own-1', {});
     expect(res).toMatchObject({ total: 1, limit: 50, offset: 0 });
     expect(res.items[0]).toMatchObject({

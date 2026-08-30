@@ -1,10 +1,22 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { IsBoolean, IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { SupportService } from './support.service';
+import { MAX_ATTACHMENT_BYTES, UploadedAttachment } from './support-attachment.util';
 
 class CreateTicketDto {
   @IsOptional() @IsUUID() ownerId?: string;
@@ -65,6 +77,16 @@ export class SupportController {
   @RequirePermissions('support.reply')
   message(@Param('id') id: string, @Body() dto: MessageDto) {
     return this.svc.postMessage(id, dto);
+  }
+
+  @Post(':id/attachments')
+  @RequirePermissions('support.reply')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: MAX_ATTACHMENT_BYTES, files: 1 } }),
+  )
+  attach(@Param('id') id: string, @UploadedFile() file: UploadedAttachment) {
+    return this.svc.addAttachment(id, file);
   }
 
   @Post(':id/assign')

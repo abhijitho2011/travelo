@@ -517,6 +517,7 @@ export const supportAttachments = pgTable('support_attachments', {
     .notNull()
     .references(() => supportMessages.id, { onDelete: 'cascade' }),
   filename: varchar('filename', { length: 255 }).notNull(),
+  // Holds the object-store KEY (not a browsable URL); callers presign it on read.
   url: text('url').notNull(),
   mimeType: varchar('mime_type', { length: 128 }),
   size: integer('size'),

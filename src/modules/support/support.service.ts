@@ -1,11 +1,25 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, desc, eq, ilike, sql, SQL } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, sql, SQL } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
-import { admins, owners, properties, supportMessages, supportTickets } from '../../database/schema';
+import {
+  admins,
+  owners,
+  properties,
+  supportAttachments,
+  supportMessages,
+  supportTickets,
+} from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { getRequestContext } from '../../common/context/request-context';
 import { NotificationDeliveryService } from '../notifications/notification-delivery.service';
 import { inAppRecipient } from '../notifications/channels/channel.interface';
+import { StorageService } from '../storage/storage.service';
+import {
+  assertValidAttachment,
+  attachmentObjectKey,
+  ATTACHMENT_URL_TTL_SECONDS,
+  UploadedAttachment,
+} from './support-attachment.util';
 
 @Injectable()
 export class SupportService {
@@ -13,7 +27,56 @@ export class SupportService {
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly audit: AuditService,
     private readonly notifications: NotificationDeliveryService,
+    private readonly storage: StorageService,
   ) {}
+
+  /**
+   * attachments keyed by message id, each with a freshly presigned download URL.
+   * `support_attachments.url` holds the object STORAGE KEY, so it is presigned
+   * here rather than returned raw.
+   */
+  private async attachmentsByMessage(messageIds: string[]): Promise<
+    Map<
+      string,
+      Array<{
+        id: string;
+        filename: string;
+        mimeType: string | null;
+        size: number | null;
+        url: string;
+      }>
+    >
+  > {
+    const map = new Map<
+      string,
+      Array<{
+        id: string;
+        filename: string;
+        mimeType: string | null;
+        size: number | null;
+        url: string;
+      }>
+    >();
+    if (!messageIds.length) return map;
+    const rows = await this.db
+      .select()
+      .from(supportAttachments)
+      .where(inArray(supportAttachments.messageId, messageIds));
+    await Promise.all(
+      rows.map(async (r) => {
+        const list = map.get(r.messageId) ?? [];
+        list.push({
+          id: r.id,
+          filename: r.filename,
+          mimeType: r.mimeType,
+          size: r.size,
+          url: await this.storage.getSignedUrl(r.url, ATTACHMENT_URL_TTL_SECONDS),
+        });
+        map.set(r.messageId, list);
+      }),
+    );
+    return map;
+  }
 
   async list(params: {
     limit?: number;
@@ -119,12 +182,70 @@ export class SupportService {
       .from(supportMessages)
       .where(eq(supportMessages.ticketId, id))
       .orderBy(supportMessages.createdAt);
+    const attachments = await this.attachmentsByMessage(msgs.map((m) => m.id));
     return {
       ...row.t,
       owner: row.owner,
       hotel: row.hotel,
       assigned: row.assigned ?? 'Unassigned',
-      messages: msgs,
+      messages: msgs.map((m) => ({ ...m, attachments: attachments.get(m.id) ?? [] })),
+    };
+  }
+
+  /**
+   * A support attachment must hang off a message (the schema FK). Rather than
+   * demand the caller name one, we author a short admin message to carry it, so
+   * the upload is always tied to a real, thread-visible message.
+   */
+  async addAttachment(ticketId: string, file: UploadedAttachment | undefined) {
+    assertValidAttachment(file);
+    const [ticket] = await this.db
+      .select({ id: supportTickets.id })
+      .from(supportTickets)
+      .where(eq(supportTickets.id, ticketId))
+      .limit(1);
+    if (!ticket) throw new NotFoundException('Ticket not found');
+
+    const ctx = getRequestContext();
+    const [msg] = await this.db
+      .insert(supportMessages)
+      .values({
+        ticketId,
+        authorType: 'ADMIN',
+        authorId: ctx?.adminId,
+        body: `Shared an attachment: ${file.originalname ?? 'file'}`,
+      })
+      .returning();
+
+    const key = attachmentObjectKey(ticketId, msg.id, file.originalname);
+    await this.storage.put(key, file.buffer, file.mimetype);
+    const [att] = await this.db
+      .insert(supportAttachments)
+      .values({
+        messageId: msg.id,
+        filename: file.originalname ?? 'file',
+        url: key,
+        mimeType: file.mimetype,
+        size: file.size,
+      })
+      .returning();
+
+    await this.db
+      .update(supportTickets)
+      .set({ updatedAt: new Date() })
+      .where(eq(supportTickets.id, ticketId));
+    await this.audit.record({
+      action: 'support.attachment.added',
+      entity: 'ticket',
+      entityId: ticketId,
+      after: { messageId: msg.id, attachmentId: att.id },
+    });
+    return {
+      id: att.id,
+      filename: att.filename,
+      mimeType: att.mimeType,
+      size: att.size,
+      url: await this.storage.getSignedUrl(key, ATTACHMENT_URL_TTL_SECONDS),
     };
   }
 

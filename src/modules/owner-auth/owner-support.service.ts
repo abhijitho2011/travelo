@@ -1,8 +1,20 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, ilike, isNull, sql, SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, isNull, sql, SQL } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
-import { properties, supportMessages, supportTickets } from '../../database/schema';
+import {
+  properties,
+  supportAttachments,
+  supportMessages,
+  supportTickets,
+} from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
+import { StorageService } from '../storage/storage.service';
+import {
+  assertValidAttachment,
+  attachmentObjectKey,
+  ATTACHMENT_URL_TTL_SECONDS,
+  UploadedAttachment,
+} from '../support/support-attachment.util';
 import { CreateTicketDto, TicketFilterDto } from './dto';
 import { OwnerErrors } from './owner-errors';
 
@@ -27,7 +39,44 @@ export class OwnerSupportService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly audit: AuditService,
+    private readonly storage: StorageService,
   ) {}
+
+  /**
+   * attachments keyed by message id, each with a freshly presigned download URL.
+   * `support_attachments.url` holds the object STORAGE KEY, presigned on read.
+   */
+  private async attachmentsByMessage(messageIds: string[]) {
+    const map = new Map<
+      string,
+      Array<{
+        id: string;
+        filename: string;
+        mimeType: string | null;
+        size: number | null;
+        url: string;
+      }>
+    >();
+    if (!messageIds.length) return map;
+    const rows = await this.db
+      .select()
+      .from(supportAttachments)
+      .where(inArray(supportAttachments.messageId, messageIds));
+    await Promise.all(
+      rows.map(async (r) => {
+        const list = map.get(r.messageId) ?? [];
+        list.push({
+          id: r.id,
+          filename: r.filename,
+          mimeType: r.mimeType,
+          size: r.size,
+          url: await this.storage.getSignedUrl(r.url, ATTACHMENT_URL_TTL_SECONDS),
+        });
+        map.set(r.messageId, list);
+      }),
+    );
+    return map;
+  }
 
   private static ticketDto(t: TicketRow, propertyName?: string | null) {
     return {
@@ -115,9 +164,67 @@ export class OwnerSupportService {
         ),
       )
       .orderBy(asc(supportMessages.createdAt));
+    const attachments = await this.attachmentsByMessage(messages.map((m) => m.id));
     return {
       ...OwnerSupportService.ticketDto(ticket),
-      messages: messages.map((m) => OwnerSupportService.messageDto(m)),
+      messages: messages.map((m) => ({
+        ...OwnerSupportService.messageDto(m),
+        attachments: attachments.get(m.id) ?? [],
+      })),
+    };
+  }
+
+  /**
+   * Owner attaches a file to THEIR OWN ticket. Like the admin surface, the file
+   * hangs off a freshly authored owner message so it is always tied to a real
+   * thread message. Non-owned tickets 404 via loadOwnedTicket.
+   */
+  async addAttachment(ownerId: string, ticketId: string, file: UploadedAttachment | undefined) {
+    assertValidAttachment(file);
+    const ticket = await this.loadOwnedTicket(ownerId, ticketId);
+
+    const [message] = await this.db
+      .insert(supportMessages)
+      .values({
+        ticketId: ticket.id,
+        authorType: OWNER_AUTHOR,
+        authorId: ownerId,
+        body: `Shared an attachment: ${file.originalname ?? 'file'}`,
+        isInternalNote: false,
+      })
+      .returning();
+
+    const key = attachmentObjectKey(ticket.id, message.id, file.originalname);
+    await this.storage.put(key, file.buffer, file.mimetype);
+    const [att] = await this.db
+      .insert(supportAttachments)
+      .values({
+        messageId: message.id,
+        filename: file.originalname ?? 'file',
+        url: key,
+        mimeType: file.mimetype,
+        size: file.size,
+      })
+      .returning();
+
+    await this.db
+      .update(supportTickets)
+      .set({ updatedAt: new Date() })
+      .where(eq(supportTickets.id, ticket.id));
+    await this.audit.record({
+      action: 'owner.support.attachment.added',
+      entity: 'ticket',
+      entityId: ticket.id,
+      after: { messageId: message.id, attachmentId: att.id },
+      actorId: ownerId,
+      actorRole: 'OWNER',
+    });
+    return {
+      id: att.id,
+      filename: att.filename,
+      mimeType: att.mimeType,
+      size: att.size,
+      url: await this.storage.getSignedUrl(key, ATTACHMENT_URL_TTL_SECONDS),
     };
   }
 

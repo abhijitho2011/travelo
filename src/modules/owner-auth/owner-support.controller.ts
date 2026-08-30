@@ -5,14 +5,18 @@ import {
   Param,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
   VERSION_NEUTRAL,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { OwnerJwtGuard } from './owner-jwt.guard';
 import { CurrentOwner, AuthenticatedOwner } from './current-owner.decorator';
 import { OwnerSupportService } from './owner-support.service';
 import { CreateTicketDto, TicketFilterDto, TicketMessageDto } from './dto';
+import { MAX_ATTACHMENT_BYTES, UploadedAttachment } from '../support/support-attachment.util';
 
 @ApiTags('Owner Support')
 @ApiBearerAuth()
@@ -43,5 +47,18 @@ export class OwnerSupportController {
     @Body() dto: TicketMessageDto,
   ) {
     return this.svc.addMessage(owner.id, id, dto.body);
+  }
+
+  @Post('tickets/:id/attachments')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: MAX_ATTACHMENT_BYTES, files: 1 } }),
+  )
+  attach(
+    @CurrentOwner() owner: AuthenticatedOwner,
+    @Param('id') id: string,
+    @UploadedFile() file: UploadedAttachment,
+  ) {
+    return this.svc.addAttachment(owner.id, id, file);
   }
 }
