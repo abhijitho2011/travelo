@@ -146,6 +146,7 @@ class RoleConfig {
     this.bottomNav = const <NavItem>[],
     this.moreMenu = const <NavItem>[],
     this.built = false,
+    this.extraRoutes = const <String>{},
   });
 
   final StaffRole role;
@@ -163,6 +164,12 @@ class RoleConfig {
   /// False when the home module is still a placeholder in this build.
   final bool built;
 
+  /// Routes reachable by this role that are NOT nav destinations — detail
+  /// screens and management pages opened from a button. They widen
+  /// [allowedRoutes] (so the RoleGuard admits them) without adding a tab; each
+  /// screen still gates its own actions with a PermissionGate.
+  final Set<String> extraRoutes;
+
   List<NavItem> visibleNav(PermissionSet permissions) =>
       bottomNav.where((i) => i.isVisibleTo(permissions)).toList(growable: false);
 
@@ -175,6 +182,7 @@ class RoleConfig {
     homeRoute,
     for (final i in bottomNav) i.route,
     for (final i in moreMenu) i.route,
+    ...extraRoutes,
     ..._alwaysAllowed,
   };
 
@@ -249,10 +257,14 @@ class RoleConfig {
     IconData icon, {
     List<String> requires = const [],
     List<NavItem> more = const <NavItem>[],
+    bool built = false,
+    Set<String> extraRoutes = const <String>{},
   }) => RoleConfig(
     role: role,
     homeRoute: route,
     homeModuleLabel: moduleLabel,
+    built: built,
+    extraRoutes: extraRoutes,
     bottomNav: [
       NavItem(label: navLabel, icon: icon, route: route, requires: requires),
     ],
@@ -809,8 +821,16 @@ class RoleConfig {
       'Restaurant Dashboard',
       'Restaurant',
       Icons.restaurant_outlined,
+      built: true,
       requires: [P.restaurantRead],
       more: const [_posMore, _myTablesMore, _kitchenMore, _inventoryMore],
+      // Menu, tables and any order the manager drills into — reached from
+      // buttons on the dashboard, not from a tab.
+      extraRoutes: const {
+        Routes.restaurantMenu,
+        Routes.restaurantTables,
+        Routes.restaurantOrders,
+      },
     ),
     StaffRole.cashier: _simple(
       StaffRole.cashier,
@@ -818,8 +838,11 @@ class RoleConfig {
       'Point of Sale',
       'POS',
       Icons.point_of_sale_outlined,
+      built: true,
       requires: [P.posOperate],
       more: const [_myTablesMore],
+      // The bill detail the cashier opens to settle an order.
+      extraRoutes: const {Routes.restaurantOrders},
     ),
     StaffRole.waiter: _simple(
       StaffRole.waiter,
@@ -827,8 +850,11 @@ class RoleConfig {
       'My Tables',
       'My tables',
       Icons.table_restaurant_outlined,
+      built: true,
       requires: [P.tableRead],
-      more: const [_myTasksMore],
+      more: const [_kitchenMore, _myTasksMore],
+      // The running order screen a waiter opens from a table.
+      extraRoutes: const {Routes.restaurantOrders},
     ),
     StaffRole.chef: _simple(
       StaffRole.chef,
@@ -836,6 +862,7 @@ class RoleConfig {
       'Kitchen Display',
       'Kitchen',
       Icons.soup_kitchen_outlined,
+      built: true,
       requires: [P.kotRead],
       more: const [_inventoryMore, _myTasksMore],
     ),

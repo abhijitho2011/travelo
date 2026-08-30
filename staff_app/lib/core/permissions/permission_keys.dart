@@ -89,7 +89,18 @@ class P {
   static const posRead = 'pos.read';
   static const posOperate = 'pos.operate';
   static const tableRead = 'table.read';
+  // Restaurant floor + menu management (manager), orders (waiter), the KOT
+  // (kitchen + floor, split by role in-service) and the bill (request vs settle).
+  static const tableManage = 'table.manage';
+  static const menuManage = 'menu.manage';
+  static const orderRead = 'order.read';
+  static const orderCreate = 'order.create';
+  static const orderUpdate = 'order.update';
+  static const orderVoid = 'order.void';
   static const kotRead = 'kot.read';
+  static const kotUpdate = 'kot.update';
+  static const billGenerate = 'bill.generate';
+  static const billSettle = 'bill.settle';
   static const spaRead = 'spa.read';
   static const spaBookingRead = 'spa.booking.read';
   static const eventRead = 'event.read';
