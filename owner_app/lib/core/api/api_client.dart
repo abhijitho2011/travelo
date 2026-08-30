@@ -24,6 +24,12 @@ class ApiClient {
 
   late final Dio _dio;
   final TokenStore _tokens;
+
+  /// Set by [AuthController]. Called when a refresh fails — the app maps this to
+  /// a sign-out so a dead session never leaves the user staring at generic
+  /// errors. Mutable (not a ctor arg) so wiring it does not create a provider
+  /// cycle between the client and the auth controller.
+  void Function()? onSessionExpired;
   Future<bool>? _refreshing;
 
   Future<dynamic> get(String path, {Map<String, dynamic>? query}) =>
@@ -88,6 +94,7 @@ class ApiClient {
         );
       }
       await _tokens.clear();
+      onSessionExpired?.call();
       throw const ApiException(
         code: 'UNAUTHENTICATED',
         message: 'Your session has expired. Please sign in again.',

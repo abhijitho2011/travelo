@@ -146,9 +146,20 @@ class ApiClient {
         );
         return true;
       }
-    } catch (_) {
-      // fall through — treated as a failed refresh
+      // A real response that was not a success envelope — the refresh token is
+      // genuinely rejected. Fall through to a signed-out.
+      return false;
+    } on DioException catch (e) {
+      // The auth service was unreachable, not the token rejected. Surface a
+      // transient network error so the caller keeps the session instead of
+      // signing the user out mid-shift on a flaky connection.
+      if (e.type == DioExceptionType.connectionError ||
+          e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.sendTimeout) {
+        throw ApiException.network();
+      }
+      return false;
     }
-    return false;
   }
 }

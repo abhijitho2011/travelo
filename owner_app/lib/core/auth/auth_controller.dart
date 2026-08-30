@@ -20,7 +20,11 @@ class AuthController extends StateNotifier<AuthState> {
   }) : _api = api,
        _tokens = tokens,
        _google = google,
-       super(const AuthState.unknown());
+       super(const AuthState.unknown()) {
+    // A failed token refresh drops straight to signed-out so the router sends
+    // the owner back to /login instead of stranding them on a dead session.
+    _api.onSessionExpired = forceSignedOut;
+  }
 
   final ApiClient _api;
   final TokenStore _tokens;
@@ -119,5 +123,14 @@ class AuthController extends StateNotifier<AuthState> {
     await _google.signOut();
     await _tokens.clear();
     state = const AuthState.signedOut();
+  }
+
+  /// The session died server-side (refresh failed). Tokens are already cleared;
+  /// just drop to signed-out so the router redirects to /login instead of
+  /// leaving the user in a dead session. Idempotent.
+  void forceSignedOut() {
+    if (state.phase != AuthPhase.unauthenticated) {
+      state = const AuthState.signedOut();
+    }
   }
 }
