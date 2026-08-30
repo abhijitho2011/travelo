@@ -234,8 +234,11 @@ describe('ReservationsService — no double booking', () => {
         room_types: [[typeRow]],
         // Two sellable rooms of the type...
         rooms: [[{ count: 2 }]],
-        // ...and two overlapping committed stays already on them.
-        reservations: [[{ count: 2 }]],
+        // ...and two committed stays covering every night of 14th–17th.
+        reservations: [[
+          { checkIn: '2026-03-14', checkOut: '2026-03-17' },
+          { checkIn: '2026-03-14', checkOut: '2026-03-17' },
+        ]],
       },
     });
     await expect(
@@ -248,7 +251,10 @@ describe('ReservationsService — no double booking', () => {
       select: {
         room_types: [[typeRow]],
         rooms: [[{ count: 2 }]],
-        reservations: [[{ count: 2 }]],
+        reservations: [[
+          { checkIn: '2026-03-14', checkOut: '2026-03-17' },
+          { checkIn: '2026-03-14', checkOut: '2026-03-17' },
+        ]],
       },
     });
     await expect(
@@ -556,5 +562,32 @@ describe('ReservationsService — move room (4.5)', () => {
     await expect(
       svc(db).moveRoom(MY_PROPERTY, 'res-1', { roomId: 'room-2' }, STAFF_ID),
     ).rejects.toMatchObject({ response: { error: 'NOT_IN_HOUSE' } });
+  });
+});
+
+describe('ReservationsService — per-night availability (4.4)', () => {
+  it('allows a stay when each night is under capacity, though the interval total exceeds it', async () => {
+    // Two rooms of the type. Three existing one-night stays, each on a DIFFERENT
+    // night of 14th–17th — so every night holds just one. The old interval count
+    // (3 stays >= 2 rooms) refused this wrongly; the per-night check allows it.
+    const db = mockDb({
+      select: {
+        room_types: [[typeRow], []],
+        rooms: [[{ count: 2 }]],
+        reservations: [
+          [
+            { checkIn: '2026-03-14', checkOut: '2026-03-15' },
+            { checkIn: '2026-03-15', checkOut: '2026-03-16' },
+            { checkIn: '2026-03-16', checkOut: '2026-03-17' },
+          ],
+          [{ count: 0 }], // reservation-number counter
+        ],
+      },
+      insert: { reservations: [resRow()] },
+    });
+    await expect(
+      svc(db).create(MY_PROPERTY, newBooking({ status: 'CONFIRMED' }), STAFF_ID),
+    ).resolves.toBeDefined();
+    expect(db.inserts.find((i) => i.table === 'reservations')).toBeTruthy();
   });
 });

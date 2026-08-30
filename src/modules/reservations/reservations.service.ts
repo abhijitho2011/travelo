@@ -25,6 +25,7 @@ import { ReservationErrors } from './reservation-errors';
 import { HousekeepingService } from '../housekeeping/housekeeping.service';
 import {
   ASSIGNABLE_ROOM_STATUSES,
+  addDays,
   assertDateOrder,
   assertTransition,
   coversDate,
@@ -122,15 +123,14 @@ export class ReservationsService {
   }
 
   /**
-   * Refuse if every room of the type is already spoken for.
+   * Refuse if any SINGLE NIGHT of the stay is fully sold for this room type.
    *
-   * The comparison is "overlapping committed reservations of this type" against
-   * "live rooms of this type that are not OUT_OF_ORDER". It is deliberately an
-   * INTERVAL count, not a per-night one: a hotel that has sold N stays touching
-   * the window has at most N rooms of that type in play, so this never lets an
-   * oversell through. It can refuse a booking that a night-by-night calculation
-   * would allow (three one-night stays on three different nights against two
-   * rooms), which is the safe direction to be wrong in for a first cut.
+   * The comparison is "committed reservations of this type covering that night"
+   * against "live rooms of this type that are not OUT_OF_ORDER". A PER-NIGHT
+   * check, not an interval one: three one-night stays on three different nights
+   * are three separate nights, so against two rooms they all fit — the old
+   * interval count refused that wrongly. It still never oversells, because a
+   * night is only blocked once its own occupancy reaches the room count.
    */
   private static async assertTypeCapacity(
     tx: Tx,
@@ -151,9 +151,10 @@ export class ReservationsService {
           ne(rooms.status, 'OUT_OF_ORDER' as RoomStatus),
         ),
       );
+    const rooms_ = roomCount ?? 0;
 
-    const [{ count: booked }] = await tx
-      .select({ count: sql<number>`count(*)::int` })
+    const overlapping = await tx
+      .select({ checkIn: reservations.checkIn, checkOut: reservations.checkOut })
       .from(reservations)
       .where(
         and(
@@ -161,9 +162,22 @@ export class ReservationsService {
           eq(reservations.roomTypeId, roomTypeId),
           ...ReservationsService.occupyingOverlap(checkIn, checkOut, excludeId),
         ),
-      );
+      )
+      // Locks the candidate rows so a simultaneous confirm cannot slip past the
+      // per-night count between here and the write.
+      .for('update');
 
-    if (booked >= (roomCount ?? 0)) throw ReservationErrors.noAvailability();
+    // Walk each night of the requested window; block on the first that is full.
+    const nights = nightsBetween(checkIn, checkOut);
+    for (let i = 0; i < nights; i += 1) {
+      const night = addDays(checkIn, i);
+      let sold = 0;
+      for (const s of overlapping) {
+        // A stay covers `night` when check_in <= night < check_out.
+        if ((s.checkIn as IsoDate) <= night && night < (s.checkOut as IsoDate)) sold += 1;
+      }
+      if (sold >= rooms_) throw ReservationErrors.noAvailability(night);
+    }
   }
 
   /** Append-only trail. Always written with the same `tx` as the change. */
