@@ -14,23 +14,21 @@ import { TransportErrors } from './transport-errors';
  * separate machine so the desk's status stays coarse and reportable while the
  * driver ticks through the doorstep steps.
  */
-export const TRANSPORT_TRANSITIONS: Readonly<
-  Record<TransportStatus, readonly TransportStatus[]>
-> = {
-  REQUESTED: ['ASSIGNED', 'CANCELLED'],
-  ASSIGNED: ['IN_PROGRESS', 'REQUESTED', 'CANCELLED'],
-  IN_PROGRESS: ['COMPLETED', 'CANCELLED'],
-  COMPLETED: [],
-  CANCELLED: [],
-};
+export const TRANSPORT_TRANSITIONS: Readonly<Record<TransportStatus, readonly TransportStatus[]>> =
+  {
+    REQUESTED: ['ASSIGNED', 'CANCELLED'],
+    ASSIGNED: ['IN_PROGRESS', 'REQUESTED', 'CANCELLED'],
+    IN_PROGRESS: ['COMPLETED', 'CANCELLED'],
+    COMPLETED: [],
+    CANCELLED: [],
+  };
 
 export function canTransitionTransport(from: TransportStatus, to: TransportStatus): boolean {
   return TRANSPORT_TRANSITIONS[from]?.includes(to) ?? false;
 }
 
 export function assertTransportTransition(from: TransportStatus, to: TransportStatus): void {
-  if (!canTransitionTransport(from, to))
-    throw TransportErrors.invalidTransportTransition(from, to);
+  if (!canTransitionTransport(from, to)) throw TransportErrors.invalidTransportTransition(from, to);
 }
 
 // ---------- Driver stage machine (within IN_PROGRESS) ----------
@@ -40,9 +38,7 @@ export function assertTransportTransition(from: TransportStatus, to: TransportSt
  * a merely ASSIGNED request. Accepting sets ACCEPTED; the driver then walks
  * ACCEPTED → EN_ROUTE → ARRIVED → PICKED_UP, and completing the trip closes it.
  */
-export const DRIVER_STAGE_TRANSITIONS: Readonly<
-  Record<DriverStage, readonly DriverStage[]>
-> = {
+export const DRIVER_STAGE_TRANSITIONS: Readonly<Record<DriverStage, readonly DriverStage[]>> = {
   ACCEPTED: ['EN_ROUTE'],
   EN_ROUTE: ['ARRIVED'],
   ARRIVED: ['PICKED_UP'],
@@ -70,13 +66,7 @@ export function assertDriverStage(from: DriverStage | null, to: DriverStage): vo
  *   pickedUp  — stage ARRIVED → PICKED_UP
  *   complete  — request IN_PROGRESS → COMPLETED   (requires stage PICKED_UP)
  */
-export const driverStepValues = [
-  'accept',
-  'onTheWay',
-  'arrived',
-  'pickedUp',
-  'complete',
-] as const;
+export const driverStepValues = ['accept', 'onTheWay', 'arrived', 'pickedUp', 'complete'] as const;
 export type DriverStep = (typeof driverStepValues)[number];
 
 /** The driver-stage a step targets, or null for `complete` (a status move). */

@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS "inventory_items" (
 	"category" varchar(64),
 	"reorder_level" integer DEFAULT 0 NOT NULL,
 	"current_qty" integer DEFAULT 0 NOT NULL,
+	"unit_cost_paise" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"deleted_at" timestamp with time zone

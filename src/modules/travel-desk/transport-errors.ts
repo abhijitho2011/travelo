@@ -6,12 +6,20 @@ export function transportError(code: string, message: string, status: HttpStatus
 
 export const TransportErrors = {
   requestNotFound: () =>
-    transportError('TRANSPORT_REQUEST_NOT_FOUND', 'Transport request not found', HttpStatus.NOT_FOUND),
+    transportError(
+      'TRANSPORT_REQUEST_NOT_FOUND',
+      'Transport request not found',
+      HttpStatus.NOT_FOUND,
+    ),
   vehicleNotFound: () =>
     transportError('VEHICLE_NOT_FOUND', 'Vehicle not found', HttpStatus.NOT_FOUND),
 
   duplicatePlate: () =>
-    transportError('DUPLICATE_PLATE', 'A vehicle with that plate already exists', HttpStatus.CONFLICT),
+    transportError(
+      'DUPLICATE_PLATE',
+      'A vehicle with that plate already exists',
+      HttpStatus.CONFLICT,
+    ),
 
   invalidTransportTransition: (from: string, to: string) =>
     transportError(
@@ -37,7 +45,11 @@ export const TransportErrors = {
 
   /** The driver's own trip guard: a driver may only act on trips assigned to them. */
   notYourTrip: () =>
-    transportError('TRANSPORT_REQUEST_NOT_FOUND', 'Transport request not found', HttpStatus.NOT_FOUND),
+    transportError(
+      'TRANSPORT_REQUEST_NOT_FOUND',
+      'Transport request not found',
+      HttpStatus.NOT_FOUND,
+    ),
 
   notAssignable: () =>
     transportError(

@@ -21,6 +21,11 @@ import { RoomsModule } from './modules/rooms/rooms.module';
 import { ReservationsModule } from './modules/reservations/reservations.module';
 import { HousekeepingModule } from './modules/housekeeping/housekeeping.module';
 import { RestaurantModule } from './modules/restaurant/restaurant.module';
+import { AccountsModule } from './modules/accounts/accounts.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
+import { SalesModule } from './modules/sales/sales.module';
+import { TravelDeskModule } from './modules/travel-desk/travel-desk.module';
+import { DriverModule } from './modules/driver/driver.module';
 import { EntitlementsModule } from './modules/entitlements/entitlements.module';
 import { PlansModule } from './modules/plans/plans.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
@@ -95,6 +100,11 @@ import { ScheduleModule } from '@nestjs/schedule';
     ReservationsModule,
     HousekeepingModule,
     RestaurantModule,
+    AccountsModule,
+    InventoryModule,
+    SalesModule,
+    TravelDeskModule,
+    DriverModule,
     PlansModule,
     SubscriptionsModule,
     BillingModule,

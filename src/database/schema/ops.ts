@@ -98,6 +98,12 @@ export const inventoryItems = pgTable(
     reorderLevel: integer('reorder_level').notNull().default(0),
     /** Live on-hand quantity. Only ever changed through a stock movement, in-tx. */
     currentQty: integer('current_qty').notNull().default(0),
+    /**
+     * Last known purchase cost per unit, integer paise. Set when a PO is
+     * received (or as an opening value) and used to value on-hand stock. Not a
+     * moving average — the simplest honest basis for a store dashboard.
+     */
+    unitCostPaise: integer('unit_cost_paise').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
@@ -237,7 +243,10 @@ export const purchaseOrders = pgTable(
   (t) => ({
     propertyIdx: index('purchase_orders_property_idx').on(t.propertyId),
     propertyStatusIdx: index('purchase_orders_property_status_idx').on(t.propertyId, t.status),
-    numberUnique: uniqueIndex('purchase_orders_property_number_unique').on(t.propertyId, t.poNumber),
+    numberUnique: uniqueIndex('purchase_orders_property_number_unique').on(
+      t.propertyId,
+      t.poNumber,
+    ),
   }),
 );
 export type PurchaseOrder = typeof purchaseOrders.$inferSelect;

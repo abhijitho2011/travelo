@@ -28,9 +28,7 @@ describe('transport request state machine', () => {
 
   it('assert throws on an illegal move', () => {
     expect(() => assertTransportTransition('REQUESTED', 'ASSIGNED')).not.toThrow();
-    expect(() => assertTransportTransition('COMPLETED', 'REQUESTED')).toThrow(
-      /cannot move from/,
-    );
+    expect(() => assertTransportTransition('COMPLETED', 'REQUESTED')).toThrow(/cannot move from/);
   });
 });
 
