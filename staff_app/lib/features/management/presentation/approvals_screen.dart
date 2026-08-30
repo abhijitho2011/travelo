@@ -120,6 +120,7 @@ class _ApprovalRowState extends ConsumerState<_ApprovalRow> {
         ApprovalKind.discount => Icons.percent_outlined,
         ApprovalKind.refund => Icons.undo_outlined,
         ApprovalKind.purchase => Icons.shopping_cart_outlined,
+        ApprovalKind.expense => Icons.receipt_long_outlined,
         ApprovalKind.leave => Icons.event_busy_outlined,
         ApprovalKind.other => Icons.fact_check_outlined,
       },

@@ -88,6 +88,7 @@ enum ApprovalKind {
   discount,
   refund,
   purchase,
+  expense,
   leave,
   other;
 
@@ -96,6 +97,7 @@ enum ApprovalKind {
     'discount' => ApprovalKind.discount,
     'refund' => ApprovalKind.refund,
     'purchase' || 'purchase_order' => ApprovalKind.purchase,
+    'expense' => ApprovalKind.expense,
     'leave' => ApprovalKind.leave,
     _ => ApprovalKind.other,
   };
@@ -105,6 +107,7 @@ enum ApprovalKind {
     ApprovalKind.discount => 'Discount',
     ApprovalKind.refund => 'Refund',
     ApprovalKind.purchase => 'Purchase',
+    ApprovalKind.expense => 'Expense',
     ApprovalKind.leave => 'Leave',
     ApprovalKind.other => 'Approval',
   };
