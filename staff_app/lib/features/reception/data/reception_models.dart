@@ -796,3 +796,97 @@ enum CheckInStep {
 
   static List<CheckInStep> get ordered => CheckInStep.values;
 }
+
+// --------------------------------------------------------------- Folio ---
+
+/// The itemised stay bill: the room charge, any ancillary charges posted from
+/// restaurant/spa, every payment and refund, and the outstanding balance.
+class Folio {
+  const Folio({
+    required this.roomChargePaise,
+    required this.ancillaryPaise,
+    required this.chargesPaise,
+    required this.netPaidPaise,
+    required this.balancePaise,
+    required this.lineItems,
+    required this.payments,
+  });
+
+  final int roomChargePaise;
+  final int ancillaryPaise;
+  final int chargesPaise;
+  final int netPaidPaise;
+  final int balancePaise;
+  final List<FolioLineItem> lineItems;
+  final List<FolioPayment> payments;
+
+  bool get hasBalance => balancePaise > 0;
+  String get roomChargeLabel => formatPaise(roomChargePaise);
+  String get chargesLabel => formatPaise(chargesPaise);
+  String get paidLabel => formatPaise(netPaidPaise);
+  String get balanceLabel => formatPaise(balancePaise);
+
+  factory Folio.fromJson(Map json) => Folio(
+    roomChargePaise: _int(_pick(json, ['roomChargePaise', 'room_charge_paise'])),
+    ancillaryPaise: _int(_pick(json, ['ancillaryPaise', 'ancillary_paise'])),
+    chargesPaise: _int(_pick(json, ['chargesPaise', 'charges_paise'])),
+    netPaidPaise: _int(_pick(json, ['netPaidPaise', 'net_paid_paise'])),
+    balancePaise: _int(_pick(json, ['balancePaise', 'balance_paise'])),
+    lineItems: (json['lineItems'] as List? ?? const [])
+        .whereType<Map>()
+        .map(FolioLineItem.fromJson)
+        .toList(),
+    payments: (json['payments'] as List? ?? const [])
+        .whereType<Map>()
+        .map(FolioPayment.fromJson)
+        .toList(),
+  );
+}
+
+class FolioLineItem {
+  const FolioLineItem({
+    required this.kind,
+    required this.description,
+    required this.amountPaise,
+  });
+
+  final String kind;
+  final String description;
+  final int amountPaise;
+
+  String get amountLabel => formatPaise(amountPaise);
+
+  factory FolioLineItem.fromJson(Map json) => FolioLineItem(
+    kind: _str(json['kind']) ?? 'MISC',
+    description: _str(json['description']) ?? '',
+    amountPaise: _int(_pick(json, ['amountPaise', 'amount_paise'])),
+  );
+}
+
+class FolioPayment {
+  const FolioPayment({
+    required this.direction,
+    required this.method,
+    required this.amountPaise,
+    this.reference,
+  });
+
+  final String direction;
+  final String method;
+  final int amountPaise;
+  final String? reference;
+
+  bool get isRefund => direction == 'REFUND';
+  String get amountLabel => formatPaise(amountPaise);
+
+  factory FolioPayment.fromJson(Map json) => FolioPayment(
+    direction: _str(json['direction']) ?? 'PAYMENT',
+    method: _str(json['method']) ?? 'CASH',
+    amountPaise: _int(_pick(json, ['amountPaise', 'amount_paise'])),
+    reference: _str(json['reference']),
+  );
+}
+
+/// The payment methods the desk can record — mirrors the server's
+/// folioPaymentMethodValues.
+const kFolioPaymentMethods = <String>['CASH', 'CARD', 'UPI', 'BANK', 'ONLINE'];

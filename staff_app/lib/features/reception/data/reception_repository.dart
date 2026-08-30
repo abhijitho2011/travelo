@@ -130,16 +130,72 @@ class ReceptionRepository {
   Future<Reservation> checkOut(
     String id, {
     int? collectedPaise,
+    String? paymentMethod,
+    bool allowOutstanding = false,
     String? note,
+    String? idempotencyKey,
   }) async {
     final data = await _api.post(
       '/reservations/$id/check-out',
       body: {
         if (collectedPaise != null) 'collectedPaise': collectedPaise,
+        if (paymentMethod != null) 'paymentMethod': paymentMethod,
+        if (allowOutstanding) 'allowOutstanding': true,
         if (note != null && note.isNotEmpty) 'note': note,
+        if (idempotencyKey != null) 'idempotencyKey': idempotencyKey,
       },
     );
     return _one(data, Reservation.fromJson, 'booking');
+  }
+
+  /// The itemised folio for a stay: room, ancillary charges, payments, balance.
+  Future<Folio> folio(String id) async {
+    final data = await _api.get('/reservations/$id/folio');
+    return _one(data, Folio.fromJson, 'folio');
+  }
+
+  /// Take a payment against a stay's folio. Idempotent: pass a stable key so a
+  /// double-tap on a flaky connection never charges the guest twice.
+  Future<void> collectPayment(
+    String id, {
+    required String method,
+    required int amountPaise,
+    String? reference,
+    String? note,
+    String? idempotencyKey,
+  }) async {
+    await _api.post(
+      '/reservations/$id/payments',
+      body: {
+        'method': method,
+        'amountPaise': amountPaise,
+        if (reference != null && reference.isNotEmpty) 'reference': reference,
+        if (note != null && note.isNotEmpty) 'note': note,
+        if (idempotencyKey != null) 'idempotencyKey': idempotencyKey,
+      },
+    );
+  }
+
+  /// Record a refund against a stay's folio. Behind the stronger
+  /// `payment.refund` server-side.
+  Future<void> refund(
+    String id, {
+    required String method,
+    required int amountPaise,
+    String? reference,
+    String? note,
+    String? idempotencyKey,
+  }) async {
+    await _api.post(
+      '/reservations/$id/refunds',
+      body: {
+        'method': method,
+        'amountPaise': amountPaise,
+        if (reference != null && reference.isNotEmpty) 'reference': reference,
+        if (note != null && note.isNotEmpty) 'note': note,
+        if (idempotencyKey != null) 'idempotencyKey': idempotencyKey,
+      },
+    );
   }
 
   /// The reason is required by the server, not optional politeness: a

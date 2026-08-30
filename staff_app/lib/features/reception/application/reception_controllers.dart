@@ -37,6 +37,12 @@ final reservationProvider = FutureProvider.autoDispose
       (ref, id) => ref.watch(receptionRepositoryProvider).reservation(id),
     );
 
+/// The itemised folio for one stay. Autodisposed and keyed by reservation id,
+/// invalidated whenever a payment, refund or checkout lands.
+final folioProvider = FutureProvider.autoDispose.family<Folio, String>(
+  (ref, id) => ref.watch(receptionRepositoryProvider).folio(id),
+);
+
 /// The dates a booking form is currently asking about. A record rather than a
 /// class so two forms on the same range share one fetch for free.
 typedef StayRange = ({DateTime checkIn, DateTime checkOut});
@@ -130,15 +136,61 @@ class ReservationActions {
   Future<Reservation> checkOut(
     String id, {
     int? collectedPaise,
+    String? paymentMethod,
+    bool allowOutstanding = false,
     String? note,
+    String? idempotencyKey,
   }) async {
     final result = await _repo.checkOut(
       id,
       collectedPaise: collectedPaise,
+      paymentMethod: paymentMethod,
+      allowOutstanding: allowOutstanding,
       note: note,
+      idempotencyKey: idempotencyKey,
     );
     _invalidate(id);
     return result;
+  }
+
+  Future<void> collectPayment(
+    String id, {
+    required String method,
+    required int amountPaise,
+    String? reference,
+    String? note,
+    String? idempotencyKey,
+  }) async {
+    await _repo.collectPayment(
+      id,
+      method: method,
+      amountPaise: amountPaise,
+      reference: reference,
+      note: note,
+      idempotencyKey: idempotencyKey,
+    );
+    _ref.invalidate(folioProvider(id));
+    _invalidate(id);
+  }
+
+  Future<void> refund(
+    String id, {
+    required String method,
+    required int amountPaise,
+    String? reference,
+    String? note,
+    String? idempotencyKey,
+  }) async {
+    await _repo.refund(
+      id,
+      method: method,
+      amountPaise: amountPaise,
+      reference: reference,
+      note: note,
+      idempotencyKey: idempotencyKey,
+    );
+    _ref.invalidate(folioProvider(id));
+    _invalidate(id);
   }
 
   Future<Reservation> cancel(String id, String reason) async {

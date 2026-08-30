@@ -20,6 +20,7 @@ import '../../rooms/presentation/room_widgets.dart'
 import '../application/reception_controllers.dart';
 import '../data/reception_models.dart';
 import '../data/reception_repository.dart';
+import 'folio_payment_sheet.dart';
 import 'room_picker_sheet.dart';
 
 /// One booking, and everything the desk may do to it.
@@ -183,28 +184,7 @@ class _ReservationDetailScreenState
                   permission: P.paymentRead,
                   child: Padding(
                     padding: const EdgeInsets.only(top: Sp.md),
-                    child: Panel(
-                      title: 'Folio',
-                      padBody: false,
-                      child: Column(
-                        children: [
-                          _Fact(label: 'Rate', value: r.rateLabel),
-                          const RowDivider(),
-                          _Fact(label: 'Total', value: r.totalLabel),
-                          const RowDivider(),
-                          _Fact(
-                            label: 'Paid',
-                            value: formatPaiseOf(r.paidPaise),
-                          ),
-                          const RowDivider(),
-                          _Fact(
-                            label: 'Outstanding',
-                            value: r.balanceLabel,
-                            emphasise: r.balancePaise > 0,
-                          ),
-                        ],
-                      ),
-                    ),
+                    child: _FolioPanel(reservation: r),
                   ),
                 ),
 
@@ -257,6 +237,105 @@ class _ReservationDetailScreenState
 /// Rupees for a paise figure the model does not already label.
 String formatPaiseOf(int paise) => Fmt.money(paise / 100);
 
+/// The folio panel: the itemised stay bill with collect-payment and refund
+/// actions. It watches the live folio (ancillary charges posted from
+/// restaurant/spa land here too), and falls back to the reservation's own
+/// figures while that first fetch is in flight so the panel is never empty.
+class _FolioPanel extends ConsumerWidget {
+  const _FolioPanel({required this.reservation});
+
+  final Reservation reservation;
+
+  Future<void> _take(BuildContext context, WidgetRef ref, bool isRefund, int? suggested) async {
+    final ok = await FolioPaymentSheet.show(
+      context,
+      reservationId: reservation.id,
+      guestName: reservation.guestName,
+      isRefund: isRefund,
+      suggestedPaise: suggested,
+    );
+    if (ok == true && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(isRefund ? 'Refund recorded' : 'Payment taken')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final r = reservation;
+    final folioAsync = ref.watch(folioProvider(r.id));
+    final folio = folioAsync.valueOrNull;
+
+    final balancePaise = folio?.balancePaise ?? r.balancePaise;
+    final paidPaise = folio?.netPaidPaise ?? r.paidPaise;
+    final chargesPaise = folio?.chargesPaise ?? r.totalPaise;
+
+    return Panel(
+      title: 'Folio',
+      padBody: false,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _Fact(label: 'Room', value: formatPaiseOf(folio?.roomChargePaise ?? r.totalPaise)),
+          if (folio != null)
+            for (final item in folio.lineItems) ...[
+              const RowDivider(),
+              _Fact(label: item.description, value: item.amountLabel),
+            ],
+          const RowDivider(),
+          _Fact(label: 'Total charges', value: formatPaiseOf(chargesPaise)),
+          if (folio != null)
+            for (final p in folio.payments) ...[
+              const RowDivider(),
+              _Fact(
+                label: '${p.isRefund ? 'Refund' : 'Payment'} · ${p.method}',
+                value: '${p.isRefund ? '-' : ''}${p.amountLabel}',
+              ),
+            ],
+          const RowDivider(),
+          _Fact(label: 'Paid', value: formatPaiseOf(paidPaise)),
+          const RowDivider(),
+          _Fact(
+            label: 'Outstanding',
+            value: formatPaiseOf(balancePaise),
+            emphasise: balancePaise > 0,
+          ),
+          Padding(
+            padding: const EdgeInsets.all(Sp.md),
+            child: Row(
+              children: [
+                PermissionGate(
+                  permission: P.paymentCollect,
+                  child: FilledButton.icon(
+                    onPressed: () => _take(
+                      context,
+                      ref,
+                      false,
+                      balancePaise > 0 ? balancePaise : null,
+                    ),
+                    icon: const Icon(Icons.payments_outlined, size: 17),
+                    label: const Text('Collect'),
+                  ),
+                ),
+                const SizedBox(width: Sp.sm),
+                PermissionGate(
+                  permission: P.paymentRefund,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _take(context, ref, true, null),
+                    icon: const Icon(Icons.undo_outlined, size: 17),
+                    label: const Text('Refund'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _Actions extends ConsumerWidget {
   const _Actions({
     required this.reservation,
@@ -298,8 +377,13 @@ class _Actions extends ConsumerWidget {
       ),
     );
     if (confirmed != true) return;
+    // Confirming the dialog above — which spells out the outstanding amount — IS
+    // the explicit override the server now requires to let a guest depart owing
+    // money. Collect first via the folio's Collect button to avoid it.
     await run(
-      () => ref.read(reservationActionsProvider).checkOut(r.id),
+      () => ref
+          .read(reservationActionsProvider)
+          .checkOut(r.id, allowOutstanding: r.balancePaise > 0),
       '${r.guestName} checked out',
     );
   }

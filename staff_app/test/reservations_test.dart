@@ -917,4 +917,45 @@ void main() {
       expect(auditor.has(P.checkInPerform), isFalse);
     });
   });
+
+  group('Folio', () {
+    test('parses charges, ancillary lines, payments and balance', () {
+      final folio = Folio.fromJson({
+        'roomChargePaise': 500000,
+        'ancillaryPaise': 200000,
+        'chargesPaise': 700000,
+        'netPaidPaise': 330000,
+        'balancePaise': 370000,
+        'lineItems': [
+          {'kind': 'RESTAURANT', 'description': 'Restaurant ORD-1', 'amountPaise': 120000},
+          {'kind': 'SPA', 'description': 'Spa — Deep Tissue', 'amountPaise': 80000},
+        ],
+        'payments': [
+          {'direction': 'PAYMENT', 'method': 'CARD', 'amountPaise': 350000},
+          {'direction': 'REFUND', 'method': 'CARD', 'amountPaise': 20000},
+        ],
+      });
+      expect(folio.roomChargePaise, 500000);
+      expect(folio.chargesPaise, 700000);
+      expect(folio.balancePaise, 370000);
+      expect(folio.hasBalance, isTrue);
+      expect(folio.lineItems, hasLength(2));
+      expect(folio.lineItems.first.description, 'Restaurant ORD-1');
+      expect(folio.payments, hasLength(2));
+      expect(folio.payments.last.isRefund, isTrue);
+    });
+
+    test('accepts snake_case keys and tolerates missing lists', () {
+      final folio = Folio.fromJson({
+        'room_charge_paise': 100000,
+        'charges_paise': 100000,
+        'net_paid_paise': 0,
+        'balance_paise': 100000,
+      });
+      expect(folio.roomChargePaise, 100000);
+      expect(folio.balancePaise, 100000);
+      expect(folio.lineItems, isEmpty);
+      expect(folio.payments, isEmpty);
+    });
+  });
 }
