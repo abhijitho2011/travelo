@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../networking/api_client.dart';
@@ -42,6 +44,15 @@ class NotificationsRepository {
       if (!e.isMissingEndpoint) rethrow;
     }
   }
+
+  /// One call to clear the inbox, instead of a POST per unread row.
+  Future<void> markAllRead() async {
+    try {
+      await _api.post('/notifications/read-all');
+    } on ApiException catch (e) {
+      if (!e.isMissingEndpoint) rethrow;
+    }
+  }
 }
 
 final notificationsRepositoryProvider = Provider<NotificationsRepository>(
@@ -55,8 +66,25 @@ final notificationsProvider =
 
 class NotificationsController extends AsyncNotifier<List<StaffNotification>> {
   @override
-  Future<List<StaffNotification>> build() =>
-      ref.watch(notificationsRepositoryProvider).list();
+  Future<List<StaffNotification>> build() {
+    // Poll so the bell badge does not sit stale for a whole shift. The inbox is
+    // small and the call is cheap; the timer is cancelled when the provider is
+    // disposed so it never outlives the session.
+    final timer = Timer.periodic(
+      const Duration(seconds: 90),
+      (_) => _silentRefresh(),
+    );
+    ref.onDispose(timer.cancel);
+    return ref.watch(notificationsRepositoryProvider).list();
+  }
+
+  /// Refreshes without flipping the UI to a loading spinner — for the poll.
+  Future<void> _silentRefresh() async {
+    final next = await AsyncValue.guard(
+      () => ref.read(notificationsRepositoryProvider).list(),
+    );
+    if (next.hasValue) state = next;
+  }
 
   Future<void> refresh() async {
     state = const AsyncValue.loading();
@@ -81,9 +109,8 @@ class NotificationsController extends AsyncNotifier<List<StaffNotification>> {
     state = AsyncValue.data([
       for (final n in current) n.copyWith(read: true),
     ]);
-    for (final n in current.where((n) => !n.read)) {
-      await ref.read(notificationsRepositoryProvider).markRead(n.id);
-    }
+    // One server call, not one per unread row.
+    await ref.read(notificationsRepositoryProvider).markAllRead();
   }
 }
 

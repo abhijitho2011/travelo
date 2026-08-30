@@ -12,6 +12,21 @@ enum NotificationKind {
 
   static NotificationKind fromWire(String? v) => NotificationKind.values
       .firstWhere((k) => k.name == v?.toLowerCase(), orElse: () => NotificationKind.system);
+
+  /// The server sends a dotted notification `type` (e.g. `staff.approved`,
+  /// `work_order.assigned`), not one of our coarse kinds. Map it by its leading
+  /// segment so the icon and tone are right; unknown types read as `system`.
+  static NotificationKind fromType(String? type) {
+    final head = (type ?? '').toLowerCase().split('.').first;
+    return switch (head) {
+      'task' || 'housekeeping' || 'kot' => NotificationKind.task,
+      'approval' || 'staff' || 'expense' || 'purchase' => NotificationKind.approval,
+      'reservation' || 'booking' || 'checkin' || 'checkout' => NotificationKind.reservation,
+      'maintenance' || 'work_order' || 'workorder' => NotificationKind.maintenance,
+      'security' || 'incident' || 'visitor' || 'patrol' => NotificationKind.security,
+      _ => NotificationKind.system,
+    };
+  }
 }
 
 @immutable
@@ -56,15 +71,26 @@ class StaffNotification {
     route: route,
   );
 
-  factory StaffNotification.fromJson(Map json) => StaffNotification(
-    id: (json['id'] ?? '').toString(),
-    title: (json['title'] as String?) ?? 'Notification',
-    body: (json['body'] as String?) ?? '',
-    createdAt:
-        DateTime.tryParse((json['createdAt'] ?? '').toString())?.toLocal() ??
-        DateTime.now(),
-    kind: NotificationKind.fromWire(json['kind'] as String?),
-    read: json['read'] == true,
-    route: json['route'] as String?,
-  );
+  factory StaffNotification.fromJson(Map json) {
+    // The server row carries `type` (a dotted key), `readAt` (a timestamp, null
+    // when unread) and `meta` (json). The app previously read `kind`/`read`/
+    // `route`, so every notification rendered unread, as `system`, with no deep
+    // link. Read the real fields, keeping the old names as fallbacks.
+    final meta = json['meta'];
+    final route = (json['route'] ??
+        (meta is Map ? (meta['route'] ?? meta['relatedType']) : null)) as String?;
+    return StaffNotification(
+      id: (json['id'] ?? '').toString(),
+      title: (json['title'] as String?) ?? 'Notification',
+      body: (json['body'] as String?) ?? '',
+      createdAt:
+          DateTime.tryParse((json['createdAt'] ?? '').toString())?.toLocal() ??
+          DateTime.now(),
+      kind: NotificationKind.fromType(
+        (json['type'] ?? json['kind']) as String?,
+      ),
+      read: json['readAt'] != null || json['read'] == true,
+      route: route,
+    );
+  }
 }
