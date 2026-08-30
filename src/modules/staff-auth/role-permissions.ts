@@ -457,6 +457,9 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
 
   SECURITY_MANAGER: [
     'gate.read',
+    // Writes the gate feed (vehicle + staff movements) — a scoped operational
+    // key, nothing in the forbidden finance/revenue/... namespaces.
+    'gate.record',
     'vehicle.entry',
     'vehicle.exit',
     'staff.entry',
@@ -468,6 +471,9 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
     'incident.read',
     'incident.create',
     'incident.update',
+    // The manager owns the roster: read it and assign shifts.
+    'shift.read',
+    'shift.assign',
     'patrol.read',
     'patrol.assign',
     'cctv.read',
@@ -479,9 +485,14 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
 
   SECURITY_STAFF: [
     'gate.read',
+    // The guard on the gate writes the gate feed and browses the visitor book
+    // they manage. Deliberately NO `incident.read`: a guard reports an incident,
+    // the manager browses them. And nothing in the finance/revenue/... family.
+    'gate.record',
     'vehicle.entry',
     'vehicle.exit',
     'staff.entry',
+    'visitor.read',
     'visitor.record',
     'lostfound.read',
     'lostfound.create',
