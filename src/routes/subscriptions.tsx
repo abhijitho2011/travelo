@@ -5,6 +5,7 @@ import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { DataTable, type Column } from "@/components/admin/data-table";
 import { ExportButton } from "@/components/admin/export-button";
 import { ExtendSubscriptionDialog } from "@/components/admin/extend-subscription";
+import { GatewayOrderDialog } from "@/components/admin/gateway-order";
 import { StatusFilter, ToolbarActions } from "@/components/admin/list-toolbar";
 import { PageHeader, StatusBadge } from "@/components/admin/primitives";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,7 @@ function SubscriptionActions({ subscription }: { subscription: Subscription }) {
   return (
     <div className="flex items-center justify-end gap-1">
       <ExtendSubscriptionDialog subscription={subscription} variant="outline" />
+      <GatewayOrderDialog subscription={subscription} />
       {subscription.status === "SUSPENDED" ? (
         <ConfirmDialog
           destructive={false}

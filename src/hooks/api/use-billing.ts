@@ -92,6 +92,38 @@ export function useRecordManualPayment() {
   });
 }
 
+export const GATEWAYS = ["RAZORPAY", "CASHFREE"] as const;
+export type Gateway = (typeof GATEWAYS)[number];
+
+/** The order a gateway raises; the owner completes payment against it. */
+export type GatewayOrder = {
+  paymentId: string;
+  gateway: Gateway;
+  orderId: string;
+  amount: number;
+  currency: string;
+  keyId?: string;
+  paymentSessionId?: string;
+  appId?: string;
+};
+
+/**
+ * Raises a PENDING gateway order (Razorpay or Cashfree) for an owner's
+ * subscription. Errors GATEWAY_NOT_CONFIGURED when the chosen gateway has no
+ * credentials — the desk then falls back to a manual payment. Parks a PENDING
+ * payment row, so billing is invalidated.
+ */
+export function useCreateGatewayOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { ownerId: string; subscriptionId: string; gateway: Gateway }) =>
+      apiFetch<GatewayOrder>("/billing/payments/orders", { method: "POST", body: input }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.billing.all });
+    },
+  });
+}
+
 /** Presigned, short-lived URL for an invoice document; 404s until one exists. */
 export function useInvoiceDocumentUrl() {
   return useMutation({
