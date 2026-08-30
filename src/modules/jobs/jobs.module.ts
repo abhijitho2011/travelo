@@ -1,9 +1,11 @@
-import { Inject, Injectable, Module, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Module, NotFoundException, Optional } from '@nestjs/common';
 import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { and, desc, eq, SQL } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import { backgroundJobs } from '../../database/schema';
+import { NotificationDispatchWorker } from '../workers/workers.module';
+import { WorkersModule } from '../workers/workers.module';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
@@ -14,6 +16,7 @@ export class JobsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly audit: AuditService,
+    @Optional() private readonly dispatch?: NotificationDispatchWorker,
   ) {}
 
   async list(params: { limit?: number; offset?: number; state?: string; queue?: string }) {
@@ -42,17 +45,41 @@ export class JobsService {
     return row;
   }
 
+  /**
+   * A background_job row is a RECORD of a worker RUN, not a queued unit of work,
+   * so a retry cannot replay the row itself — it re-drives the queue the row
+   * belongs to. The only queue is 'notifications'; retrying re-runs the dispatch
+   * worker (which re-attempts the still-PENDING deliveries) and stamps this row
+   * with the fresh outcome. An unknown queue falls back to a best-effort reset.
+   */
   async retry(id: string) {
     const before = await this.get(id);
+
+    if (before.queue === 'notifications' && this.dispatch) {
+      await this.db
+        .update(backgroundJobs)
+        .set({ state: 'Running', attempts: before.attempts + 1, error: null, startedAt: new Date(), finishedAt: null })
+        .where(eq(backgroundJobs.id, id));
+      let state = 'Completed';
+      let error: string | null = null;
+      try {
+        await this.dispatch.run();
+      } catch (err) {
+        state = 'Failed';
+        error = ((err as Error)?.message ?? String(err)).slice(0, 2000);
+      }
+      await this.db
+        .update(backgroundJobs)
+        .set({ state, error, finishedAt: new Date() })
+        .where(eq(backgroundJobs.id, id));
+      await this.audit.record({ action: 'job.retried', entity: 'job', entityId: id, before, after: { state } });
+      return this.get(id);
+    }
+
+    // Unknown queue — reset to Pending so the row is at least re-queued.
     await this.db
       .update(backgroundJobs)
-      .set({
-        state: 'Pending',
-        attempts: before.attempts + 1,
-        error: null,
-        startedAt: null,
-        finishedAt: null,
-      })
+      .set({ state: 'Pending', attempts: before.attempts + 1, error: null, startedAt: null, finishedAt: null })
       .where(eq(backgroundJobs.id, id));
     await this.audit.record({ action: 'job.retried', entity: 'job', entityId: id, before });
     return this.get(id);
@@ -95,5 +122,10 @@ export class JobsController {
   }
 }
 
-@Module({ providers: [JobsService], controllers: [JobsController], exports: [JobsService] })
+@Module({
+  imports: [WorkersModule],
+  providers: [JobsService],
+  controllers: [JobsController],
+  exports: [JobsService],
+})
 export class JobsModule {}

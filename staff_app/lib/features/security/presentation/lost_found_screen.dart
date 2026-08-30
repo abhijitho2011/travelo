@@ -8,6 +8,7 @@ import '../../../core/widgets/cards.dart';
 import '../../../core/widgets/primitives.dart';
 import '../../../core/widgets/states.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../../core/networking/api_exception.dart';
 import '../data/security_repository.dart';
 import 'record_sheets.dart';
 
@@ -69,10 +70,18 @@ class LostFoundScreen extends ConsumerWidget {
                             if (items[i].location != null) items[i].location!,
                             Fmt.dateTime(items[i].foundAt),
                           ].join(' · '),
+                          onTap: ref.hasPermission(P.lostFoundUpdate)
+                              ? () => _changeStatus(context, ref, items[i].id,
+                                  items[i].status ?? 'STORED')
+                              : null,
                           badge: items[i].status == null
                               ? null
                               : StatusBadge(
-                                  tone: StatusTone.neutral,
+                                  tone: switch (items[i].status) {
+                                    'CLAIMED' => StatusTone.healthy,
+                                    'DISPOSED' => StatusTone.neutral,
+                                    _ => StatusTone.warning,
+                                  },
                                   label: Fmt.humanise(items[i].status!),
                                   dense: true,
                                 ),
@@ -83,6 +92,46 @@ class LostFoundScreen extends ConsumerWidget {
                 ),
         ),
       ],
+    );
+  }
+}
+
+/// Bottom sheet to move a held item between STORED / CLAIMED / DISPOSED.
+Future<void> _changeStatus(
+  BuildContext context,
+  WidgetRef ref,
+  String id,
+  String current,
+) async {
+  final messenger = ScaffoldMessenger.of(context);
+  const options = {
+    'STORED': 'Back to stored',
+    'CLAIMED': 'Mark claimed',
+    'DISPOSED': 'Mark disposed',
+  };
+  final choice = await showModalBottomSheet<String>(
+    context: context,
+    builder: (ctx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final e in options.entries)
+            if (e.key != current)
+              ListTile(
+                title: Text(e.value),
+                onTap: () => Navigator.pop(ctx, e.key),
+              ),
+        ],
+      ),
+    ),
+  );
+  if (choice == null) return;
+  try {
+    await ref.read(securityRepositoryProvider).updateLostFound(id, choice);
+    ref.invalidate(lostFoundProvider);
+  } on ApiException catch (e) {
+    messenger.showSnackBar(
+      SnackBar(content: Text(e.message.isEmpty ? 'Could not update.' : e.message)),
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../config/app_config.dart';
 import '../storage/token_store.dart';
@@ -113,6 +114,12 @@ class ApiClient {
     if (data is Map && data['success'] == true) return data['data'];
 
     final err = (data is Map ? data['error'] : null) as Map?;
+    // A 404 for a path the app calls is often a route/permission mismatch, not
+    // genuinely-absent data. Repos swallow it as "empty", so surface it in
+    // debug builds where it would otherwise be invisible.
+    if (res.statusCode == 404 && kDebugMode) {
+      debugPrint('[api] 404 on $method $path — route/permission mismatch?');
+    }
     throw ApiException(
       code: (err?['code'] as String?) ?? _codeForStatus(res.statusCode),
       message: (err?['message'] as String?) ?? 'Something went wrong.',

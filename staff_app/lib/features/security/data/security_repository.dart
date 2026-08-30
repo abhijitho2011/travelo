@@ -57,6 +57,10 @@ class SecurityRepository {
   Future<List<LostFoundItem>> lostAndFound() =>
       _read('/security/lost-found', LostFoundItem.fromJson);
 
+  /// Move a held item to CLAIMED or DISPOSED (or back to STORED).
+  Future<void> updateLostFound(String id, String status) =>
+      _api.patch('/security/lost-found/\$id', body: {'status': status});
+
   Future<void> logFoundItem({
     required String description,
     String? location,
