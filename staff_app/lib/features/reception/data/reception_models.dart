@@ -689,6 +689,18 @@ class ReservationFilter {
   };
 }
 
+/// What the calendar hands the booking form when a clerk taps an empty cell:
+/// the room lane and the date they pointed at. Travels as go_router `extra`, so
+/// it is null on a cold deep link and the form simply opens blank.
+@immutable
+class NewBookingSeed {
+  const NewBookingSeed({this.checkIn, this.roomId, this.roomTypeId});
+
+  final DateTime? checkIn;
+  final String? roomId;
+  final String? roomTypeId;
+}
+
 // --------------------------------------------------------------- payloads --
 
 /// Payload for `POST /reservations`.

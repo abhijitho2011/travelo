@@ -37,6 +37,7 @@ import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/reception/presentation/check_in_screen.dart';
 import '../../features/reception/presentation/reception_dashboard_screen.dart';
+import '../../features/reception/data/reception_models.dart' show NewBookingSeed;
 import '../../features/reception/presentation/booking_calendar_screen.dart';
 import '../../features/reception/presentation/reservation_detail_screen.dart';
 import '../../features/reception/presentation/reservation_form_screen.dart';
@@ -174,7 +175,18 @@ final routerProvider = Provider<GoRouter>((ref) {
           // in declaration order, and the pattern would otherwise swallow it.
           GoRoute(
             path: Routes.reservationNew,
-            builder: (_, _) => const ReservationFormScreen(),
+            // The calendar seeds the room + date it was started from; `extra`
+            // is null on a cold deep link and the form opens blank.
+            builder: (_, state) {
+              final seed = state.extra is NewBookingSeed
+                  ? state.extra as NewBookingSeed
+                  : null;
+              return ReservationFormScreen(
+                initialCheckIn: seed?.checkIn,
+                initialRoomId: seed?.roomId,
+                initialRoomTypeId: seed?.roomTypeId,
+              );
+            },
           ),
           GoRoute(
             path: Routes.reservationPattern,

@@ -108,6 +108,27 @@ class ReceptionRepository {
     return _one(data, Reservation.fromJson, 'booking');
   }
 
+  /// Move a guest who is ALREADY CHECKED IN to another room. Before check-in
+  /// the room is simply (re)assigned — see [assignRoom]. The server re-quotes
+  /// when the new room is a different type.
+  Future<Reservation> moveRoom(String id, String roomId) async {
+    final data = await _api.post(
+      '/reservations/$id/move-room',
+      body: {'roomId': roomId},
+    );
+    return _one(data, Reservation.fromJson, 'booking');
+  }
+
+  /// Push check-out later. [checkOut] is EXCLUSIVE and must be after the
+  /// current one; the server refuses anything else.
+  Future<Reservation> extendStay(String id, DateTime checkOut) async {
+    final data = await _api.post(
+      '/reservations/$id/extend',
+      body: {'checkOut': isoDate(checkOut)},
+    );
+    return _one(data, Reservation.fromJson, 'booking');
+  }
+
   Future<Reservation> checkIn(
     String id, {
     String? roomId,

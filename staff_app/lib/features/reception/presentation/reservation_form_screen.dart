@@ -27,7 +27,24 @@ import '../data/reception_repository.dart';
 /// either date moves, so the clerk sees "Deluxe · 0 of 4 free" before they
 /// promise anything rather than a NO_AVAILABILITY after.
 class ReservationFormScreen extends ConsumerStatefulWidget {
-  const ReservationFormScreen({super.key});
+  const ReservationFormScreen({
+    super.key,
+    this.initialCheckIn,
+    this.initialRoomId,
+    this.initialRoomTypeId,
+  });
+
+  /// Arrival to open on — the calendar passes the date cell that was tapped so
+  /// the clerk does not re-enter what they just pointed at. Null means today.
+  final DateTime? initialCheckIn;
+
+  /// The room the booking should land in, when it was started from a specific
+  /// room's lane on the calendar. Optional everywhere else: reception usually
+  /// picks the room on arrival.
+  final String? initialRoomId;
+
+  /// The type that room is sold as, so the form opens with the right rate.
+  final String? initialRoomTypeId;
 
   @override
   ConsumerState<ReservationFormScreen> createState() =>
@@ -49,6 +66,9 @@ class _ReservationFormScreenState extends ConsumerState<ReservationFormScreen> {
   late DateTime _checkIn;
   late DateTime _checkOut;
   String? _roomTypeId;
+
+  /// Set only when the booking was started from a room's lane on the calendar.
+  String? _roomId;
   int _adults = 2;
   int _children = 0;
   ReservationSource _source = ReservationSource.walkIn;
@@ -67,9 +87,13 @@ class _ReservationFormScreenState extends ConsumerState<ReservationFormScreen> {
   @override
   void initState() {
     super.initState();
-    final today = dateOnly(DateTime.now());
-    _checkIn = today;
-    _checkOut = today.add(const Duration(days: 1));
+    // Prefilled from the calendar when the clerk tapped a room/date cell;
+    // otherwise a one-night stay starting today, the desk's common case.
+    final start = dateOnly(widget.initialCheckIn ?? DateTime.now());
+    _checkIn = start;
+    _checkOut = start.add(const Duration(days: 1));
+    _roomId = widget.initialRoomId;
+    _roomTypeId = widget.initialRoomTypeId;
   }
 
   @override
@@ -152,6 +176,7 @@ class _ReservationFormScreenState extends ConsumerState<ReservationFormScreen> {
           .create(
             NewReservation(
               roomTypeId: _roomTypeId!,
+              roomId: _roomId,
               guestName: _name.text.trim(),
               guestPhone: _phone.text.trim(),
               guestEmail: _email.text.trim(),

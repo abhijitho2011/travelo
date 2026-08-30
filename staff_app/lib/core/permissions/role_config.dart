@@ -271,14 +271,6 @@ class RoleConfig {
     route: Routes.reservations,
     requires: [P.reservationRead],
   );
-
-  /// The front-desk tape chart. Gated on the same read permission as Bookings.
-  static const _calendarMore = NavItem(
-    label: 'Calendar',
-    icon: Icons.calendar_month_outlined,
-    route: Routes.calendar,
-    requires: [P.reservationRead],
-  );
   /// The room inventory. Every role the server grants `room.read` carries this
   /// entry; the gate on the item, not a role list, is what decides who sees it.
   static const _roomsMore = NavItem(
@@ -388,7 +380,6 @@ class RoleConfig {
           route: Routes.reservations,
           requires: [P.reservationRead],
         ),
-        _calendarMore,
         _roomsMore,
         NavItem(
           label: 'Housekeeping',
@@ -484,7 +475,6 @@ class RoleConfig {
           route: Routes.reservations,
           requires: [P.reservationRead],
         ),
-        _calendarMore,
         _roomsMore,
         NavItem(
           label: 'Housekeeping',
@@ -594,7 +584,7 @@ class RoleConfig {
       // The desk sees the board and may move a room's status; it holds none of
       // room.create/update/delete, so every other control on that screen gates
       // itself away without this config saying a word about it.
-      moreMenu: const [_calendarMore, _roomsMore, ..._commonMore],
+      moreMenu: const [_roomsMore, ..._commonMore],
     ),
 
     // ======================= Room attendant (BUILT) =======================
