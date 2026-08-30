@@ -24,9 +24,17 @@ const LIMIT = 25;
 
 function AuditPage() {
   const [entity, setEntity] = useState("");
+  const [actorId, setActorId] = useState("");
+  const [entityId, setEntityId] = useState("");
   const [offset, setOffset] = useState(0);
 
-  const query = useAuditLogs({ limit: LIMIT, offset, entity: entity.trim() || undefined });
+  const query = useAuditLogs({
+    limit: LIMIT,
+    offset,
+    entity: entity.trim() || undefined,
+    actorId: actorId.trim() || undefined,
+    entityId: entityId.trim() || undefined,
+  });
   const page = query.data;
 
   const columns: Column<AuditLog>[] = [
@@ -94,10 +102,35 @@ function AuditPage() {
                 setOffset(0);
               }}
               placeholder="Filter by entity, e.g. owner"
-              className="h-8 max-w-xs"
+              className="h-8 max-w-[12rem]"
+            />
+            <Input
+              value={actorId}
+              onChange={(event) => {
+                setActorId(event.target.value);
+                setOffset(0);
+              }}
+              placeholder="Actor ID"
+              className="h-8 max-w-[10rem]"
+            />
+            <Input
+              value={entityId}
+              onChange={(event) => {
+                setEntityId(event.target.value);
+                setOffset(0);
+              }}
+              placeholder="Entity ID"
+              className="h-8 max-w-[10rem]"
             />
             <ToolbarActions>
-              <ExportButton entity="audit-logs" filters={{ entity: entity.trim() || undefined }} />
+              <ExportButton
+                entity="audit-logs"
+                filters={{
+                  entity: entity.trim() || undefined,
+                  actorId: actorId.trim() || undefined,
+                  entityId: entityId.trim() || undefined,
+                }}
+              />
             </ToolbarActions>
           </>
         }
