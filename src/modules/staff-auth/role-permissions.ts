@@ -293,9 +293,16 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
     'spa.booking.update',
     'spa.booking.cancel',
     'spa.service.read',
+    // The manager owns the service catalogue end to end.
+    'spa.service.create',
     'spa.service.update',
+    'spa.service.delete',
     'spa.staff.read',
     'spa.roster.update',
+    // Reads the outlet's own takings — scoped to spa, not the `revenue.*`
+    // namespace the invariants forbid operational roles. The manager sees bills
+    // read-only; raising and settling them is the spa-accounts desk's job.
+    'spa.bill.read',
     'spa.revenue.read',
     'guest.read',
     'task.read',
@@ -310,6 +317,12 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
     'spa.booking.read',
     'spa.invoice.read',
     'spa.invoice.create',
+    // The billing desk: raise a bill for a completed treatment, settle it
+    // (CASH/CARD/UPI/ROOM_CHARGE) and record a refund.
+    'spa.bill.read',
+    'spa.bill.create',
+    'spa.bill.settle',
+    'spa.bill.refund',
     'spa.revenue.read',
     'finance.read',
     'payment.read',
@@ -320,6 +333,10 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
 
   SPA_STAFF: [
     'spa.booking.read',
+    // A therapist advances their OWN appointments (start, complete, add notes);
+    // the service restricts every write to appointments assigned to them, and
+    // assigning a therapist is a manager act (`spa.roster.update`) they lack.
+    'spa.booking.update',
     'spa.service.read',
     'task.read',
     'task.start',
