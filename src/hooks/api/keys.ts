@@ -68,6 +68,7 @@ export const qk = {
     all: ["notifications"] as const,
     list: (params: unknown) => ["notifications", "list", params] as const,
     templates: ["notifications", "templates"] as const,
+    deliveries: (params: unknown) => ["notifications", "deliveries", params] as const,
   },
   integrations: {
     all: ["integrations"] as const,

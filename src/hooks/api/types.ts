@@ -255,6 +255,18 @@ export type AdminNotification = {
   createdAt: string;
 };
 
+export type NotificationDelivery = {
+  id: string;
+  notificationKey: string | null;
+  channel: string;
+  status: string;
+  recipient: string | null;
+  subject: string | null;
+  attempts: number;
+  error: string | null;
+  createdAt: string;
+};
+
 export type NotificationTemplate = {
   id: string;
   templateKey: string;

@@ -10,6 +10,7 @@ import type {
   BackgroundJob,
   ImpersonationSession,
   IntegrationConnection,
+  NotificationDelivery,
   NotificationTemplate,
 } from "@/hooks/api/types";
 
@@ -168,6 +169,30 @@ export function useNotificationTemplates() {
   return useQuery({
     queryKey: qk.notifications.templates,
     queryFn: () => apiFetch<NotificationTemplate[]>("/notifications/templates"),
+  });
+}
+
+export type DeliveryListParams = {
+  channel?: string | undefined;
+  status?: string | undefined;
+  q?: string | undefined;
+  limit?: number | undefined;
+  offset?: number | undefined;
+};
+
+export function useNotificationDeliveries(params: DeliveryListParams) {
+  const search = new URLSearchParams();
+  if (params.channel) search.set("channel", params.channel);
+  if (params.status) search.set("status", params.status);
+  if (params.q) search.set("q", params.q);
+  search.set("limit", String(params.limit ?? 50));
+  search.set("offset", String(params.offset ?? 0));
+  return useQuery({
+    queryKey: qk.notifications.deliveries(params),
+    queryFn: () =>
+      apiFetch<{ items: NotificationDelivery[]; total?: number }>(
+        `/notifications/deliveries?${search.toString()}`,
+      ),
   });
 }
 
