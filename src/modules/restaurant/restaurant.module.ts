@@ -14,6 +14,8 @@ import { TablesService } from './tables.service';
 import { MenuService } from './menu.service';
 import { OrdersService } from './orders.service';
 import { FolioModule } from '../folio/folio.module';
+import { EntitlementsModule } from '../entitlements/entitlements.module';
+import { FeatureGuard } from '../../common/guards/feature.guard';
 
 /**
  * Restaurant / F&B — one module, one staff surface under
@@ -22,7 +24,7 @@ import { FolioModule } from '../folio/folio.module';
  * settlement path; nothing here mutates a booking.
  */
 @Module({
-  imports: [JwtModule.register({}), SharedAuthModule, FolioModule],
+  imports: [JwtModule.register({}), SharedAuthModule, FolioModule, EntitlementsModule],
   controllers: [
     StaffRestaurantTablesController,
     StaffRestaurantMenuController,
@@ -30,7 +32,14 @@ import { FolioModule } from '../folio/folio.module';
     StaffRestaurantSummaryController,
     StaffRestaurantOrdersController,
   ],
-  providers: [TablesService, MenuService, OrdersService, StaffJwtGuard, StaffPermissionsGuard],
+  providers: [
+    TablesService,
+    MenuService,
+    OrdersService,
+    StaffJwtGuard,
+    StaffPermissionsGuard,
+    FeatureGuard,
+  ],
   exports: [TablesService, MenuService, OrdersService],
 })
 export class RestaurantModule {}

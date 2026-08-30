@@ -12,6 +12,8 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { StaffJwtGuard } from '../staff-auth/staff-jwt.guard';
+import { FeatureGuard } from '../../common/guards/feature.guard';
+import { RequireFeature } from '../../common/decorators/require-feature.decorator';
 import {
   RequireStaffPermissions,
   StaffPermissionsGuard,
@@ -56,7 +58,8 @@ import {
 
 @ApiTags('Staff Restaurant Tables')
 @ApiBearerAuth()
-@UseGuards(StaffJwtGuard, StaffPermissionsGuard)
+@UseGuards(StaffJwtGuard, StaffPermissionsGuard, FeatureGuard)
+@RequireFeature('RESTAURANT')
 @Controller({ path: 'api/v1/staff/restaurant/tables', version: VERSION_NEUTRAL })
 export class StaffRestaurantTablesController {
   constructor(
@@ -128,7 +131,8 @@ export class StaffRestaurantTablesController {
 
 @ApiTags('Staff Restaurant Menu')
 @ApiBearerAuth()
-@UseGuards(StaffJwtGuard, StaffPermissionsGuard)
+@UseGuards(StaffJwtGuard, StaffPermissionsGuard, FeatureGuard)
+@RequireFeature('RESTAURANT')
 @Controller({ path: 'api/v1/staff/restaurant/menu', version: VERSION_NEUTRAL })
 export class StaffRestaurantMenuController {
   constructor(
@@ -280,7 +284,8 @@ export class StaffRestaurantMenuController {
 
 @ApiTags('Staff Restaurant Kitchen')
 @ApiBearerAuth()
-@UseGuards(StaffJwtGuard, StaffPermissionsGuard)
+@UseGuards(StaffJwtGuard, StaffPermissionsGuard, FeatureGuard)
+@RequireFeature('RESTAURANT')
 @Controller({ path: 'api/v1/staff/restaurant/kitchen', version: VERSION_NEUTRAL })
 export class StaffRestaurantKitchenController {
   constructor(private readonly orders: OrdersService) {}
@@ -296,7 +301,8 @@ export class StaffRestaurantKitchenController {
 
 @ApiTags('Staff Restaurant Summary')
 @ApiBearerAuth()
-@UseGuards(StaffJwtGuard, StaffPermissionsGuard)
+@UseGuards(StaffJwtGuard, StaffPermissionsGuard, FeatureGuard)
+@RequireFeature('RESTAURANT')
 @Controller({ path: 'api/v1/staff/restaurant/summary', version: VERSION_NEUTRAL })
 export class StaffRestaurantSummaryController {
   constructor(private readonly orders: OrdersService) {}
@@ -316,7 +322,8 @@ export class StaffRestaurantSummaryController {
 
 @ApiTags('Staff Restaurant Orders')
 @ApiBearerAuth()
-@UseGuards(StaffJwtGuard, StaffPermissionsGuard)
+@UseGuards(StaffJwtGuard, StaffPermissionsGuard, FeatureGuard)
+@RequireFeature('RESTAURANT')
 @Controller({ path: 'api/v1/staff/restaurant/orders', version: VERSION_NEUTRAL })
 export class StaffRestaurantOrdersController {
   constructor(
