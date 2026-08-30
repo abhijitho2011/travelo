@@ -4,6 +4,7 @@ import { BillingController, WebhookController } from './billing.controller';
 import { InvoiceNumberService } from './invoice-number.service';
 import { InvoicePdfService } from './invoice-pdf.service';
 import { RazorpayClient } from './razorpay.client';
+import { CashfreeClient } from './cashfree.client';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
@@ -20,6 +21,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     // unit-test injection), which Nest's class auto-wiring would try to
     // resolve as a provider — hence the explicit factory, same as StorageService.
     { provide: RazorpayClient, useFactory: () => new RazorpayClient(process.env) },
+    { provide: CashfreeClient, useFactory: () => new CashfreeClient(process.env) },
   ],
   controllers: [BillingController, WebhookController],
   exports: [BillingService, InvoiceNumberService, InvoicePdfService],

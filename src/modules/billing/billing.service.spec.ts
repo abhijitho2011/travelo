@@ -10,6 +10,8 @@ function build(opts: {
   invoiceId?: string;
   paymentId?: string;
   owner?: Record<string, unknown> | null;
+  razorpay?: unknown;
+  cashfree?: unknown;
 }) {
   const sub = {
     id: 'sub-1',
@@ -40,7 +42,8 @@ function build(opts: {
     { get: () => undefined } as never,
     { getSignedUrl: async () => 'https://signed' } as never,
     pdf as never,
-    { configured: false } as never,
+    (opts.razorpay ?? { configured: false }) as never,
+    (opts.cashfree ?? { configured: false }) as never,
     notifications as never,
   );
   return { svc, db, audit, pdf, invNum, notifications };
@@ -304,6 +307,42 @@ describe('BillingService.createGatewayOrder', () => {
     // Crucially, no PENDING payment is parked for an order that never existed.
     expect(db.inserts).toHaveLength(0);
   });
+
+  it('raises a Cashfree order when gateway=CASHFREE and parks a PENDING payment', async () => {
+    const createOrder = jest.fn(async () => ({
+      order_id: 'cf-order-1',
+      payment_session_id: 'session_abc',
+      order_status: 'ACTIVE',
+      order_amount: 30_000,
+      order_currency: 'INR',
+    }));
+    const cashfree = { configured: true, publicAppId: 'app_123', createOrder };
+    const { svc, db } = build({ cashfree });
+    const res = await svc.createGatewayOrder({
+      ownerId: 'own-1',
+      subscriptionId: 'sub-1',
+      gateway: 'CASHFREE',
+    });
+    expect(res).toMatchObject({
+      gateway: 'CASHFREE',
+      orderId: 'cf-order-1',
+      paymentSessionId: 'session_abc',
+      appId: 'app_123',
+    });
+    // Amount is the period total in paise: monthlyPrice * durationMonths.
+    expect(createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ amountPaise: 3_000_000, currency: 'INR', customerId: 'own-1' }),
+    );
+    const parked = insertFor(db, 'payments');
+    expect(parked).toMatchObject({ gateway: 'CASHFREE', gatewayRef: 'cf-order-1', status: 'PENDING' });
+  });
+
+  it('returns GATEWAY_NOT_CONFIGURED for Cashfree when its keys are absent', async () => {
+    const { svc } = build({ cashfree: { configured: false } });
+    await expect(
+      svc.createGatewayOrder({ ownerId: 'own-1', subscriptionId: 'sub-1', gateway: 'CASHFREE' }),
+    ).rejects.toMatchObject({ response: { error: 'GATEWAY_NOT_CONFIGURED' } });
+  });
 });
 
 /**
@@ -350,6 +389,7 @@ describe('BillingService.handleWebhook idempotency', () => {
       { get: () => undefined } as never,
       {} as never,
       { generateQuietly: async () => undefined } as never,
+      { configured: false } as never,
       { configured: false } as never,
       mockNotifications() as never,
     );
@@ -478,6 +518,7 @@ describe('invoice numbers stay unique', () => {
       {} as never,
       { generateQuietly: async () => undefined } as never,
       { configured: false } as never,
+      { configured: false } as never,
       mockNotifications() as never,
     );
     await expect(
@@ -536,6 +577,7 @@ describe('BillingService — notifying the owner cannot undo the money', () => {
       { get: () => undefined } as never,
       { getSignedUrl: async () => 'https://signed' } as never,
       { generateQuietly: async () => undefined } as never,
+      { configured: false } as never,
       { configured: false } as never,
       exploding as never,
     );

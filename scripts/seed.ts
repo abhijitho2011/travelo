@@ -28,6 +28,9 @@ const PERMISSIONS: { key: string; group: string; description: string }[] = [
   ...groupPerms('Search', 'search', ['query']),
   ...groupPerms('Audit', 'audit', ['view', 'export']),
   ...groupPerms('Admin', 'admin', ['view', 'create', 'edit']),
+  // Settings surface (location catalogue + amenity catalogue). Keys must match
+  // what the admin controllers guard on and what scripts/seed-node.mjs grants.
+  ...groupPerms('Settings', 'settings', ['locations.manage', 'amenities.manage']),
 ];
 
 function groupPerms(group: string, prefix: string, actions: string[]) {
@@ -75,6 +78,7 @@ const ROLES = [
       'owner.view', 'subscription.view', 'property.view', 'staff.read', 'staff.manage',
       'integration.view', 'integration.sync', 'job.view', 'job.retry',
       'analytics.view', 'search.query', 'notification.view',
+      'settings.locations.manage', 'settings.amenities.manage',
     ],
   },
   {

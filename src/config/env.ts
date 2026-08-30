@@ -59,6 +59,14 @@ const envSchema = z.object({
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),
 
+  // ---------- Cashfree API credentials (order creation) ----------
+  // Symmetric to Razorpay: without BOTH halves the Cashfree order path returns
+  // GATEWAY_NOT_CONFIGURED and the manual-payment path still collects money.
+  CASHFREE_APP_ID: z.string().optional(),
+  CASHFREE_SECRET_KEY: z.string().optional(),
+  CASHFREE_ENV: z.enum(['sandbox', 'production']).default('sandbox'),
+  CASHFREE_API_VERSION: z.string().default('2023-08-01'),
+
   // ---------- Owner auth (separate from admin) ----------
   OWNER_JWT_ACCESS_SECRET: z.string().min(16).default('owner-access-secret-change-me-32chars'),
   OWNER_JWT_REFRESH_SECRET: z.string().min(16).default('owner-refresh-secret-change-me-32chars'),

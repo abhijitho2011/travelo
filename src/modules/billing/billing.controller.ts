@@ -20,6 +20,9 @@ class ManualPaymentDto {
 class CreateOrderDto {
   @IsUUID() ownerId!: string;
   @IsUUID() subscriptionId!: string;
+  // Which gateway to raise the order with. Defaults to Razorpay to preserve the
+  // previous single-gateway behaviour.
+  @IsOptional() @IsIn(['RAZORPAY', 'CASHFREE']) gateway?: 'RAZORPAY' | 'CASHFREE';
 }
 
 class RefundDto {

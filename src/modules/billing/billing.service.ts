@@ -18,6 +18,7 @@ import { StorageService } from '../storage/storage.service';
 import { InvoiceNumberService } from './invoice-number.service';
 import { InvoicePdfService } from './invoice-pdf.service';
 import { RazorpayClient } from './razorpay.client';
+import { CashfreeClient } from './cashfree.client';
 import { PROVIDERS, SettlementHint, WebhookInput } from './payment-providers';
 import { getRequestContext } from '../../common/context/request-context';
 import { NotificationDeliveryService } from '../notifications/notification-delivery.service';
@@ -62,6 +63,7 @@ export class BillingService {
     private readonly storage: StorageService,
     private readonly pdf: InvoicePdfService,
     private readonly razorpay: RazorpayClient,
+    private readonly cashfree: CashfreeClient,
     private readonly notifications: NotificationDeliveryService,
   ) {}
 
@@ -387,7 +389,11 @@ export class BillingService {
    * PENDING payment carrying its id. The webhook later finds that row by
    * `gatewayRef` and settles it — so an order is the only thing this writes.
    */
-  async createGatewayOrder(dto: { ownerId: string; subscriptionId: string }) {
+  async createGatewayOrder(dto: {
+    ownerId: string;
+    subscriptionId: string;
+    gateway?: 'RAZORPAY' | 'CASHFREE';
+  }) {
     const [row] = await this.db
       .select({ s: subscriptions, p: subscriptionPlans })
       .from(subscriptions)
@@ -401,7 +407,18 @@ export class BillingService {
 
     const amountPaise = row.s.priceOverride ?? row.p.monthlyPrice * row.p.durationMonths;
     const currency = row.p.currency;
+    const gateway = dto.gateway ?? 'RAZORPAY';
 
+    return gateway === 'CASHFREE'
+      ? this.createCashfreeOrder(dto, amountPaise, currency)
+      : this.createRazorpayOrder(dto, amountPaise, currency);
+  }
+
+  private async createRazorpayOrder(
+    dto: { ownerId: string; subscriptionId: string },
+    amountPaise: number,
+    currency: string,
+  ) {
     if (!this.razorpay.configured) {
       throw new BadRequestException({
         error: 'GATEWAY_NOT_CONFIGURED',
@@ -418,17 +435,91 @@ export class BillingService {
       notes: { ownerId: dto.ownerId, subscriptionId: dto.subscriptionId },
     });
 
+    const payment = await this.parkPendingOrder({
+      ownerId: dto.ownerId,
+      subscriptionId: dto.subscriptionId,
+      gateway: 'RAZORPAY',
+      gatewayRef: order.id,
+      amountPaise,
+      currency,
+      raw: order,
+    });
+
+    return {
+      paymentId: payment.id,
+      gateway: 'RAZORPAY' as const,
+      orderId: order.id,
+      amount: amountPaise,
+      currency,
+      keyId: this.razorpay.publicKeyId,
+    };
+  }
+
+  private async createCashfreeOrder(
+    dto: { ownerId: string; subscriptionId: string },
+    amountPaise: number,
+    currency: string,
+  ) {
+    if (!this.cashfree.configured) {
+      throw new BadRequestException({
+        error: 'GATEWAY_NOT_CONFIGURED',
+        message:
+          'Cashfree credentials are not configured. Record the payment manually via POST /billing/payments/manual.',
+      });
+    }
+
+    // A gateway-unique order id the webhook can resolve back to this row.
+    const orderId = `sub-${dto.subscriptionId}-${Date.now()}`.slice(0, 45);
+    const order = await this.cashfree.createOrder({
+      amountPaise,
+      currency,
+      orderId,
+      customerId: dto.ownerId,
+      notes: { ownerId: dto.ownerId, subscriptionId: dto.subscriptionId },
+    });
+
+    const payment = await this.parkPendingOrder({
+      ownerId: dto.ownerId,
+      subscriptionId: dto.subscriptionId,
+      gateway: 'CASHFREE',
+      gatewayRef: order.order_id,
+      amountPaise,
+      currency,
+      raw: order,
+    });
+
+    return {
+      paymentId: payment.id,
+      gateway: 'CASHFREE' as const,
+      orderId: order.order_id,
+      amount: amountPaise,
+      currency,
+      paymentSessionId: order.payment_session_id,
+      appId: this.cashfree.publicAppId,
+    };
+  }
+
+  /** The single PENDING-payment write shared by both gateway order paths. */
+  private async parkPendingOrder(input: {
+    ownerId: string;
+    subscriptionId: string;
+    gateway: 'RAZORPAY' | 'CASHFREE';
+    gatewayRef: string;
+    amountPaise: number;
+    currency: string;
+    raw: unknown;
+  }) {
     const [payment] = await this.db
       .insert(payments)
       .values({
-        ownerId: dto.ownerId,
-        subscriptionId: dto.subscriptionId,
-        gateway: 'RAZORPAY',
-        gatewayRef: order.id,
-        amount: amountPaise,
-        currency,
+        ownerId: input.ownerId,
+        subscriptionId: input.subscriptionId,
+        gateway: input.gateway,
+        gatewayRef: input.gatewayRef,
+        amount: input.amountPaise,
+        currency: input.currency,
         status: 'PENDING',
-        raw: order as never,
+        raw: input.raw as never,
       })
       .returning();
 
@@ -436,16 +527,15 @@ export class BillingService {
       action: 'billing.order.created',
       entity: 'payment',
       entityId: payment.id,
-      after: { orderId: order.id, amount: amountPaise, currency },
+      after: {
+        orderId: input.gatewayRef,
+        gateway: input.gateway,
+        amount: input.amountPaise,
+        currency: input.currency,
+      },
     });
 
-    return {
-      paymentId: payment.id,
-      orderId: order.id,
-      amount: amountPaise,
-      currency,
-      keyId: this.razorpay.publicKeyId,
-    };
+    return payment;
   }
 
   // ---------- Payments ----------
