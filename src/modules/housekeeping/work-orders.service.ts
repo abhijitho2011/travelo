@@ -237,6 +237,12 @@ export class WorkOrdersService {
               takesRoomOutOfService: dto.takesRoomOutOfService ?? false,
             })
             .returning();
+          // A room flagged out of service is out NOW — not once someone accepts
+          // the order. Leaving it sellable in the meantime is how a guest ends
+          // up handed the key to a flooded room.
+          if ((dto.takesRoomOutOfService ?? false) && dto.roomId) {
+            await WorkOrdersService.setRoomStatus(handle, dto.roomId, 'OUT_OF_ORDER', new Date());
+          }
           return created;
         });
         const [out] = await this.hydrate([row]);
@@ -338,12 +344,10 @@ export class WorkOrdersService {
       throw HousekeepingErrors.cancelReasonRequired();
     }
     assertWorkOrderTransition(before.status, 'CANCELLED');
-    // The room is only ever off the board once the order was ACCEPTED (that is
-    // where MAINTENANCE is set); cancelling before then leaves the room alone.
-    const roomWasTakenOut =
-      before.takesRoomOutOfService &&
-      !!before.roomId &&
-      ['ACCEPTED', 'IN_PROGRESS', 'PAUSED'].includes(before.status);
+    // The order took the room off the board (OUT_OF_ORDER on create, MAINTENANCE
+    // on accept), so cancelling it must always put the room back — including a
+    // cancel while still OPEN.
+    const roomWasTakenOut = before.takesRoomOutOfService && !!before.roomId;
 
     const row = await this.db.transaction(async (tx) => {
       const handle = tx as unknown as Tx;

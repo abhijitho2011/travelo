@@ -135,7 +135,7 @@ describe('WorkOrdersService — cancel', () => {
     expect(db.updates.find((u) => u.table === 'rooms')?.values).toMatchObject({ status: 'DIRTY' });
   });
 
-  it('does not touch the room when cancelling an order still OPEN', async () => {
+  it('restores the room even when cancelling an order still OPEN (create took it out)', async () => {
     const db = mockDb({
       select: {
         work_orders: [[woRow({ status: 'OPEN', takesRoomOutOfService: true })]],
@@ -144,6 +144,38 @@ describe('WorkOrdersService — cancel', () => {
       update: { work_orders: [woRow({ status: 'CANCELLED' })] },
     });
     await svc(db).cancel(PROP, WO_ID, { reason: 'not needed' });
+    expect(db.updates.find((u) => u.table === 'rooms')?.values).toMatchObject({ status: 'DIRTY' });
+  });
+});
+
+describe('WorkOrdersService — create takes the room out of service', () => {
+  it('flips the room to OUT_OF_ORDER immediately when the order says so', async () => {
+    const db = mockDb({
+      select: {
+        rooms: [[{ id: 'room-1', number: '101', status: 'AVAILABLE' }]], // requireRoom
+        work_orders: [[{ count: 0 }]], // number counter
+      },
+      insert: { work_orders: [{ id: WO_ID, roomId: 'room-1', takesRoomOutOfService: true }] },
+    });
+    await svc(db).create(
+      PROP,
+      { title: 'Burst pipe', roomId: 'room-1', takesRoomOutOfService: true } as never,
+      ME,
+    );
+    expect(db.updates.find((u) => u.table === 'rooms')?.values).toMatchObject({
+      status: 'OUT_OF_ORDER',
+    });
+  });
+
+  it('leaves the room alone when the order does not take it out', async () => {
+    const db = mockDb({
+      select: {
+        rooms: [[{ id: 'room-1', number: '101', status: 'AVAILABLE' }]],
+        work_orders: [[{ count: 0 }]],
+      },
+      insert: { work_orders: [{ id: WO_ID, roomId: 'room-1' }] },
+    });
+    await svc(db).create(PROP, { title: 'Flickering light', roomId: 'room-1' } as never, ME);
     expect(db.updates.find((u) => u.table === 'rooms')).toBeUndefined();
   });
 });
