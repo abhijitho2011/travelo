@@ -18,7 +18,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useArchivePlan, useCreatePlan, usePlans } from "@/hooks/api/use-plans";
+import {
+  useArchivePlan,
+  useCreatePlan,
+  usePlans,
+  useFeatureCatalog,
+  useSetPlanFeatures,
+} from "@/hooks/api/use-plans";
+import type { Plan } from "@/hooks/api/types";
 import { errorMessage } from "@/lib/api";
 import { inr, num } from "@/lib/format";
 
@@ -275,6 +282,7 @@ function PlansPage() {
                       ))}
                     </ul>
                   )}
+                  <PlanFeaturesDialog plan={plan} />
                   {plan.status !== "Inactive" && (
                     <ConfirmDialog
                       confirmLabel="Archive plan"
@@ -299,5 +307,73 @@ function PlansPage() {
         </AsyncSection>
       </div>
     </>
+  );
+}
+
+function PlanFeaturesDialog({ plan }: { plan: Plan }) {
+  const [open, setOpen] = useState(false);
+  const catalog = useFeatureCatalog();
+  const setFeatures = useSetPlanFeatures();
+  const [selected, setSelected] = useState<string[]>(plan.features);
+
+  // Re-seed from the plan whenever the dialog opens.
+  const openDialog = () => {
+    setSelected(plan.features);
+    setOpen(true);
+  };
+
+  const toggle = (key: string) =>
+    setSelected((cur) => (cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]));
+
+  const save = async () => {
+    try {
+      await setFeatures.mutateAsync({ id: plan.id, features: selected });
+      toast.success("Features updated", { description: plan.name });
+      setOpen(false);
+    } catch (error) {
+      toast.error("Could not update features", { description: errorMessage(error) });
+    }
+  };
+
+  const features = catalog.data ?? [];
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="w-full" onClick={openDialog}>
+          Edit features
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Features · {plan.name}</DialogTitle>
+          <DialogDescription>Toggle what this plan includes.</DialogDescription>
+        </DialogHeader>
+        <div className="max-h-80 space-y-1.5 overflow-y-auto">
+          {features.map((f) => (
+            <label
+              key={f.key}
+              className="flex cursor-pointer items-center gap-2 rounded-md border border-border p-2 text-sm"
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(f.key)}
+                onChange={() => toggle(f.key)}
+              />
+              <span className="font-medium">{f.name}</span>
+              <code className="ml-auto text-xs text-muted-foreground">{f.key}</code>
+            </label>
+          ))}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button disabled={setFeatures.isPending} onClick={() => void save()}>
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
