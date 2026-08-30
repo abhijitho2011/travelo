@@ -6,6 +6,7 @@ import 'authentication/auth_state.dart';
 import 'authentication/google_auth_service.dart';
 import 'authentication/session.dart';
 import 'networking/api_client.dart';
+import 'push/push_messaging.dart';
 import 'permissions/permission_set.dart';
 import 'permissions/role_config.dart';
 import 'storage/local_store.dart';
@@ -42,6 +43,7 @@ final StateNotifierProvider<AuthController, AuthState> authControllerProvider =
         tokens: ref.watch(tokenStoreProvider),
         google: ref.watch(googleAuthServiceProvider),
         store: ref.watch(localStoreProvider),
+        push: ref.watch(pushMessagingProvider),
       );
     });
 

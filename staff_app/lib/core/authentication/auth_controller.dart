@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/app_config.dart';
 import '../networking/api_client.dart';
 import '../networking/api_exception.dart';
+import '../push/push_messaging.dart';
 import '../storage/local_store.dart';
 import '../storage/token_store.dart';
 import 'auth_state.dart';
@@ -20,16 +23,19 @@ class AuthController extends StateNotifier<AuthState> {
     required TokenStore tokens,
     required GoogleAuthService google,
     required LocalStore store,
+    PushMessaging? push,
   }) : _api = api,
        _tokens = tokens,
        _google = google,
        _store = store,
+       _push = push,
        super(const AuthState());
 
   final ApiClient _api;
   final TokenStore _tokens;
   final GoogleAuthService _google;
   final LocalStore _store;
+  final PushMessaging? _push;
 
   /// Decide, once at launch, whether we already hold a usable session.
   Future<void> bootstrap() async {
@@ -133,6 +139,9 @@ class AuthController extends StateNotifier<AuthState> {
   }
 
   Future<void> signOut() async {
+    // Revoke the device token while we still hold a valid session to authorise
+    // the call — before /auth/logout drops it.
+    await _push?.revokeOnLogout();
     try {
       await _api.post('/auth/logout');
     } catch (_) {
@@ -210,6 +219,8 @@ class AuthController extends StateNotifier<AuthState> {
         isFirstLogin: firstLogin,
         clearError: true,
       );
+      // Register this device for push now the session is live. Best-effort.
+      unawaited(_push?.registerAfterLogin() ?? Future<void>.value());
     } on ApiException catch (e) {
       _handleSignInFailure(e);
     }

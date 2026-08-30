@@ -6,6 +6,7 @@ import 'api/token_store.dart';
 import 'auth/auth_controller.dart';
 import 'auth/auth_state.dart';
 import 'auth/google_auth_service.dart';
+import 'push/push_messaging.dart';
 import 'storage/local_store.dart';
 
 final secureStorageProvider = Provider<FlutterSecureStorage>(
@@ -33,6 +34,7 @@ final authControllerProvider = StateNotifierProvider<AuthController, AuthState>(
       api: ref.watch(apiClientProvider),
       tokens: ref.watch(tokenStoreProvider),
       google: ref.watch(googleAuthServiceProvider),
+      push: ref.watch(pushMessagingProvider),
     );
   },
 );

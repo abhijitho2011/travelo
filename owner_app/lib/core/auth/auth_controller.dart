@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_client.dart';
 import '../api/token_store.dart';
 import '../models/owner_models.dart';
+import '../push/push_messaging.dart';
 import 'auth_state.dart';
 import 'google_auth_service.dart';
 import 'impersonation.dart';
@@ -17,9 +20,11 @@ class AuthController extends StateNotifier<AuthState> {
     required ApiClient api,
     required TokenStore tokens,
     required GoogleAuthService google,
+    PushMessaging? push,
   }) : _api = api,
        _tokens = tokens,
        _google = google,
+       _push = push,
        super(const AuthState.unknown()) {
     // A failed token refresh drops straight to signed-out so the router sends
     // the owner back to /login instead of stranding them on a dead session.
@@ -29,6 +34,7 @@ class AuthController extends StateNotifier<AuthState> {
   final ApiClient _api;
   final TokenStore _tokens;
   final GoogleAuthService _google;
+  final PushMessaging? _push;
 
   /// Restore session on cold start.
   Future<void> bootstrap() async {
@@ -92,6 +98,10 @@ class AuthController extends StateNotifier<AuthState> {
       // stops being reported here too.
       impersonation: ImpersonationInfo.fromJson(me['impersonation']),
     );
+    // Register this device for push once a session is live. Best-effort and
+    // idempotent (an upsert keyed on the token), so re-running it on refresh is
+    // harmless.
+    unawaited(_push?.registerAfterLogin() ?? Future<void>.value());
   }
 
   /// Leaves a support session from the owner app.
@@ -117,6 +127,8 @@ class AuthController extends StateNotifier<AuthState> {
   }
 
   Future<void> signOut() async {
+    // Detach the device token while the session is still valid to authorise it.
+    await _push?.revokeOnLogout();
     try {
       await _api.post('/auth/logout');
     } catch (_) {}

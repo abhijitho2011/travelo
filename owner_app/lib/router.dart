@@ -1,10 +1,13 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'core/auth/auth_state.dart';
+import 'core/data/owner_repository.dart';
 import 'core/models/owner_models.dart';
 import 'core/providers.dart';
+import 'core/push/push_messaging.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/app_typography.dart';
@@ -137,8 +140,56 @@ final routerProvider = Provider<GoRouter>((ref) {
             SupportTicketScreen(ticketId: s.pathParameters['id']!),
       ),
     ],
+    // A deep link (or a tapped notification) to a path that no longer resolves
+    // lands here instead of a raw go_router error page.
+    errorBuilder: (context, state) => _RouteNotFound(location: state.uri.toString()),
   );
 });
+
+/// Shown when a route cannot be resolved — a stale deep link, a mistyped path,
+/// or a notification pointing at something since removed. Offers the way home.
+class _RouteNotFound extends StatelessWidget {
+  const _RouteNotFound({required this.location});
+
+  final String location;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Scaffold(
+      backgroundColor: c.background,
+      appBar: AppBar(title: const Text('Not found')),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.explore_off_outlined, size: 48, color: c.mutedForeground),
+              const SizedBox(height: 16),
+              Text(
+                'This page could not be opened',
+                style: AppTypography.body(color: c.foreground, weight: FontWeight.w600),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                location,
+                style: AppTypography.body(color: c.mutedForeground, size: 13),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: () => context.go('/'),
+                child: const Text('Go to dashboard'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// Splash that bootstraps the session, then lets the router take over.
 class SplashGate extends ConsumerStatefulWidget {
@@ -153,7 +204,30 @@ class _SplashGateState extends ConsumerState<SplashGate> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(authControllerProvider.notifier).bootstrap();
+      _attachPushHandlers();
     });
+  }
+
+  /// Foreground pushes refresh the inbox; a tapped push (background or cold
+  /// start) deep-links to the related screen. Guarded — an FCM-less host is a
+  /// no-op.
+  void _attachPushHandlers() {
+    try {
+      FirebaseMessaging.onMessage.listen((_) {
+        ref.read(ownerNotificationsProvider.notifier).refresh();
+      });
+      FirebaseMessaging.onMessageOpenedApp.listen(_openFromMessage);
+      FirebaseMessaging.instance.getInitialMessage().then((message) {
+        if (message != null) _openFromMessage(message);
+      });
+    } catch (error) {
+      debugPrint('Push handlers not attached: $error');
+    }
+  }
+
+  void _openFromMessage(RemoteMessage message) {
+    if (message.data.isEmpty) return;
+    ref.read(routerProvider).go(PushMessaging.routeForData(message.data));
   }
 
   @override
