@@ -37,6 +37,7 @@ import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/reception/presentation/check_in_screen.dart';
 import '../../features/reception/presentation/reception_dashboard_screen.dart';
+import '../../features/reception/presentation/booking_calendar_screen.dart';
 import '../../features/reception/presentation/reservation_detail_screen.dart';
 import '../../features/reception/presentation/reservation_form_screen.dart';
 import '../../features/reception/presentation/reservations_screen.dart';
@@ -164,6 +165,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: Routes.reservations,
             builder: (_, _) => const ReservationsScreen(),
+          ),
+          GoRoute(
+            path: Routes.calendar,
+            builder: (_, _) => const BookingCalendarScreen(),
           ),
           // `/reservations/new` before `/reservations/:id`: go_router matches
           // in declaration order, and the pattern would otherwise swallow it.
