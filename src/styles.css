@@ -1,24 +1,27 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
 
 @custom-variant dark (&:is(.dark *));
 
 /*
- * TRAVELO SUPER ADMIN — design system
- * Enterprise SaaS control plane: dense, quiet, high-contrast data surfaces.
- * All colors are oklch semantic tokens. Never hardcode colors in components.
+ * TAVELO SUPER ADMIN — design system
+ * Brand green #006847 + accent #23A926; Outfit (display) + Poppins (body).
+ * All colors are the --tv-* semantic tokens. Never hardcode colors in components.
  */
 
 @theme inline {
-  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-sans: "Poppins", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Outfit", "Poppins", ui-sans-serif, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  --radius-sm: calc(var(--radius) - 3px);
-  --radius-md: calc(var(--radius) - 1px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
+  /* Tavelo radius scale: sm 6, md 9 (buttons/inputs), lg 14 (cards), xl 18. */
+  --radius-sm: 6px;
+  --radius-md: 9px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 22px;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -68,94 +71,115 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --shadow-panel: 0 1px 2px 0 oklch(0.2 0.03 250 / 0.06);
-  --shadow-raised: 0 8px 24px -12px oklch(0.2 0.03 250 / 0.22);
+  --shadow-panel: 0 1px 2px 0 rgba(20, 26, 24, 0.06), 0 2px 6px 0 rgba(20, 26, 24, 0.05);
+  --shadow-raised: 0 8px 24px 0 rgba(20, 26, 24, 0.1), 0 2px 6px 0 rgba(20, 26, 24, 0.06);
 }
 
+/* Tavelo light theme — direct transcription of the --tv-* tokens. */
 :root {
-  --radius: 0.5rem;
+  --radius: 0.875rem; /* 14px = tv-radius-lg */
 
-  --background: oklch(0.985 0.003 250);
-  --foreground: oklch(0.21 0.028 258);
-  --surface: oklch(1 0 0);
-  --surface-muted: oklch(0.972 0.004 253);
+  --background: #f5f7f6; /* tv-canvas = n-50 */
+  --foreground: #141a18; /* n-900 */
+  --surface: #ffffff; /* n-0 */
+  --surface-muted: #edf0ee; /* tv-subtle = n-100 */
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.21 0.028 258);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.21 0.028 258);
+  --card: #ffffff;
+  --card-foreground: #141a18;
+  --popover: #ffffff;
+  --popover-foreground: #141a18;
 
-  --primary: oklch(0.48 0.135 248);
-  --primary-foreground: oklch(0.99 0.002 250);
-  --primary-soft: oklch(0.955 0.024 248);
+  --primary: #006847; /* tv-action = brand-600 */
+  --primary-foreground: #ffffff;
+  --primary-soft: #e9f5f0; /* brand-50 */
 
-  --secondary: oklch(0.966 0.005 253);
-  --secondary-foreground: oklch(0.3 0.028 258);
+  --secondary: #edf0ee; /* n-100 */
+  --secondary-foreground: #232b28; /* n-800 */
 
-  --muted: oklch(0.966 0.005 253);
-  --muted-foreground: oklch(0.535 0.024 257);
+  --muted: #edf0ee;
+  --muted-foreground: #6e7b76; /* n-500 */
 
-  --accent: oklch(0.955 0.024 248);
-  --accent-foreground: oklch(0.36 0.1 248);
+  --accent: #e9f5f0; /* tv-selected = brand-50 */
+  --accent-foreground: #00432c; /* brand-800 */
 
-  --destructive: oklch(0.55 0.208 26);
-  --destructive-foreground: oklch(0.99 0.002 250);
-  --destructive-soft: oklch(0.955 0.032 24);
+  --destructive: #c8372d; /* tv-danger */
+  --destructive-foreground: #ffffff;
+  --destructive-soft: #fbeae8; /* tv-danger-bg */
 
-  --success: oklch(0.52 0.115 162);
-  --success-foreground: oklch(0.99 0.002 250);
-  --success-soft: oklch(0.955 0.038 162);
+  --success: #1b8a1e; /* success-600 */
+  --success-foreground: #ffffff;
+  --success-soft: #e5f6e4; /* accent-50 */
 
-  --warning: oklch(0.62 0.14 62);
-  --warning-foreground: oklch(0.99 0.002 250);
-  --warning-soft: oklch(0.962 0.052 76);
+  --warning: #e08a1e; /* tv-warning */
+  --warning-foreground: #ffffff;
+  --warning-soft: #fdf3e3; /* tv-warning-bg */
 
-  --info: oklch(0.55 0.11 232);
-  --info-foreground: oklch(0.99 0.002 250);
-  --info-soft: oklch(0.955 0.028 232);
+  --info: #2563a8; /* tv-info */
+  --info-foreground: #ffffff;
+  --info-soft: #e8f0f9; /* tv-info-bg */
 
-  --border: oklch(0.915 0.006 255);
-  --border-strong: oklch(0.86 0.01 255);
-  --input: oklch(0.9 0.008 255);
-  --ring: oklch(0.48 0.135 248);
+  --border: #dfe4e1; /* n-200 */
+  --border-strong: #c6cdc9; /* n-300 */
+  --input: #dfe4e1;
+  --ring: #23a926; /* tv-focus = accent-500 */
 
-  --chart-1: oklch(0.48 0.135 248);
-  --chart-2: oklch(0.58 0.12 195);
-  --chart-3: oklch(0.55 0.115 162);
-  --chart-4: oklch(0.66 0.14 62);
-  --chart-5: oklch(0.55 0.19 26);
+  --chart-1: #006847; /* brand-600 */
+  --chart-2: #23a926; /* accent-500 */
+  --chart-3: #0d7a55; /* brand-500 */
+  --chart-4: #e08a1e; /* warning */
+  --chart-5: #2563a8; /* info */
 
-  --sidebar: oklch(0.225 0.035 259);
-  --sidebar-foreground: oklch(0.86 0.014 255);
-  --sidebar-primary: oklch(0.68 0.115 205);
-  --sidebar-primary-foreground: oklch(0.16 0.03 259);
-  --sidebar-accent: oklch(0.29 0.038 259);
-  --sidebar-accent-foreground: oklch(0.98 0.003 250);
-  --sidebar-border: oklch(0.31 0.032 259);
-  --sidebar-ring: oklch(0.68 0.115 205);
+  --sidebar: #002e1e; /* brand-900 — branded dark rail */
+  --sidebar-foreground: #c6cdc9; /* n-300 */
+  --sidebar-primary: #23a926; /* accent-500 */
+  --sidebar-primary-foreground: #002e1e;
+  --sidebar-accent: #00432c; /* brand-800 */
+  --sidebar-accent-foreground: #e9f5f0; /* brand-50 */
+  --sidebar-border: #0b3320;
+  --sidebar-ring: #23a926;
 }
 
+/* Tavelo dark theme — the --tv-* dark tokens. */
 .dark {
-  --background: oklch(0.17 0.026 259);
-  --foreground: oklch(0.95 0.005 250);
-  --surface: oklch(0.215 0.03 259);
-  --surface-muted: oklch(0.245 0.03 259);
-  --card: oklch(0.215 0.03 259);
-  --card-foreground: oklch(0.95 0.005 250);
-  --popover: oklch(0.215 0.03 259);
-  --popover-foreground: oklch(0.95 0.005 250);
-  --primary: oklch(0.68 0.12 240);
-  --primary-foreground: oklch(0.17 0.026 259);
-  --primary-soft: oklch(0.3 0.05 245);
-  --secondary: oklch(0.27 0.03 259);
-  --secondary-foreground: oklch(0.95 0.005 250);
-  --muted: oklch(0.27 0.03 259);
-  --muted-foreground: oklch(0.7 0.02 255);
-  --accent: oklch(0.3 0.045 245);
-  --accent-foreground: oklch(0.95 0.005 250);
-  --border: oklch(1 0 0 / 10%);
-  --border-strong: oklch(1 0 0 / 18%);
-  --input: oklch(1 0 0 / 14%);
+  --background: #0b100e; /* tv-canvas = n-950 */
+  --foreground: #f5f7f6; /* n-50 */
+  --surface: #141a18; /* tv-surface = n-900 */
+  --surface-muted: #232b28; /* tv-subtle = n-800 */
+  --card: #141a18;
+  --card-foreground: #f5f7f6;
+  --popover: #141a18;
+  --popover-foreground: #f5f7f6;
+  --primary: #52c34e; /* tv-action dark = accent-400 */
+  --primary-foreground: #0b100e;
+  --primary-soft: #0f2e22; /* tv-selected dark */
+  --secondary: #232b28; /* n-800 */
+  --secondary-foreground: #f5f7f6;
+  --muted: #232b28;
+  --muted-foreground: #9aa5a0; /* n-400 */
+  --accent: #0f2e22; /* tv-selected dark */
+  --accent-foreground: #e9f5f0;
+  --destructive: #e4655a; /* tv-danger dark */
+  --destructive-foreground: #faf8f5;
+  --destructive-soft: #361714; /* tv-danger-bg dark */
+  --success: #52c34e; /* tv-success dark */
+  --success-soft: #12321a; /* tv-success-bg dark */
+  --warning: #f0a93e;
+  --warning-soft: #2a1e0c;
+  --info: #5a9be0; /* tv-info dark */
+  --info-soft: #122536; /* tv-info-bg dark */
+  --border: #2c3733; /* tv-border dark */
+  --border-strong: #3e4a45; /* tv-border-strong dark */
+  --input: #3e4a45;
+  --ring: #23a926;
+
+  --sidebar: #060b09;
+  --sidebar-foreground: #c6cdc9;
+  --sidebar-primary: #52c34e;
+  --sidebar-primary-foreground: #060b09;
+  --sidebar-accent: #00432c;
+  --sidebar-accent-foreground: #e9f5f0;
+  --sidebar-border: #1a2b22;
+  --sidebar-ring: #52c34e;
 }
 
 @layer base {
@@ -175,6 +199,7 @@
   h2,
   h3,
   h4 {
+    font-family: var(--font-display);
     letter-spacing: -0.015em;
   }
 

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { TaveloMark, TaveloWordmark } from "@/components/admin/tavelo-logo";
 import { KeyRound, Loader2, ShieldCheck, Smartphone } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -210,13 +211,9 @@ function LoginPage() {
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
       <div className="hidden flex-col justify-between bg-sidebar p-10 lg:flex">
-        <div className="flex items-center gap-2">
-          <span className="flex size-8 items-center justify-center rounded-md bg-sidebar-primary text-sm font-black text-sidebar-primary-foreground">
-            T
-          </span>
-          <span className="text-sm font-extrabold tracking-tight text-sidebar-accent-foreground">
-            TAVELO
-          </span>
+        <div className="flex items-center gap-2.5">
+          <TaveloMark onDark className="h-8 w-auto" />
+          <TaveloWordmark onDark className="h-[18px] w-auto" />
         </div>
         <div className="max-w-md">
           <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-sidebar-primary">
@@ -237,10 +234,8 @@ function LoginPage() {
       <div className="flex items-center justify-center px-5 py-12">
         <div className="w-full max-w-sm">
           <div className="mb-6 flex items-center gap-2 lg:hidden">
-            <span className="flex size-7 items-center justify-center rounded-md bg-primary text-xs font-black text-primary-foreground">
-              T
-            </span>
-            <span className="text-sm font-extrabold tracking-tight">TAVELO</span>
+            <TaveloMark className="h-7 w-auto" />
+            <TaveloWordmark className="h-4 w-auto" />
           </div>
           <p className="eyebrow">Super Admin</p>
           <h1 className="mt-1 text-2xl font-bold">Sign in to continue</h1>

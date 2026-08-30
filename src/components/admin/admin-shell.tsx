@@ -35,6 +35,7 @@ import {
 } from "@/hooks/api/use-operations";
 import { hasPermission, initials, useCurrentAdmin, useSignOut } from "@/lib/auth";
 import { relativeTime } from "@/lib/format";
+import { TaveloMark, TaveloWordmark } from "@/components/admin/tavelo-logo";
 import { cn } from "@/lib/utils";
 
 function Wordmark({ compact }: { compact?: boolean }) {
@@ -43,15 +44,11 @@ function Wordmark({ compact }: { compact?: boolean }) {
       to="/"
       className="flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring"
     >
-      <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-[13px] font-black text-sidebar-primary-foreground">
-        T
-      </span>
+      <TaveloMark onDark className="h-7 w-auto shrink-0" />
       {!compact && (
         <span className="flex flex-col leading-none">
-          <span className="text-sm font-extrabold tracking-tight text-sidebar-accent-foreground">
-            TAVELO
-          </span>
-          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/70">
+          <TaveloWordmark onDark className="h-[15px] w-auto" />
+          <span className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/70">
             Super Admin
           </span>
         </span>
