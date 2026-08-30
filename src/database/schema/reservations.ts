@@ -153,3 +153,39 @@ export const reservationEvents = pgTable(
 
 export type Reservation = typeof reservations.$inferSelect;
 export type ReservationEvent = typeof reservationEvents.$inferSelect;
+
+/**
+ * The night audit's daily close per property — arrivals/departures/occupancy
+ * and no-shows for one business date. Written by the NightAuditWorker, one row
+ * per (property, date). The at-a-glance history the on-the-fly desk figures
+ * could never give.
+ */
+export const propertyDailySnapshots = pgTable(
+  'property_daily_snapshots',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    propertyId: uuid('property_id')
+      .notNull()
+      .references(() => properties.id, { onDelete: 'cascade' }),
+    businessDate: date('business_date').notNull(),
+    arrivals: integer('arrivals').notNull().default(0),
+    departures: integer('departures').notNull().default(0),
+    inHouse: integer('in_house').notNull().default(0),
+    roomsAvailable: integer('rooms_available').notNull().default(0),
+    roomsSold: integer('rooms_sold').notNull().default(0),
+    occupancyPct: integer('occupancy_pct').notNull().default(0),
+    noShows: integer('no_shows').notNull().default(0),
+    revenuePaise: integer('revenue_paise').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    propertyDateUnique: uniqueIndex('property_daily_snapshots_property_date_unique').on(
+      t.propertyId,
+      t.businessDate,
+    ),
+  }),
+);
+
+export type PropertyDailySnapshot = typeof propertyDailySnapshots.$inferSelect;

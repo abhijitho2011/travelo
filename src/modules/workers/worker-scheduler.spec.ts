@@ -19,6 +19,7 @@ describe('WorkerSchedulerService', () => {
     const notifications = over.notifications ?? worker();
     const channex = over.channex ?? worker();
     const billing = over.billing ?? { retryPendingRefunds: jest.fn(async () => ({ retried: 0, processed: 0 })) };
+    const nightAudit = over.nightAudit ?? { run: jest.fn(async () => ({ ok: true, noShows: 0, snapshots: 0 })) };
     const svc = new WorkerSchedulerService(
       lifecycle as never,
       metrics as never,
@@ -26,8 +27,9 @@ describe('WorkerSchedulerService', () => {
       notifications as never,
       channex as never,
       billing as never,
+      nightAudit as never,
     );
-    return { svc, lifecycle, metrics, announcements, notifications, channex, billing };
+    return { svc, lifecycle, metrics, announcements, notifications, channex, billing, nightAudit };
   };
 
   it('runs each worker on its tick', async () => {

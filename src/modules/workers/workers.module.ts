@@ -6,6 +6,10 @@ import {
   backgroundJobs,
   dailyPlatformMetrics,
   owners,
+  properties,
+  propertyDailySnapshots,
+  reservations,
+  rooms,
   subscriptionPlans,
   subscriptions,
 } from '../../database/schema';
@@ -396,6 +400,117 @@ export class ChannexSyncWorker {
  *  - **No crash.** A worker that throws is logged and swallowed. One failing
  *    worker must never stop the timer that drives all the others.
  */
+/**
+ * The night audit — the property PMS end-of-day close (Phase 4, item 4.1).
+ *
+ * Two jobs, both idempotent so a re-run (or a boot that missed midnight) is
+ * safe:
+ *   1. AUTO NO-SHOW. A CONFIRMED booking whose arrival date has passed and that
+ *      never checked in is marked NO_SHOW, so it stops holding capacity.
+ *   2. DAILY SNAPSHOT. One row per (property, business date) with arrivals,
+ *      departures, in-house, occupancy and no-shows — the history the on-the-fly
+ *      desk figures could never keep.
+ */
+@Injectable()
+export class NightAuditWorker {
+  private readonly logger = new Logger(NightAuditWorker.name);
+  constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+
+  private static isoDate(d: Date): string {
+    return d.toISOString().slice(0, 10);
+  }
+
+  /** CONFIRMED with an arrival date strictly before today → NO_SHOW. */
+  async autoNoShow(now: Date = new Date()): Promise<number> {
+    const today = NightAuditWorker.isoDate(now);
+    const res = await this.db.execute(sql`
+      UPDATE reservations
+      SET status='NO_SHOW', updated_at=now()
+      WHERE status='CONFIRMED' AND check_in < ${today}::date AND deleted_at IS NULL
+    `);
+    const count = (res as unknown as { rowCount?: number }).rowCount ?? 0;
+    if (count > 0) this.logger.log(`Night audit marked ${count} booking(s) NO_SHOW`);
+    return count;
+  }
+
+  /**
+   * Writes the snapshot for one business date (default: the day that just
+   * ended). Occupancy is rooms in-house over rooms not out of service.
+   */
+  async snapshot(now: Date = new Date()): Promise<number> {
+    // The business date is the day that closed — yesterday relative to a
+    // just-after-midnight run.
+    const date = NightAuditWorker.isoDate(new Date(now.getTime() - 12 * 3600_000));
+    const props = await this.db
+      .select({ id: properties.id })
+      .from(properties)
+      .where(isNull(properties.deletedAt));
+
+    for (const p of props) {
+      const [row] = await this.db.execute(sql`
+        SELECT
+          (SELECT count(*) FROM reservations r WHERE r.property_id = ${p.id}
+             AND r.check_in = ${date}::date AND r.status IN ('CHECKED_IN','CHECKED_OUT'))::int AS arrivals,
+          (SELECT count(*) FROM reservations r WHERE r.property_id = ${p.id}
+             AND r.check_out = ${date}::date AND r.status = 'CHECKED_OUT')::int AS departures,
+          (SELECT count(*) FROM reservations r WHERE r.property_id = ${p.id}
+             AND r.check_in <= ${date}::date AND r.check_out > ${date}::date
+             AND r.status = 'CHECKED_IN')::int AS in_house,
+          (SELECT count(*) FROM rooms rm WHERE rm.property_id = ${p.id}
+             AND rm.deleted_at IS NULL AND rm.status <> 'OUT_OF_ORDER')::int AS rooms_available,
+          (SELECT count(*) FROM reservations r WHERE r.property_id = ${p.id}
+             AND r.check_in = ${date}::date AND r.status = 'NO_SHOW')::int AS no_shows,
+          (SELECT coalesce(sum(r.rate_paise),0) FROM reservations r WHERE r.property_id = ${p.id}
+             AND r.check_in <= ${date}::date AND r.check_out > ${date}::date
+             AND r.status IN ('CHECKED_IN','CHECKED_OUT'))::int AS revenue_paise
+      `).then((x) => (x as unknown as { rows: Record<string, number>[] }).rows);
+
+      const arrivals = row?.arrivals ?? 0;
+      const departures = row?.departures ?? 0;
+      const inHouse = row?.in_house ?? 0;
+      const roomsAvailable = row?.rooms_available ?? 0;
+      const noShows = row?.no_shows ?? 0;
+      const revenuePaise = row?.revenue_paise ?? 0;
+      const occupancyPct = roomsAvailable > 0 ? Math.round((inHouse / roomsAvailable) * 100) : 0;
+
+      await this.db
+        .insert(propertyDailySnapshots)
+        .values({
+          propertyId: p.id,
+          businessDate: date,
+          arrivals,
+          departures,
+          inHouse,
+          roomsAvailable,
+          roomsSold: inHouse,
+          occupancyPct,
+          noShows,
+          revenuePaise,
+        })
+        .onConflictDoUpdate({
+          target: [propertyDailySnapshots.propertyId, propertyDailySnapshots.businessDate],
+          set: {
+            arrivals,
+            departures,
+            inHouse,
+            roomsAvailable,
+            roomsSold: inHouse,
+            occupancyPct,
+            noShows,
+            revenuePaise,
+          },
+        });
+    }
+    return props.length;
+  }
+
+  async run(now: Date = new Date()): Promise<{ ok: boolean; noShows: number; snapshots: number }> {
+    const noShows = await this.autoNoShow(now);
+    const snapshots = await this.snapshot(now);
+    return { ok: true, noShows, snapshots };
+  }
+}
+
 @Injectable()
 export class WorkerSchedulerService {
   private readonly logger = new Logger(WorkerSchedulerService.name);
@@ -408,6 +523,7 @@ export class WorkerSchedulerService {
     private readonly notifications: NotificationDispatchWorker,
     private readonly channex: ChannexSyncWorker,
     private readonly billing: BillingService,
+    private readonly nightAudit: NightAuditWorker,
   ) {}
 
   /** Queued notifications are user-visible, so they drain often. */
@@ -448,6 +564,12 @@ export class WorkerSchedulerService {
   }
 
   /** Yesterday's numbers, computed once the day is safely over. */
+  /** The property end-of-day close, just after the platform metrics roll. */
+  @Cron('30 0 * * *')
+  runNightAudit(): Promise<void> {
+    return this.guard('night-audit', () => this.nightAudit.run());
+  }
+
   @Cron('15 0 * * *')
   aggregateDailyMetrics(): Promise<void> {
     return this.guard('metrics', () => this.metrics.run());
@@ -478,6 +600,7 @@ export class WorkerSchedulerService {
     DailyMetricsAggregator,
     AnnouncementPublisherWorker,
     NotificationDispatchWorker,
+    NightAuditWorker,
   ],
   exports: [
     ChannexSyncWorker,
@@ -485,6 +608,7 @@ export class WorkerSchedulerService {
     DailyMetricsAggregator,
     AnnouncementPublisherWorker,
     NotificationDispatchWorker,
+    NightAuditWorker,
   ],
 })
 export class WorkersModule {}
