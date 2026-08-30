@@ -451,6 +451,7 @@ export class ReservationsService {
               propertyId,
               roomTypeId: dto.roomTypeId,
               roomId: dto.roomId ?? null,
+              groupId: dto.groupId ?? null,
               reservationNumber: formatReservationNumber((count ?? 0) + 1 + attempt),
               guestName: dto.guestName,
               guestPhone: dto.guestPhone,

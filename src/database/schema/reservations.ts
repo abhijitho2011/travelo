@@ -69,6 +69,8 @@ export const reservations = pgTable(
       .references(() => roomTypes.id, { onDelete: 'restrict' }),
     /** NULL until a room is assigned — see the note above. */
     roomId: uuid('room_id').references(() => rooms.id, { onDelete: 'set null' }),
+    /** NULL unless the stay is part of a group booking (Phase 4). */
+    groupId: uuid('group_id'),
     /** `RSV-XXXXXX`. Unique PER PROPERTY: two hotels may both have RSV-000001. */
     reservationNumber: varchar('reservation_number', { length: 32 }).notNull(),
 
@@ -226,3 +228,33 @@ export const guestProfiles = pgTable(
 );
 
 export type GuestProfile = typeof guestProfiles.$inferSelect;
+
+/**
+ * A group-booking master — a wedding block, a corporate party. Many
+ * reservations reference it via `reservations.group_id`; each is still its own
+ * stay. Phase 4, item 4.11 (first cut — shared folio is a later refinement).
+ */
+export const bookingGroups = pgTable(
+  'booking_groups',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    propertyId: uuid('property_id')
+      .notNull()
+      .references(() => properties.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 160 }).notNull(),
+    contactName: varchar('contact_name', { length: 160 }),
+    contactPhone: varchar('contact_phone', { length: 32 }),
+    notes: text('notes'),
+    createdBy: uuid('created_by').references(() => hotelStaff.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (t) => ({
+    propertyIdx: index('booking_groups_property_idx').on(t.propertyId),
+  }),
+);
+
+export type BookingGroup = typeof bookingGroups.$inferSelect;

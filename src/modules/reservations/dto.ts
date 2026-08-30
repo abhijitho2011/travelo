@@ -48,6 +48,9 @@ export class CreateReservationDto {
   /** Optional at booking time — reception usually picks the room at arrival. */
   @IsOptional() @IsUUID() roomId?: string;
 
+  /** Optional: tie this stay to a group booking. */
+  @IsOptional() @IsUUID() groupId?: string;
+
   @IsString() @Length(2, 160) guestName!: string;
 
   @IsString() @Length(6, 32) guestPhone!: string;
