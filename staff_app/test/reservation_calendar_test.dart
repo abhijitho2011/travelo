@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tavelo_staff/features/reception/application/booking_calendar_controllers.dart';
+import 'package:tavelo_staff/features/reception/application/reservation_calendar_controllers.dart';
 import 'package:tavelo_staff/features/reception/data/reception_models.dart';
 import 'package:tavelo_staff/features/rooms/data/room_models.dart';
 

@@ -4,7 +4,7 @@ import '../../rooms/data/room_models.dart' show Room, RoomFilter, RoomStatus;
 import '../../rooms/data/rooms_repository.dart' show roomsRepositoryProvider;
 import '../data/reception_models.dart';
 import '../data/reception_repository.dart';
-import 'booking_calendar_controllers.dart';
+import 'reservation_calendar_controllers.dart';
 
 // ------------------------------------------------------------- the boards --
 
@@ -227,7 +227,7 @@ class ReservationActions {
   /// the list the caller happens to be looking at.
   void _invalidate([String? id]) {
     _ref.invalidate(reservationsProvider);
-    _ref.invalidate(bookingCalendarProvider);
+    _ref.invalidate(reservationCalendarProvider);
     _ref.invalidate(deskTodayProvider);
     _ref.invalidate(gmDashboardProvider);
     if (id != null) _ref.invalidate(reservationProvider(id));

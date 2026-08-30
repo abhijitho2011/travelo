@@ -39,7 +39,7 @@ class Routes {
   // --- reception — built ---
   static const reception = '/reception';
   static const reservations = '/reception/reservations';
-  static const calendar = '/reception/calendar';
+  static const reservationCalendar = '/reception/reservation-calendar';
 
   /// Declared — and, in the router, registered — BEFORE the `:id` pattern, or
   /// "new" is matched as a reservation whose id is the word "new".

@@ -73,14 +73,6 @@ class _ReservationsScreenState extends ConsumerState<ReservationsScreen> {
           title: 'Bookings',
           subtitle: 'Every stay on the book, past and future.',
           actions: [
-            // The same bookings, seen as a room-by-night chart. It sits beside
-            // New booking because that is the pair a clerk reaches for: look at
-            // what is free, then sell it.
-            OutlinedButton.icon(
-              onPressed: () => context.go(Routes.calendar),
-              icon: const Icon(Icons.calendar_month_outlined, size: 16),
-              label: const Text('Calendar'),
-            ),
             PermissionGate(
               permission: P.reservationCreate,
               child: FilledButton.icon(

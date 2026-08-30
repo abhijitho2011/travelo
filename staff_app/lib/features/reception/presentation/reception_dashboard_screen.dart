@@ -45,6 +45,17 @@ class ReceptionDashboardScreen extends ConsumerWidget {
                 label: const Text('New booking'),
               ),
             ),
+            // The room-by-night chart. It sits with the desk's other two
+            // actions because it answers the question they lead to: what is
+            // free, and who is where.
+            PermissionGate(
+              permission: P.reservationRead,
+              child: OutlinedButton.icon(
+                onPressed: () => context.go(Routes.reservationCalendar),
+                icon: const Icon(Icons.calendar_month_outlined, size: 16),
+                label: const Text('Calendar'),
+              ),
+            ),
             PermissionGate(
               permission: P.reservationRead,
               child: FilledButton.icon(

@@ -92,14 +92,14 @@ int _compareRoomNumber(String a, String b) {
   return a.compareTo(b);
 }
 
-final bookingCalendarProvider = FutureProvider.autoDispose<CalendarData>((ref) async {
+final reservationCalendarProvider = FutureProvider.autoDispose<CalendarData>((ref) async {
   final start = ref.watch(calendarWindowStartProvider);
   final end = start.add(const Duration(days: kCalendarWindowDays));
 
-  // Rooms drive the rows; reservations touching the window fill them. Both are
-  // capped generously — a single property's rooms and a fortnight of stays are
-  // small sets.
-  final rooms = await ref.watch(roomsRepositoryProvider).rooms(const RoomFilter(limit: 500));
+  // Rooms drive the rows; reservations touching the window fill them. 200 is
+  // the API's hard ceiling on BOTH pages (RoomFilterDto / ReservationFilterDto)
+  // — asking for more is a 400, not a bigger page.
+  final rooms = await ref.watch(roomsRepositoryProvider).rooms(const RoomFilter(limit: 200));
   final reservations = await ref
       .watch(receptionRepositoryProvider)
       .reservations(ReservationFilter(from: start, to: end, limit: 200));

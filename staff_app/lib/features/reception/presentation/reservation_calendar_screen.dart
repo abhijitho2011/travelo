@@ -11,7 +11,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../rooms/data/room_models.dart';
-import '../application/booking_calendar_controllers.dart';
+import '../application/reservation_calendar_controllers.dart';
 import '../application/reception_controllers.dart';
 import '../data/reception_models.dart';
 import '../data/reception_repository.dart' show ReservationErrors;
@@ -44,7 +44,7 @@ class _ExtendIntent {
   final Reservation reservation;
 }
 
-/// The front-desk booking calendar — a tape chart of rooms (rows) against dates
+/// The front-desk reservation calendar — a tape chart of rooms (rows) against dates
 /// (columns), with each reservation drawn as a bar across the nights it holds.
 ///
 /// What it can do:
@@ -56,14 +56,14 @@ class _ExtendIntent {
 ///
 /// Every mutation asks first and reports what the server said — a drag is easy
 /// to start by accident, and moving a guest is not a silent operation.
-class BookingCalendarScreen extends ConsumerStatefulWidget {
-  const BookingCalendarScreen({super.key});
+class ReservationCalendarScreen extends ConsumerStatefulWidget {
+  const ReservationCalendarScreen({super.key});
 
   @override
-  ConsumerState<BookingCalendarScreen> createState() => _BookingCalendarScreenState();
+  ConsumerState<ReservationCalendarScreen> createState() => _ReservationCalendarScreenState();
 }
 
-class _BookingCalendarScreenState extends ConsumerState<BookingCalendarScreen> {
+class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarScreen> {
   final _datesCtrl = ScrollController();
   final _gridCtrl = ScrollController();
   bool _syncing = false;
@@ -204,7 +204,7 @@ class _BookingCalendarScreenState extends ConsumerState<BookingCalendarScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final async = ref.watch(bookingCalendarProvider);
+    final async = ref.watch(reservationCalendarProvider);
 
     return Scaffold(
       backgroundColor: c.background,
@@ -242,7 +242,10 @@ class _BookingCalendarScreenState extends ConsumerState<BookingCalendarScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Calendar', style: AppTypography.display(size: 18, color: c.foreground)),
+                Text(
+                  'Reservation calendar',
+                  style: AppTypography.display(size: 18, color: c.foreground),
+                ),
                 Text(
                   '${_monthDay(start)} – ${_monthDay(end)}',
                   style: AppTypography.body(size: 12.5, color: c.mutedForeground),
@@ -498,7 +501,7 @@ class _BookingCalendarScreenState extends ConsumerState<BookingCalendarScreen> {
             ),
             const SizedBox(height: Sp.md),
             FilledButton(
-              onPressed: () => ref.invalidate(bookingCalendarProvider),
+              onPressed: () => ref.invalidate(reservationCalendarProvider),
               child: const Text('Retry'),
             ),
           ],
