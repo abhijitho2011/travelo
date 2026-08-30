@@ -297,12 +297,6 @@ class RoleConfig {
     route: Routes.inventory,
     requires: [P.inventoryRead],
   );
-  static const _maintenanceMore = NavItem(
-    label: 'Maintenance',
-    icon: Icons.build_outlined,
-    route: Routes.maintenance,
-    requires: [P.maintenanceRead],
-  );
   static const _lostFoundMore = NavItem(
     label: 'Lost & found',
     icon: Icons.travel_explore_outlined,
@@ -401,8 +395,8 @@ class RoleConfig {
         NavItem(
           label: 'Maintenance',
           icon: Icons.build_outlined,
-          route: Routes.maintenance,
-          requires: [P.maintenanceRead],
+          route: Routes.workOrders,
+          requires: [P.workOrderRead],
         ),
         NavItem(
           label: 'Restaurant',
@@ -496,8 +490,8 @@ class RoleConfig {
         NavItem(
           label: 'Maintenance',
           icon: Icons.build_outlined,
-          route: Routes.maintenance,
-          requires: [P.maintenanceRead],
+          route: Routes.workOrders,
+          requires: [P.workOrderRead],
         ),
         NavItem(
           label: 'Restaurant',
@@ -729,6 +723,7 @@ class RoleConfig {
       role: StaffRole.housekeepingSupervisor,
       homeRoute: Routes.housekeeping,
       homeModuleLabel: 'Housekeeping Board',
+      built: true,
       bottomNav: const [
         NavItem(
           label: 'Board',
@@ -739,29 +734,47 @@ class RoleConfig {
         NavItem(
           label: 'Tasks',
           icon: Icons.checklist_outlined,
-          route: Routes.myTasks,
+          route: Routes.housekeepingTasks,
           requires: [P.taskRead],
+        ),
+        NavItem(
+          label: 'Maintenance',
+          icon: Icons.build_outlined,
+          route: Routes.workOrders,
+          requires: [P.workOrderRead],
         ),
       ],
       moreMenu: const [
         _roomsMore,
-        _maintenanceMore,
         _inventoryMore,
         _lostFoundMore,
         ..._commonMore,
       ],
     ),
-    // A technician holds `room.read` and nothing else on the inventory: the
-    // board tells them which room is out of order, and every control on it —
-    // status included — gates itself away.
-    StaffRole.technician: _simple(
-      StaffRole.technician,
-      Routes.myWorkOrders,
-      'My Work Orders',
-      'My work',
-      Icons.handyman_outlined,
-      requires: [P.maintenanceRead],
-      more: const [_roomsMore, _maintenanceMore, _myTasksMore],
+    // The technician drives the maintenance queue: their own jobs first, the
+    // whole queue behind it. Every lifecycle control gates itself on its
+    // workorder.* permission, so the surface never offers an action the API
+    // would refuse.
+    StaffRole.technician: RoleConfig(
+      role: StaffRole.technician,
+      homeRoute: Routes.myWorkOrders,
+      homeModuleLabel: 'My Work Orders',
+      built: true,
+      bottomNav: const [
+        NavItem(
+          label: 'My work',
+          icon: Icons.handyman_outlined,
+          route: Routes.myWorkOrders,
+          requires: [P.workOrderRead],
+        ),
+        NavItem(
+          label: 'Work orders',
+          icon: Icons.build_outlined,
+          route: Routes.workOrders,
+          requires: [P.workOrderRead],
+        ),
+      ],
+      moreMenu: const [_roomsMore, _myTasksMore, ..._commonMore],
     ),
     StaffRole.spaManager: _simple(
       StaffRole.spaManager,

@@ -13,11 +13,13 @@ import '../../features/dashboard/presentation/home_redirect.dart';
 import '../../features/driver/presentation/driver_screen.dart';
 import '../../features/events/presentation/events_screen.dart';
 import '../../features/housekeeping/presentation/housekeeping_board_screen.dart';
+import '../../features/housekeeping/presentation/housekeeping_tasks_screen.dart';
 import '../../features/housekeeping/presentation/my_tasks_screen.dart';
 import '../../features/housekeeping/presentation/task_detail_screen.dart';
 import '../../features/inventory/presentation/inventory_screen.dart';
-import '../../features/maintenance/presentation/maintenance_screen.dart';
 import '../../features/maintenance/presentation/my_work_orders_screen.dart';
+import '../../features/maintenance/presentation/work_orders_screen.dart';
+import '../../features/maintenance/presentation/work_order_detail_screen.dart';
 import '../../features/management/presentation/add_staff_screen.dart';
 import '../../features/management/presentation/approvals_screen.dart';
 import '../../features/management/presentation/management_dashboard_screen.dart';
@@ -251,12 +253,25 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, _) => const HousekeepingBoardScreen(),
           ),
           GoRoute(
+            path: Routes.housekeepingTasks,
+            builder: (_, _) => const HousekeepingTasksScreen(),
+          ),
+          GoRoute(
             path: Routes.maintenance,
-            builder: (_, _) => const MaintenanceScreen(),
+            builder: (_, _) => const WorkOrdersScreen(),
+          ),
+          GoRoute(
+            path: Routes.workOrders,
+            builder: (_, _) => const WorkOrdersScreen(),
           ),
           GoRoute(
             path: Routes.myWorkOrders,
             builder: (_, _) => const MyWorkOrdersScreen(),
+          ),
+          GoRoute(
+            path: Routes.workOrderPattern,
+            builder: (_, state) =>
+                WorkOrderDetailScreen(id: state.pathParameters['id'] ?? ''),
           ),
           GoRoute(path: Routes.spa, builder: (_, _) => const SpaScreen()),
           GoRoute(

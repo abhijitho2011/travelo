@@ -83,8 +83,12 @@ class Routes {
   static const sales = '/sales';
   static const travelDesk = '/travel-desk';
   static const housekeeping = '/housekeeping';
+  static const housekeepingTasks = '/housekeeping/tasks';
   static const maintenance = '/maintenance';
   static const myWorkOrders = '/maintenance/my-work-orders';
+  static const workOrders = '/work-orders';
+  static const workOrderPattern = '/work-orders/:id';
+  static String workOrder(String id) => '/work-orders/$id';
   static const spa = '/spa';
   static const spaAppointments = '/spa/my-appointments';
   static const spaBookings = '/spa/bookings';
