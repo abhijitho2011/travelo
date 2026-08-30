@@ -112,6 +112,13 @@ class OwnerRepository {
     return (list as List).map((e) => RoomType.fromJson(e as Map)).toList();
   }
 
+  /// A hotel's operational snapshot (owner-visible): occupancy, arrivals,
+  /// departures, in-house and a short occupancy history.
+  Future<Map<String, dynamic>> propertyOperations(String propertyId) async {
+    final d = await _api.get('/properties/$propertyId/operations');
+    return Map<String, dynamic>.from(d as Map);
+  }
+
   /// Read-only, same reasoning. Asks for the server's maximum page so the
   /// by-status summary covers a whole hotel rather than the first 100 rooms.
   Future<List<Room>> propertyRooms(String propertyId) async {
@@ -368,3 +375,8 @@ final ownerNotificationsProvider =
 final ownerUnreadCountProvider = Provider<int>((ref) {
   return ref.watch(ownerNotificationsProvider).value?.unread ?? 0;
 });
+
+final propertyOperationsProvider =
+    FutureProvider.autoDispose.family<Map<String, dynamic>, String>(
+  (ref, propertyId) => ref.watch(ownerRepositoryProvider).propertyOperations(propertyId),
+);

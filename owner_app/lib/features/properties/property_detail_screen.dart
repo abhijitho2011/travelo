@@ -124,6 +124,8 @@ class _Detail extends ConsumerWidget {
           gapMd,
           _Photos(propertyId: propertyId),
           gapSection,
+          _Operations(propertyId: propertyId),
+          gapSection,
           _ManagersTile(propertyId: propertyId),
           gapSection,
           _Facilities(propertyId: propertyId),
@@ -735,6 +737,55 @@ Future<void> _confirmArchive(
   } on ApiException catch (e) {
     messenger.showSnackBar(
       SnackBar(content: Text(e.message.isEmpty ? 'Could not archive.' : e.message)),
+    );
+  }
+}
+
+
+/// A read-only operational snapshot of the hotel for the owner: today's
+/// occupancy, arrivals/departures and in-house, plus a short history.
+class _Operations extends ConsumerWidget {
+  const _Operations({required this.propertyId});
+  final String propertyId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    final async = ref.watch(propertyOperationsProvider(propertyId));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SectionHeader(title: 'Operations today', icon: Icons.insights_outlined),
+        async.when(
+          loading: () => const SizedBox(height: 72, child: Center(child: CircularProgressIndicator())),
+          error: (_, __) => Text(
+            'Operational figures are unavailable right now.',
+            style: AppTypography.body(size: 13, color: c.mutedForeground),
+          ),
+          data: (ops) {
+            int n(String k) => (ops[k] as num?)?.toInt() ?? 0;
+            return SoftCard(
+              padding: const EdgeInsets.all(Sp.lg),
+              child: Column(
+                children: [
+                  FactRow(label: 'Occupancy', value: '${n('occupancyPct')}%'),
+                  const SizedBox(height: 10),
+                  FactRow(label: 'In-house', value: '${n('inHouse')} guests'),
+                  const SizedBox(height: 10),
+                  FactRow(label: 'Arrivals today', value: '${n('arrivalsToday')}'),
+                  const SizedBox(height: 10),
+                  FactRow(label: 'Departures today', value: '${n('departuresToday')}'),
+                  const SizedBox(height: 10),
+                  FactRow(
+                    label: 'Rooms occupied',
+                    value: '${n('roomsOccupied')} / ${n('roomsSellable')}',
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }

@@ -9,6 +9,7 @@ import {
   locationStates,
   owners,
   properties,
+  propertyDailySnapshots,
   reservations,
   rooms,
   subscriptions,
@@ -236,6 +237,56 @@ export class OwnerPortalService {
       contact: row.contact,
       address: row.address,
       coverPhotoUrl: covers.get(row.id) ?? null,
+    };
+  }
+
+  /**
+   * A hotel's operational snapshot for the owner: live occupancy today, today's
+   * arrivals and departures, and a short occupancy history from the night audit.
+   * Read-only visibility — owners do not run the front desk, but a hotel they
+   * own should not be a black box after onboarding.
+   */
+  async propertyOperations(ownerId: string, id: string) {
+    await this.assertOwnedProperty(ownerId, id);
+    const today = new Date().toISOString().slice(0, 10);
+
+    const [live] = await this.db
+      .select({
+        sellable: sql<number>`count(*) filter (where ${rooms.status} <> 'OUT_OF_ORDER')::int`,
+        occupied: sql<number>`count(*) filter (where ${rooms.status} = 'OCCUPIED')::int`,
+      })
+      .from(rooms)
+      .where(and(eq(rooms.propertyId, id), isNull(rooms.deletedAt)));
+
+    const [counts] = await this.db
+      .select({
+        arrivals: sql<number>`count(*) filter (where ${reservations.checkIn} = ${today}::date AND ${reservations.status} in ('CONFIRMED','CHECKED_IN'))::int`,
+        departures: sql<number>`count(*) filter (where ${reservations.checkOut} = ${today}::date AND ${reservations.status} in ('CHECKED_IN','CHECKED_OUT'))::int`,
+        inHouse: sql<number>`count(*) filter (where ${reservations.status} = 'CHECKED_IN')::int`,
+      })
+      .from(reservations)
+      .where(and(eq(reservations.propertyId, id), isNull(reservations.deletedAt)));
+
+    const history = await this.db
+      .select({
+        date: propertyDailySnapshots.businessDate,
+        occupancyPct: propertyDailySnapshots.occupancyPct,
+        revenuePaise: propertyDailySnapshots.revenuePaise,
+      })
+      .from(propertyDailySnapshots)
+      .where(eq(propertyDailySnapshots.propertyId, id))
+      .orderBy(desc(propertyDailySnapshots.businessDate))
+      .limit(14);
+
+    const sellable = live?.sellable ?? 0;
+    return {
+      occupancyPct: sellable > 0 ? Math.round(((live?.occupied ?? 0) / sellable) * 100) : 0,
+      roomsOccupied: live?.occupied ?? 0,
+      roomsSellable: sellable,
+      arrivalsToday: counts?.arrivals ?? 0,
+      departuresToday: counts?.departures ?? 0,
+      inHouse: counts?.inHouse ?? 0,
+      history: history.slice().reverse(),
     };
   }
 

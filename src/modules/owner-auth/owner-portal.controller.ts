@@ -59,6 +59,11 @@ export class OwnerPortalController {
     return this.portal.getProperty(owner.id, id);
   }
 
+  @Get('properties/:id/operations')
+  operations(@CurrentOwner() owner: AuthenticatedOwner, @Param('id') id: string) {
+    return this.portal.propertyOperations(owner.id, id);
+  }
+
   @Patch('properties/:id')
   updateProperty(
     @CurrentOwner() owner: AuthenticatedOwner,

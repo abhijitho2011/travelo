@@ -226,6 +226,7 @@ void main() {
     propertyRoomTypesProvider('p_1').overrideWith((ref) => roomTypes),
     propertyRoomsProvider('p_1').overrideWith((ref) => rooms),
     propertyPhotosProvider('p_1').overrideWith((ref) => <Map<String, dynamic>>[]),
+    propertyOperationsProvider('p_1').overrideWith((ref) => <String, dynamic>{}),
   ];
 
   Widget harness(Widget screen) {
