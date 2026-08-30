@@ -33,7 +33,7 @@ import {
   useMarkNotificationRead,
   useNotifications,
 } from "@/hooks/api/use-operations";
-import { initials, useCurrentAdmin, useSignOut } from "@/lib/auth";
+import { hasPermission, initials, useCurrentAdmin, useSignOut } from "@/lib/auth";
 import { relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -62,11 +62,24 @@ function Wordmark({ compact }: { compact?: boolean }) {
 
 function SidebarNav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { data: admin } = useCurrentAdmin();
+
+  // Hide nav items the current admin lacks the permission for. Items without a
+  // permission are always shown; the backend still enforces access on every
+  // request, so this is presentation only. Empty sections drop out entirely.
+  const visibleSections = navSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter(
+        (item) => !item.permission || hasPermission(admin, item.permission),
+      ),
+    }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <ScrollArea className="h-full">
       <nav aria-label="Main" className="px-2 pb-8 pt-2">
-        {navSections.map((section) => (
+        {visibleSections.map((section) => (
           <div key={section.title} className="mb-3">
             {!collapsed && (
               <p className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-sidebar-foreground/50">
