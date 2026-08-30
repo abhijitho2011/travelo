@@ -56,6 +56,15 @@ export class CreatePropertyDto {
   @IsOptional() @IsEmail() email?: string;
 }
 
+export class UpdatePropertyDto {
+  @IsOptional() @IsString() @Length(2, 255) name?: string;
+  @IsOptional() @ValidateNested() @Type(() => AddressDto) address?: AddressDto;
+  @IsOptional() @IsString() @Length(1, 128) city?: string;
+  @IsOptional() @IsString() @Length(1, 128) state?: string;
+  @IsOptional() @IsString() @Matches(MOBILE_REGEX, { message: 'phone must be 10-15 digits' }) phone?: string;
+  @IsOptional() @IsEmail() email?: string;
+}
+
 export class CreateStaffDto {
   // Owners create hotel MANAGEMENT only. The full 23-role set exists for staff
   // created later by a GM inside the property — it must not widen this.

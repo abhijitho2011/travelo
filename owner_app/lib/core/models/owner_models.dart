@@ -111,37 +111,44 @@ class SubscriptionInfo {
 class Property {
   final String id;
   final String name;
-  final int starRating;
   final String city;
   final String state;
   final String status;
   final int roomCount;
   final int completeness; // 0..100
   final String? coverPhotoUrl;
+  final String contactPhone;
+  final String contactEmail;
 
   const Property({
     required this.id,
     required this.name,
-    required this.starRating,
     required this.city,
     required this.state,
     required this.status,
     required this.roomCount,
     required this.completeness,
     this.coverPhotoUrl,
+    this.contactPhone = '',
+    this.contactEmail = '',
   });
 
-  factory Property.fromJson(Map j) => Property(
-        id: _asStr(j['id']),
-        name: _asStr(j['name']),
-        starRating: _asInt(j['starRating'] ?? j['star_rating']),
-        city: _asStr(j['city']),
-        state: _asStr(j['state']),
-        status: _asStr(j['status']),
-        roomCount: _asInt(j['roomCount'] ?? j['room_count']),
-        completeness: _asInt(j['listingCompleteness'] ?? j['completeness']),
-        coverPhotoUrl: (j['coverPhotoUrl'] ?? j['photo']) as String?,
-      );
+  factory Property.fromJson(Map j) {
+    final contact = j['contact'];
+    final cMap = contact is Map ? contact : const {};
+    return Property(
+      id: _asStr(j['id']),
+      name: _asStr(j['name']),
+      city: _asStr(j['city']),
+      state: _asStr(j['state']),
+      status: _asStr(j['status']),
+      roomCount: _asInt(j['roomCount'] ?? j['room_count']),
+      completeness: _asInt(j['listingCompleteness'] ?? j['completeness']),
+      coverPhotoUrl: (j['coverPhotoUrl'] ?? j['photo']) as String?,
+      contactPhone: _asStr(cMap['phone']),
+      contactEmail: _asStr(cMap['email']),
+    );
+  }
 }
 
 class PortfolioSummary {

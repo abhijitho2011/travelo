@@ -16,6 +16,7 @@ import { OwnerSupportService } from './owner-support.service';
 import { OwnerPortalService } from './owner-portal.service';
 import { LocationsService } from './locations.service';
 import { PropertyPhotosService } from './property-photos.service';
+import { PropertiesService } from '../properties/properties.service';
 import { OwnerJwtGuard } from './owner-jwt.guard';
 
 /**
@@ -49,6 +50,7 @@ describe('owner surface route mounting', () => {
         // Leaf collaborators that would otherwise reach a database, a bucket
         // or an environment.
         { provide: PropertyPhotosService, useValue: {} },
+        { provide: PropertiesService, useValue: {} },
         { provide: AuditService, useValue: { record: async () => undefined } },
         { provide: EntitlementsService, useValue: { resolve: async () => ({ effective: [] }) } },
         { provide: JwtService, useValue: {} },

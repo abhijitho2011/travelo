@@ -15,8 +15,9 @@ import {
   subscriptionPlans,
 } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
-import { CreatePropertyDto, CreateStaffDto, UpdateStaffDto } from './dto';
+import { CreatePropertyDto, CreateStaffDto, UpdateStaffDto, UpdatePropertyDto } from './dto';
 import { OwnerErrors } from './owner-errors';
+import { PropertiesService } from '../properties/properties.service';
 import { normalizeIndianMobile, trimToNull } from './owner-input';
 import { PropertyPhotosService } from './property-photos.service';
 
@@ -29,6 +30,7 @@ export class OwnerPortalService {
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly photos: PropertyPhotosService,
     private readonly audit: AuditService,
+    private readonly propertiesService: PropertiesService,
   ) {}
 
   private coverPhotoUrls(propertyIds: string[]): Promise<Map<string, string>> {
@@ -205,6 +207,91 @@ export class OwnerPortalService {
       // A freshly created property has no photos yet.
       coverPhotoUrl: null as string | null,
     };
+  }
+
+  /** One property the owner owns, or 404. */
+  async getProperty(ownerId: string, id: string) {
+    const [row] = await this.db
+      .select()
+      .from(properties)
+      .where(
+        and(
+          eq(properties.id, id),
+          eq(properties.ownerId, ownerId),
+          isNull(properties.deletedAt),
+        ),
+      )
+      .limit(1);
+    if (!row) throw OwnerErrors.propertyNotFound();
+    const covers = await this.coverPhotoUrls([row.id]);
+    return {
+      id: row.id,
+      name: row.name,
+      city: row.city,
+      state: row.state,
+      country: row.country,
+      status: row.status,
+      roomCount: row.roomCount,
+      listingCompleteness: row.listingCompleteness,
+      contact: row.contact,
+      address: row.address,
+      coverPhotoUrl: covers.get(row.id) ?? null,
+    };
+  }
+
+  /** Partial edit: only the provided fields change. Recomputes the listing score. */
+  async updateProperty(ownerId: string, id: string, dto: UpdatePropertyDto) {
+    await this.assertOwnedProperty(ownerId, id);
+    const [current] = await this.db
+      .select()
+      .from(properties)
+      .where(eq(properties.id, id))
+      .limit(1);
+
+    const patch: Partial<typeof properties.$inferInsert> = { updatedAt: new Date() };
+    if (dto.name !== undefined) patch.name = dto.name;
+    if (dto.city !== undefined) patch.city = dto.city;
+    if (dto.state !== undefined) patch.state = dto.state;
+    if (dto.address !== undefined) {
+      const country = dto.address.country ?? current.country ?? 'India';
+      patch.address = { ...dto.address, country } as never;
+      patch.country = country;
+    }
+    if (dto.phone !== undefined || dto.email !== undefined) {
+      const existing = (current.contact ?? {}) as { phone?: string; email?: string | null };
+      patch.contact = {
+        phone: dto.phone ?? existing.phone ?? '',
+        email: dto.email ?? existing.email ?? null,
+      } as never;
+    }
+
+    await this.db.update(properties).set(patch).where(eq(properties.id, id));
+    // Name / location / contact feed the listing-completeness score.
+    await this.propertiesService.recomputeCompleteness(id);
+    await this.audit.record({
+      action: 'owner.property.updated',
+      entity: 'property',
+      entityId: id,
+      actorId: ownerId,
+      after: patch,
+    });
+    return this.getProperty(ownerId, id);
+  }
+
+  /** Soft-delete (archive) a property the owner owns. Frees an allowance slot. */
+  async archiveProperty(ownerId: string, id: string) {
+    await this.assertOwnedProperty(ownerId, id);
+    await this.db
+      .update(properties)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(eq(properties.id, id));
+    await this.audit.record({
+      action: 'owner.property.archived',
+      entity: 'property',
+      entityId: id,
+      actorId: ownerId,
+    });
+    return { deleted: true, id };
   }
 
   /** Ensure the property belongs to this owner, else 404 (tenant isolation). */

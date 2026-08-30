@@ -51,9 +51,11 @@ function svcWith(over: {
   return {
     db,
     audit,
-    svc: new OwnerPortalService(db as never, photos as never, audit as never),
+    svc: new OwnerPortalService(db as never, photos as never, audit as never, propsStub as never),
   };
 }
+
+const propsStub = { recomputeCompleteness: async () => 0 };
 
 describe('OwnerPortalService.updateStaff — tenant scoping', () => {
   it('404s when the property is not held by this owner, without leaking membership', async () => {

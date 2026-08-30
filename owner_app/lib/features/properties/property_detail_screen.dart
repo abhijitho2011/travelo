@@ -99,7 +99,19 @@ class _Detail extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: context.colors.background,
-      appBar: AppBar(title: Text(property.name)),
+      appBar: AppBar(
+        title: Text(property.name),
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (v) {
+              if (v == 'archive') _confirmArchive(context, ref, property);
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'archive', child: Text('Archive property')),
+            ],
+          ),
+        ],
+      ),
       body: PageBody(
         onRefresh: () async {
           ref.invalidate(propertiesProvider);
@@ -192,11 +204,10 @@ class _Header extends StatelessWidget {
                 icon: Icons.bed_outlined,
                 label: '${p.roomCount} ${p.roomCount == 1 ? 'room' : 'rooms'}',
               ),
-              if (p.starRating > 0)
+              if (p.contactPhone.isNotEmpty)
                 MetaPill(
-                  icon: Icons.star_rounded,
-                  label: '${p.starRating}-star',
-                  tone: c.warning,
+                  icon: Icons.phone_outlined,
+                  label: p.contactPhone,
                 ),
             ],
           ),
@@ -690,6 +701,40 @@ class _PhotosState extends ConsumerState<_Photos> {
           },
         ),
       ],
+    );
+  }
+}
+
+/// Confirms and archives a property, then returns to the portfolio.
+Future<void> _confirmArchive(
+  BuildContext context,
+  WidgetRef ref,
+  Property property,
+) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text('Archive ${property.name}?'),
+      content: const Text(
+        'The hotel is hidden from your portfolio and frees an allowance slot. '
+        'Contact Tavelo to restore it.',
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Archive')),
+      ],
+    ),
+  );
+  if (ok != true) return;
+  try {
+    await ref.read(ownerRepositoryProvider).archiveProperty(property.id);
+    ref.invalidate(propertiesProvider);
+    ref.invalidate(portfolioProvider);
+    if (context.mounted) context.go('/properties');
+  } on ApiException catch (e) {
+    messenger.showSnackBar(
+      SnackBar(content: Text(e.message.isEmpty ? 'Could not archive.' : e.message)),
     );
   }
 }

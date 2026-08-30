@@ -42,7 +42,7 @@ void main() {
       'state': 'Kerala',
       'status': 'ACTIVE',
       'roomCount': 42,
-      'starRating': 4,
+      'contact': {'phone': '9895000000', 'email': 'stay@example.com'},
       'listingCompleteness': 100,
     }),
     Property.fromJson({

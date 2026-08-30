@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -20,7 +20,12 @@ import { stockMovementTypeValues } from '../../database/schema';
 
 export class ItemFilterDto {
   @IsOptional() @IsString() @Length(1, 64) category?: string;
-  @IsOptional() @Type(() => Boolean) @IsBoolean() lowStock?: boolean;
+  // `@Type(() => Boolean)` would coerce the string 'false' to true (any
+  // non-empty string is truthy). Parse the two literal query strings instead.
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  lowStock?: boolean;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(500) limit?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) offset?: number;
 }

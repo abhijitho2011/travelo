@@ -26,7 +26,7 @@ import {
   PropertyPhotosService,
   type UploadedPhoto,
 } from './property-photos.service';
-import { CreatePropertyDto, CreateStaffDto, SetStaffStatusDto, UpdateStaffDto } from './dto';
+import { CreatePropertyDto, CreateStaffDto, SetStaffStatusDto, UpdateStaffDto, UpdatePropertyDto } from './dto';
 
 @ApiTags('Owner Portal')
 @ApiBearerAuth()
@@ -52,6 +52,25 @@ export class OwnerPortalController {
   @Post('properties')
   createProperty(@CurrentOwner() owner: AuthenticatedOwner, @Body() dto: CreatePropertyDto) {
     return this.portal.createProperty(owner.id, dto);
+  }
+
+  @Get('properties/:id')
+  getProperty(@CurrentOwner() owner: AuthenticatedOwner, @Param('id') id: string) {
+    return this.portal.getProperty(owner.id, id);
+  }
+
+  @Patch('properties/:id')
+  updateProperty(
+    @CurrentOwner() owner: AuthenticatedOwner,
+    @Param('id') id: string,
+    @Body() dto: UpdatePropertyDto,
+  ) {
+    return this.portal.updateProperty(owner.id, id, dto);
+  }
+
+  @Delete('properties/:id')
+  archiveProperty(@CurrentOwner() owner: AuthenticatedOwner, @Param('id') id: string) {
+    return this.portal.archiveProperty(owner.id, id);
   }
 
   // ---------- Property photos ----------

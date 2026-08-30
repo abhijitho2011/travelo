@@ -24,6 +24,14 @@ class OwnerRepository {
     return (list as List).map((e) => Property.fromJson(e as Map)).toList();
   }
 
+  /// Partial edit of one property. Only the changed keys are sent.
+  Future<void> updateProperty(String propertyId, Map<String, dynamic> body) =>
+      _api.patch('/properties/$propertyId', body: body);
+
+  /// Archive (soft-delete) a property.
+  Future<void> archiveProperty(String propertyId) =>
+      _api.delete('/properties/$propertyId');
+
   /// Returns the id of the property that was just created, so photos can be
   /// uploaded against it.
   Future<String> createProperty(Map<String, dynamic> body) async {
