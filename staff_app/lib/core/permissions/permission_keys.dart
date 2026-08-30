@@ -83,6 +83,17 @@ class P {
   static const workOrderCancel = 'workorder.cancel';
   static const inventoryRead = 'inventory.read';
   static const inventoryRequest = 'inventory.request';
+  static const inventoryCreate = 'inventory.create';
+  static const inventoryUpdate = 'inventory.update';
+  static const stockRead = 'stock.read';
+  static const stockAdjust = 'stock.adjust';
+  static const supplierRead = 'supplier.read';
+  static const supplierCreate = 'supplier.create';
+  static const supplierUpdate = 'supplier.update';
+  static const poRead = 'po.read';
+  static const poCreate = 'po.create';
+  static const poUpdate = 'po.update';
+  static const poReceive = 'po.receive';
 
   // -------------------------------------------------------------- outlets --
   static const restaurantRead = 'restaurant.read';
@@ -120,9 +131,25 @@ class P {
   // ------------------------------------------------------------ transport --
   static const tripRead = 'trip.read';
   static const transportRead = 'transport.read';
+  static const transportCreate = 'transport.create';
+  static const transportUpdate = 'transport.update';
+  static const transportAssign = 'transport.assign';
+  static const transportDrive = 'transport.drive';
+  static const vehicleRead = 'vehicle.read';
+  static const vehicleCreate = 'vehicle.create';
+  static const vehicleUpdate = 'vehicle.update';
+
+  // -------------------------------------------------------------- accounts --
+  static const expenseRead = 'expense.read';
+  static const expenseCreate = 'expense.create';
+  static const expenseUpdate = 'expense.update';
 
   // ---------------------------------------------------------------- other --
   static const leadRead = 'lead.read';
+  static const leadCreate = 'lead.create';
+  static const leadUpdate = 'lead.update';
+  static const activityRead = 'activity.read';
+  static const activityCreate = 'activity.create';
   static const tourRead = 'tour.read';
   static const areaRead = 'area.read';
 }

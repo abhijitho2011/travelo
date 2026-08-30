@@ -703,15 +703,18 @@ class RoleConfig {
       ],
     ),
 
-    // ===================== Deferred modules (placeholders) ================
+    // ===================== Operations domains (BUILT) =====================
     StaffRole.accounts: _simple(
       StaffRole.accounts,
       Routes.accounts,
       'Accounts & Finance',
       'Accounts',
       Icons.account_balance_outlined,
+      built: true,
       requires: [P.financeRead],
       more: const [_bookingsMore],
+      // The expense register, reached from the dashboard.
+      extraRoutes: const {Routes.accountsExpenses},
     ),
     StaffRole.salesManager: _simple(
       StaffRole.salesManager,
@@ -719,8 +722,11 @@ class RoleConfig {
       'Sales CRM',
       'Sales',
       Icons.trending_up_outlined,
+      built: true,
       requires: [P.leadRead],
       more: const [_bookingsMore, _eventsMore],
+      // A lead opened from the pipeline board.
+      extraRoutes: const {Routes.salesLeadPattern},
     ),
     StaffRole.travelDesk: _simple(
       StaffRole.travelDesk,
@@ -728,8 +734,11 @@ class RoleConfig {
       'Travel Desk',
       'Travel desk',
       Icons.map_outlined,
-      requires: [P.tripRead],
+      built: true,
+      requires: [P.transportRead],
       more: const [_bookingsMore, _myTasksMore],
+      // The vehicle fleet, reached from the dashboard.
+      extraRoutes: const {Routes.travelDeskVehicles},
     ),
     StaffRole.housekeepingSupervisor: RoleConfig(
       role: StaffRole.housekeepingSupervisor,
@@ -881,7 +890,14 @@ class RoleConfig {
       'Inventory & Store',
       'Stock',
       Icons.inventory_2_outlined,
+      built: true,
       requires: [P.inventoryRead],
+      // Items, movements and the PO lifecycle, reached from the dashboard.
+      extraRoutes: const {
+        Routes.inventoryItems,
+        Routes.inventoryMovements,
+        Routes.inventoryPurchaseOrders,
+      },
     ),
     StaffRole.securityManager: _simple(
       StaffRole.securityManager,
@@ -930,8 +946,11 @@ class RoleConfig {
       'My Trips',
       'Trips',
       Icons.local_taxi_outlined,
-      requires: [P.tripRead],
+      built: true,
+      requires: [P.transportRead],
       more: const [_myTasksMore],
+      // A trip opened from the list.
+      extraRoutes: const {Routes.driverTripPattern},
     ),
     StaffRole.eventManager: _simple(
       StaffRole.eventManager,
