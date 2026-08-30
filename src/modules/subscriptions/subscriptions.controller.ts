@@ -30,6 +30,11 @@ class ExtendDto {
   @IsOptional() @IsIn(['expiry', 'now']) extendFrom?: 'expiry' | 'now';
 }
 
+class ChangePlanDto {
+  @IsUUID() planId!: string;
+  @IsOptional() @IsString() reason?: string;
+}
+
 class UpdateSubDto {
   @IsOptional() @IsUUID() planId?: string;
   @IsOptional() @IsIn(['MONTHLY', 'ANNUAL']) billingCycle?: 'MONTHLY' | 'ANNUAL';
@@ -81,6 +86,16 @@ export class SubscriptionsController {
   @RequirePermissions('subscription.edit')
   update(@Param('id') id: string, @Body() dto: UpdateSubDto) {
     return this.svc.update(id, dto);
+  }
+
+  /**
+   * Prorated plan change: credits the unused part of the current period against
+   * the new plan, then either reduces the amount due or extends the new period.
+   */
+  @Post(':id/change-plan')
+  @RequirePermissions('subscription.edit')
+  changePlan(@Param('id') id: string, @Body() dto: ChangePlanDto) {
+    return this.svc.changePlan(id, dto);
   }
 
   @Post(':id/extend')

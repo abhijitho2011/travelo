@@ -77,3 +77,53 @@ describe('SubscriptionsService.computePeriodEnd', () => {
     expect(() => SubscriptionsService.computePeriodEnd(start, 1.5)).toThrow();
   });
 });
+
+describe('SubscriptionsService.computeProration', () => {
+  const P = SubscriptionsService.computeProration;
+
+  it('credits the unused half of the period against an equal-priced new plan', () => {
+    // 30-day period, 15 days used → half remains. Both plans cost 300000.
+    const r = P({
+      now: new Date('2026-01-16T00:00:00Z'),
+      periodStart: new Date('2026-01-01T00:00:00Z'),
+      periodEnd: new Date('2026-01-31T00:00:00Z'),
+      currentPeriodTotalPaise: 300000,
+      newMonthlyPaise: 300000,
+      newDurationMonths: 1,
+    });
+    expect(r.creditPaise).toBe(150000); // half of 300000
+    expect(r.newCostPaise).toBe(300000);
+    expect(r.amountDuePaise).toBe(150000); // 300000 - 150000
+  });
+
+  it('charges the full new cost when nothing remains on the old period', () => {
+    const r = P({
+      now: new Date('2026-02-01T00:00:00Z'),
+      periodStart: new Date('2026-01-01T00:00:00Z'),
+      periodEnd: new Date('2026-01-31T00:00:00Z'),
+      currentPeriodTotalPaise: 300000,
+      newMonthlyPaise: 800000,
+      newDurationMonths: 1,
+    });
+    expect(r.creditPaise).toBe(0);
+    expect(r.amountDuePaise).toBe(800000);
+  });
+
+  it('extends the new period with leftover credit instead of charging or refunding', () => {
+    // Downgrade: big credit, cheap new plan. Credit exceeds new cost → 0 due,
+    // and the period is pushed out by the extra days the credit buys.
+    const r = P({
+      now: new Date('2026-01-02T00:00:00Z'),
+      periodStart: new Date('2026-01-01T00:00:00Z'),
+      periodEnd: new Date('2026-12-31T00:00:00Z'), // ~1 year left
+      currentPeriodTotalPaise: 3_600_000,
+      newMonthlyPaise: 100000,
+      newDurationMonths: 1,
+    });
+    expect(r.amountDuePaise).toBe(0);
+    expect(r.creditPaise).toBeGreaterThan(r.newCostPaise);
+    // The new period end is pushed well past a single month.
+    const oneMonth = new Date('2026-02-02T00:00:00Z');
+    expect(r.newPeriodEnd.getTime()).toBeGreaterThan(oneMonth.getTime());
+  });
+});

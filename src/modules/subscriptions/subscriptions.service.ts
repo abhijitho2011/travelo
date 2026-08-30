@@ -146,6 +146,128 @@ export class SubscriptionsService {
     return this.serialize(row);
   }
 
+  /**
+   * Prorated plan change (item 2.5).
+   *
+   * Credits the unused portion of the CURRENT period against the new plan's
+   * cost, then either shortens the amount due or — when the credit exceeds the
+   * new cost — extends the new period by the equivalent days. Pure so the maths
+   * is unit-tested without a database.
+   */
+  static computeProration(input: {
+    now: Date;
+    periodStart: Date;
+    periodEnd: Date;
+    currentPeriodTotalPaise: number;
+    newMonthlyPaise: number;
+    newDurationMonths: number;
+  }): {
+    creditPaise: number;
+    newCostPaise: number;
+    amountDuePaise: number;
+    newPeriodStart: Date;
+    newPeriodEnd: Date;
+  } {
+    const DAY = 86_400_000;
+    const totalDays = Math.max(1, Math.round((input.periodEnd.getTime() - input.periodStart.getTime()) / DAY));
+    const remainingDays = Math.min(
+      totalDays,
+      Math.max(0, Math.round((input.periodEnd.getTime() - input.now.getTime()) / DAY)),
+    );
+    const creditPaise = Math.round((input.currentPeriodTotalPaise * remainingDays) / totalDays);
+    const newCostPaise = input.newMonthlyPaise * input.newDurationMonths;
+
+    const newPeriodStart = input.now;
+    let newPeriodEnd = addMonths(newPeriodStart, input.newDurationMonths);
+    let amountDuePaise = newCostPaise - creditPaise;
+
+    if (amountDuePaise < 0) {
+      // Leftover credit buys extra days on the new plan rather than a refund.
+      const newPeriodDays = Math.max(1, Math.round((newPeriodEnd.getTime() - newPeriodStart.getTime()) / DAY));
+      const newDailyRate = newCostPaise / newPeriodDays;
+      const extraDays = newDailyRate > 0 ? Math.floor(-amountDuePaise / newDailyRate) : 0;
+      newPeriodEnd = new Date(newPeriodEnd.getTime() + extraDays * DAY);
+      amountDuePaise = 0;
+    }
+    return { creditPaise, newCostPaise, amountDuePaise, newPeriodStart, newPeriodEnd };
+  }
+
+  async changePlan(
+    id: string,
+    dto: { planId: string; reason?: string },
+    now: Date = new Date(),
+  ) {
+    const before = await this.get(id);
+    const [currentPlan] = await this.db
+      .select()
+      .from(subscriptionPlans)
+      .where(eq(subscriptionPlans.id, before.planId))
+      .limit(1);
+    const [newPlan] = await this.db
+      .select()
+      .from(subscriptionPlans)
+      .where(eq(subscriptionPlans.id, dto.planId))
+      .limit(1);
+    if (!newPlan) throw new NotFoundException('Target plan not found');
+    if (newPlan.id === before.planId) {
+      throw new BadRequestException('The subscription is already on that plan');
+    }
+
+    const currentPeriodTotalPaise =
+      before.priceOverride ??
+      (currentPlan ? currentPlan.monthlyPrice * currentPlan.durationMonths : 0);
+    const proration = SubscriptionsService.computeProration({
+      now,
+      periodStart: before.currentPeriodStart,
+      periodEnd: before.currentPeriodEnd,
+      currentPeriodTotalPaise,
+      newMonthlyPaise: newPlan.monthlyPrice,
+      newDurationMonths: newPlan.durationMonths,
+    });
+
+    const cycle: BillingCycle = newPlan.durationMonths % 12 === 0 ? 'ANNUAL' : 'MONTHLY';
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(subscriptions)
+        .set({
+          planId: newPlan.id,
+          billingCycle: cycle,
+          // The new plan carries its own pricing — any bespoke override from the
+          // old plan is cleared so it cannot bleed into the new one.
+          priceOverride: null,
+          currentPeriodStart: proration.newPeriodStart,
+          currentPeriodEnd: proration.newPeriodEnd,
+          status: 'ACTIVE',
+          updatedAt: now,
+        })
+        .where(eq(subscriptions.id, id));
+      await tx.insert(subscriptionEvents).values({
+        subscriptionId: id,
+        type: 'plan_changed',
+        actorAdminId: getRequestContext()?.adminId ?? null,
+        payload: {
+          fromPlanId: before.planId,
+          toPlanId: newPlan.id,
+          creditPaise: proration.creditPaise,
+          newCostPaise: proration.newCostPaise,
+          amountDuePaise: proration.amountDuePaise,
+          reason: dto.reason ?? null,
+        } as never,
+      });
+    });
+
+    const after = await this.get(id);
+    await this.audit.record({
+      action: 'subscription.plan_changed',
+      entity: 'subscription',
+      entityId: id,
+      before,
+      after,
+      reason: dto.reason,
+    });
+    return { ...after, proration };
+  }
+
   async update(
     id: string,
     dto: Partial<{
