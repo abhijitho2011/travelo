@@ -270,3 +270,34 @@ export type MenuCategory = typeof menuCategories.$inferSelect;
 export type MenuItem = typeof menuItems.$inferSelect;
 export type RestaurantOrder = typeof restaurantOrders.$inferSelect;
 export type OrderItem = typeof orderItems.$inferSelect;
+
+/**
+ * A menu item's recipe — which inventory items one serving consumes, and how
+ * much. Settling a restaurant order posts an OUT stock movement per recipe line
+ * so on-hand tracks reality (Phase 4, item 4.9).
+ */
+export const menuItemRecipes = pgTable(
+  'menu_item_recipes',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    propertyId: uuid('property_id')
+      .notNull()
+      .references(() => properties.id, { onDelete: 'cascade' }),
+    menuItemId: uuid('menu_item_id')
+      .notNull()
+      .references(() => menuItems.id, { onDelete: 'cascade' }),
+    inventoryItemId: uuid('inventory_item_id').notNull(),
+    qtyPerUnit: integer('qty_per_unit').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    itemIngredientUnique: uniqueIndex('menu_item_recipes_item_ingredient_unique').on(
+      t.menuItemId,
+      t.inventoryItemId,
+    ),
+  }),
+);
+
+export type MenuItemRecipe = typeof menuItemRecipes.$inferSelect;

@@ -13,6 +13,8 @@ import {
 import { TablesService } from './tables.service';
 import { MenuService } from './menu.service';
 import { OrdersService } from './orders.service';
+import { RecipesService } from './recipes.service';
+import { StaffRecipesController } from './staff-recipes.controller';
 import { FolioModule } from '../folio/folio.module';
 import { EntitlementsModule } from '../entitlements/entitlements.module';
 import { FeatureGuard } from '../../common/guards/feature.guard';
@@ -26,6 +28,7 @@ import { FeatureGuard } from '../../common/guards/feature.guard';
 @Module({
   imports: [JwtModule.register({}), SharedAuthModule, FolioModule, EntitlementsModule],
   controllers: [
+    StaffRecipesController,
     StaffRestaurantTablesController,
     StaffRestaurantMenuController,
     StaffRestaurantKitchenController,
@@ -36,6 +39,7 @@ import { FeatureGuard } from '../../common/guards/feature.guard';
     TablesService,
     MenuService,
     OrdersService,
+    RecipesService,
     StaffJwtGuard,
     StaffPermissionsGuard,
     FeatureGuard,

@@ -1,9 +1,10 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { and, asc, desc, eq, gte, inArray, sql, SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, ne, sql, SQL } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import {
   menuItems,
+  menuItemRecipes,
   orderItems,
   reservations,
   restaurantOrders,
@@ -33,6 +34,7 @@ import {
 } from './restaurant-rules';
 import { TablesService, type Tx } from './tables.service';
 import { FolioService } from '../folio/folio.service';
+import { ItemsService } from '../inventory/items.service';
 
 const MAX_LIMIT = 200;
 /** Order numbers are derived from a count; a concurrent create can race. */
@@ -60,6 +62,7 @@ const NUMBER_ATTEMPTS = 5;
  */
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly config: ConfigService,
@@ -403,6 +406,67 @@ export class OrdersService {
 
   // ---------- Settle ----------
 
+  /**
+   * Posts an OUT stock movement for every recipe line of every menu item on the
+   * order, scaled by the line quantity. Tolerant: a movement that would go
+   * negative is skipped (logged), never blocking the sale.
+   */
+  private async depleteStock(
+    tx: Tx,
+    propertyId: string,
+    orderId: string,
+    settledByStaffId: string | null,
+  ): Promise<void> {
+    const lines = await tx
+      .select({ menuItemId: orderItems.menuItemId, qty: orderItems.qty })
+      .from(orderItems)
+      .where(and(eq(orderItems.orderId, orderId), ne(orderItems.kotStatus, 'CANCELLED')));
+    const menuItemIds = [...new Set(lines.map((l) => l.menuItemId).filter((x): x is string => !!x))];
+    if (menuItemIds.length === 0) return;
+
+    const recipes = await tx
+      .select()
+      .from(menuItemRecipes)
+      .where(
+        and(
+          eq(menuItemRecipes.propertyId, propertyId),
+          inArray(menuItemRecipes.menuItemId, menuItemIds),
+        ),
+      );
+    if (recipes.length === 0) return;
+
+    const byMenuItem = new Map<string, typeof recipes>();
+    for (const r of recipes) {
+      const list = byMenuItem.get(r.menuItemId) ?? [];
+      list.push(r);
+      byMenuItem.set(r.menuItemId, list);
+    }
+
+    for (const line of lines) {
+      if (!line.menuItemId) continue;
+      const forItem = byMenuItem.get(line.menuItemId);
+      if (!forItem) continue;
+      for (const r of forItem) {
+        const consumed = r.qtyPerUnit * line.qty;
+        if (consumed <= 0) continue;
+        try {
+          await ItemsService.applyMovement(tx as never, {
+            propertyId,
+            itemId: r.inventoryItemId,
+            type: 'OUT',
+            qty: consumed,
+            reason: `Consumed by restaurant order ${orderId}`,
+            createdBy: settledByStaffId ?? undefined,
+          });
+        } catch (err) {
+          this.logger.warn(
+            `Stock depletion skipped for item ${r.inventoryItemId} on order ${orderId}: ${(err as Error).message}`,
+          );
+        }
+      }
+    }
+  }
+
   async settle(
     propertyId: string,
     orderId: string,
@@ -462,6 +526,11 @@ export class OrdersService {
           tx,
         );
       }
+      // Deplete stock for anything with a recipe. Best-effort: a sold dish is
+      // never blocked by inventory tracking, so a line that would drive stock
+      // negative is skipped and logged rather than failing the settle.
+      await this.depleteStock(tx, propertyId, orderId, settledByStaffId);
+
       // Settling frees the table back to OPEN for the next cover.
       if (order.tableId) await TablesService.setStatus(tx, order.tableId, 'OPEN');
 
