@@ -10,6 +10,7 @@ import {
 } from './staff-reservations.controller';
 import { DeskService } from './desk.service';
 import { ReservationsService } from './reservations.service';
+import { FolioModule } from '../folio/folio.module';
 
 /**
  * The booking engine. One module, one staff surface:
@@ -23,7 +24,7 @@ import { ReservationsService } from './reservations.service';
  * exactly one definition of each.
  */
 @Module({
-  imports: [JwtModule.register({}), SharedAuthModule],
+  imports: [JwtModule.register({}), SharedAuthModule, FolioModule],
   controllers: [StaffReservationsController, StaffDeskController, StaffDashboardController],
   providers: [ReservationsService, DeskService, StaffJwtGuard, StaffPermissionsGuard],
   exports: [ReservationsService, DeskService],

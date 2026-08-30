@@ -42,6 +42,19 @@ export const ReservationErrors = {
       HttpStatus.CONFLICT,
     ),
 
+  /**
+   * The checkout gate. A guest cannot depart owing money unless a staff member
+   * explicitly overrides with `allowOutstanding`. The balance rides on the
+   * message so the desk sees exactly what is due.
+   */
+  balanceOutstanding: (balancePaise: number) =>
+    reservationError(
+      'BALANCE_OUTSTANDING',
+      `Cannot check out: ₹${(balancePaise / 100).toFixed(2)} is still outstanding on the folio. ` +
+        'Collect it, or check out with an explicit outstanding-balance override.',
+      HttpStatus.CONFLICT,
+    ),
+
   /** A room whose housekeeping state makes it unusable right now. */
   roomNotReady: (number: string, status: string) =>
     reservationError(

@@ -25,6 +25,7 @@ import {
   CancelReservationDto,
   CheckInDto,
   CheckOutDto,
+  CollectPaymentDto,
   CreateReservationDto,
   NoShowDto,
   ReservationFilterDto,
@@ -198,6 +199,87 @@ export class StaffReservationsController {
       actorRole: me.role,
     });
     return res;
+  }
+
+  /** The itemised folio for a stay: room, ancillary charges, payments, balance. */
+  @Get(':id/folio')
+  @RequireStaffPermissions('folio.read')
+  folio(@CurrentStaff() me: AuthenticatedStaff, @Param('id') id: string) {
+    return this.reservations.folioFor(me.propertyId, id);
+  }
+
+  /**
+   * Take a payment against a stay's folio, out of band from checkout — an
+   * advance at booking, a mid-stay top-up, a partial settlement. Idempotent by
+   * key so a tablet double-tap never charges twice.
+   */
+  @Post(':id/payments')
+  @RequireStaffPermissions('payment.collect')
+  async collectPayment(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @Body() dto: CollectPaymentDto,
+  ) {
+    const out = await this.reservations.collectPayment(
+      me.propertyId,
+      id,
+      {
+        method: dto.method,
+        amountPaise: dto.amountPaise,
+        direction: 'PAYMENT',
+        reference: dto.reference,
+        note: dto.note,
+        idempotencyKey: dto.idempotencyKey,
+      },
+      me.id,
+    );
+    await this.audit.record({
+      action: 'staff.folio.payment',
+      entity: 'reservation',
+      entityId: id,
+      after: { method: dto.method, amountPaise: dto.amountPaise, balancePaise: out.balancePaise },
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return out;
+  }
+
+  /**
+   * Record a refund against a stay's folio. Deliberately a SEPARATE route
+   * behind the stronger `payment.refund` — returning money is not something the
+   * receptionist who can only take it should be able to do.
+   */
+  @Post(':id/refunds')
+  @RequireStaffPermissions('payment.refund')
+  async refundPayment(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @Body() dto: CollectPaymentDto,
+  ) {
+    const out = await this.reservations.collectPayment(
+      me.propertyId,
+      id,
+      {
+        method: dto.method,
+        amountPaise: dto.amountPaise,
+        direction: 'REFUND',
+        reference: dto.reference,
+        note: dto.note,
+        idempotencyKey: dto.idempotencyKey,
+      },
+      me.id,
+    );
+    await this.audit.record({
+      action: 'staff.folio.refund',
+      entity: 'reservation',
+      entityId: id,
+      after: { method: dto.method, amountPaise: dto.amountPaise, balancePaise: out.balancePaise },
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return out;
   }
 
   @Post(':id/cancel')

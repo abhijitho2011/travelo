@@ -201,12 +201,13 @@ export class FolioService {
    * checkout gate reads. Positive means the guest still owes money.
    */
   async balancePaise(reservationId: string, roomTotalPaise: number, tx: FolioTx): Promise<number> {
-    const [{ ancillary }] = await tx
+    const ancRows = await tx
       .select({
         ancillary: sql<number>`coalesce(sum(${folioLineItems.amountPaise}), 0)::int`,
       })
       .from(folioLineItems)
       .where(eq(folioLineItems.reservationId, reservationId));
+    const ancillary = ancRows[0]?.ancillary ?? 0;
     const net = await this.netPaid(reservationId, tx);
     return roomTotalPaise + ancillary - net;
   }
@@ -214,13 +215,13 @@ export class FolioService {
   // --------------------------------------------------------------- helpers ---
 
   private async netPaid(reservationId: string, tx: FolioTx): Promise<number> {
-    const [{ net }] = await tx
+    const rows = await tx
       .select({
         net: sql<number>`coalesce(sum(case when ${folioPayments.direction} = 'REFUND' then -${folioPayments.amountPaise} else ${folioPayments.amountPaise} end), 0)::int`,
       })
       .from(folioPayments)
       .where(eq(folioPayments.reservationId, reservationId));
-    return net;
+    return rows[0]?.net ?? 0;
   }
 
   private async findLineBySource(

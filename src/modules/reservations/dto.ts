@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
@@ -10,7 +11,14 @@ import {
   Max,
   Min,
 } from 'class-validator';
-import { reservationSourceValues, reservationStatusValues } from '../../database/schema';
+import {
+  folioPaymentDirectionValues,
+  folioPaymentMethodValues,
+  reservationSourceValues,
+  reservationStatusValues,
+  type FolioPaymentDirection,
+  type FolioPaymentMethod,
+} from '../../database/schema';
 
 /** `YYYY-MM-DD`. The one date shape this module accepts — see reservation-rules. */
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -115,10 +123,41 @@ export class CheckInDto {
 }
 
 export class CheckOutDto {
-  /** Paise collected at departure, added to `paidPaise`. */
+  /** Paise collected at departure — recorded as a folio payment. */
   @IsOptional() @IsInt() @Min(0) @Max(100_000_000) collectedPaise?: number;
 
+  /** How that money came in. Defaults to CASH. */
+  @IsOptional() @IsIn(folioPaymentMethodValues) paymentMethod?: FolioPaymentMethod;
+
+  /** Receipt/txn reference for the collected payment. */
+  @IsOptional() @IsString() @Length(0, 120) reference?: string;
+
+  /**
+   * Explicit override: check the guest out even though the folio still shows an
+   * outstanding balance (bill-to-company, dispute, comp). Recorded on the event.
+   */
+  @IsOptional() @IsBoolean() allowOutstanding?: boolean;
+
+  /** Idempotency for the collected payment — a double-tap never charges twice. */
+  @IsOptional() @IsString() @Length(1, 80) idempotencyKey?: string;
+
   @IsOptional() @IsString() @Length(0, 500) note?: string;
+}
+
+export class CollectPaymentDto {
+  @IsIn(folioPaymentMethodValues) method!: FolioPaymentMethod;
+
+  /** Paise, always positive; `direction` carries the sign. */
+  @IsInt() @Min(1) @Max(100_000_000) amountPaise!: number;
+
+  /** PAYMENT (default) collects; REFUND returns money to the guest. */
+  @IsOptional() @IsIn(folioPaymentDirectionValues) direction?: FolioPaymentDirection;
+
+  @IsOptional() @IsString() @Length(0, 120) reference?: string;
+
+  @IsOptional() @IsString() @Length(0, 500) note?: string;
+
+  @IsOptional() @IsString() @Length(1, 80) idempotencyKey?: string;
 }
 
 export class CancelReservationDto {

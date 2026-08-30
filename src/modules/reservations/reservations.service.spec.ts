@@ -1,5 +1,6 @@
 import { mockDb, sqlText, type MockDb } from '../owner-auth/testing/db.mock';
 import { ReservationsService } from './reservations.service';
+import { FolioService } from '../folio/folio.service';
 import type { Database } from '../../database/database.module';
 
 const MY_PROPERTY = 'prop-mine';
@@ -8,7 +9,7 @@ const ROOM_ID = '22222222-2222-4222-8222-222222222222';
 const STAFF_ID = 'staff-1';
 
 function svc(db: MockDb) {
-  return new ReservationsService(db as unknown as Database);
+  return new ReservationsService(db as unknown as Database, new FolioService(db as unknown as Database));
 }
 
 const typeRow = {
@@ -354,7 +355,8 @@ describe('ReservationsService — check-out, cancel and no-show', () => {
       },
       update: { reservations: [resRow({ status: 'CHECKED_OUT', roomId: ROOM_ID })] },
     });
-    await svc(db).checkOut(MY_PROPERTY, 'res-1', {}, STAFF_ID);
+    // The stay has a balance; an explicit override lets it check out anyway.
+    await svc(db).checkOut(MY_PROPERTY, 'res-1', { allowOutstanding: true }, STAFF_ID);
 
     // Housekeeping owns the next step. AVAILABLE here would sell an unmade room.
     expect(db.updates.find((u) => u.table === 'rooms')?.values).toMatchObject({
@@ -362,18 +364,44 @@ describe('ReservationsService — check-out, cancel and no-show', () => {
     });
   });
 
-  it('adds money collected at the desk to what has been paid', async () => {
+  it('records money collected at the desk as a folio payment and refreshes paid', async () => {
     const db = mockDb({
       select: {
         reservations: [[resRow({ status: 'CHECKED_IN', paidPaise: 500_000 })]],
         room_types: [[]],
+        // recordPayment.netPaid, then the gate's netPaid — both fully paid now.
+        folio_payments: [[{ net: 1_350_000 }], [{ net: 1_350_000 }]],
+        folio_line_items: [[{ ancillary: 0 }]],
       },
+      insert: { folio_payments: [{ id: 'fp-1', direction: 'PAYMENT', amountPaise: 850_000 }] },
       update: { reservations: [resRow({ status: 'CHECKED_OUT' })] },
     });
+    // Room total 1,350,000 fully covered → no override needed, gate passes.
     await svc(db).checkOut(MY_PROPERTY, 'res-1', { collectedPaise: 850_000 }, STAFF_ID);
+    // A folio payment row was written for the collected amount...
+    expect(db.inserts.find((i) => i.table === 'folio_payments')?.values).toMatchObject({
+      amountPaise: 850_000,
+      method: 'CASH',
+    });
+    // ...and the reservation's paid cache was refreshed to the net.
     expect(db.updates.find((u) => u.table === 'reservations')?.values).toMatchObject({
       paidPaise: 1_350_000,
     });
+  });
+
+  it('refuses checkout when the folio still shows a balance and no override', async () => {
+    const db = mockDb({
+      select: {
+        reservations: [[resRow({ status: 'CHECKED_IN' })]], // room 1,350,000, paid 0
+        folio_line_items: [[{ ancillary: 0 }]],
+        folio_payments: [[{ net: 0 }]],
+      },
+    });
+    await expect(svc(db).checkOut(MY_PROPERTY, 'res-1', {}, STAFF_ID)).rejects.toMatchObject({
+      response: { error: 'BALANCE_OUTSTANDING' },
+    });
+    // The status was never flipped.
+    expect(db.updates.find((u) => u.table === 'reservations')).toBeUndefined();
   });
 
   it('refuses to check out someone who never checked in', async () => {
@@ -449,5 +477,34 @@ describe('ReservationsService — list filters', () => {
     const db = mockDb({ select: { reservations: [[], [{ count: 0 }]] } });
     await svc(db).list(MY_PROPERTY);
     expect(sqlText(db.wheresFor('reservations')[0])).toContain(MY_PROPERTY);
+  });
+});
+
+describe('ReservationsService.collectPayment — out-of-band folio money', () => {
+  it('records a payment against the folio and returns the refreshed balance', async () => {
+    const db = mockDb({
+      select: {
+        reservations: [[resRow({ status: 'CHECKED_IN' })]], // room 1,350,000
+        folio_payments: [[{ net: 300_000 }]], // netPaid after this payment
+        folio_line_items: [[]], // no ancillary
+        folio_payments_summary: [[]],
+      },
+      insert: { folio_payments: [{ id: 'fp-1', direction: 'PAYMENT', amountPaise: 300_000 }] },
+      update: { reservations: [resRow({ status: 'CHECKED_IN', paidPaise: 300_000 })] },
+    });
+    const out = await svc(db).collectPayment(
+      MY_PROPERTY,
+      'res-1',
+      { method: 'UPI', amountPaise: 300_000 },
+      STAFF_ID,
+    );
+    expect(out.netPaidPaise).toBe(300_000);
+    // balance = room 1,350,000 + ancillary 0 - net 300,000
+    expect(out.balancePaise).toBe(1_050_000);
+    expect(db.inserts.find((i) => i.table === 'folio_payments')?.values).toMatchObject({
+      method: 'UPI',
+      direction: 'PAYMENT',
+      amountPaise: 300_000,
+    });
   });
 });

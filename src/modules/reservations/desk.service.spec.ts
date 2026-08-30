@@ -1,6 +1,7 @@
 import { mockDb, sqlText, type MockDb } from '../owner-auth/testing/db.mock';
 import { DeskService } from './desk.service';
 import { ReservationsService } from './reservations.service';
+import { FolioService } from '../folio/folio.service';
 import type { Database } from '../../database/database.module';
 import type { RoomStatus } from '../../database/schema';
 
@@ -9,7 +10,7 @@ const MY_PROPERTY = 'prop-mine';
 function svc(db: MockDb) {
   return new DeskService(
     db as unknown as Database,
-    new ReservationsService(db as unknown as Database),
+    new ReservationsService(db as unknown as Database, new FolioService(db as unknown as Database)),
   );
 }
 

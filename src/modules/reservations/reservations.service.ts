@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, gt, inArray, isNull, lt, ne, or, sql, SQL } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
+import { FolioService } from '../folio/folio.service';
 import {
   OCCUPYING_STATUSES,
   reservationEvents,
@@ -62,7 +63,10 @@ type Tx = Pick<Database, 'select' | 'insert' | 'update' | 'delete'>;
  */
 @Injectable()
 export class ReservationsService {
-  constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Database,
+    private readonly folio: FolioService,
+  ) {}
 
   // ---------- Shared predicates ----------
 
@@ -708,12 +712,35 @@ export class ReservationsService {
     const before = await this.requireReservation(propertyId, id);
     assertTransition(before.status, 'CHECKED_OUT');
 
+    // 1) Collect anything handed over at the desk FIRST, as a folio payment, so
+    //    that even a checkout blocked by the gate below keeps the money on
+    //    record. Idempotent by key: a tablet double-tap never charges twice.
+    if (dto.collectedPaise && dto.collectedPaise > 0) {
+      await this.folio.recordPayment({
+        reservationId: id,
+        propertyId,
+        method: dto.paymentMethod ?? 'CASH',
+        amountPaise: dto.collectedPaise,
+        reference: dto.reference ?? null,
+        collectedBy: actorStaffId,
+        idempotencyKey: dto.idempotencyKey ?? null,
+      });
+    }
+
+    // 2) THE GATE. The authoritative balance is room + ancillary − net paid. A
+    //    guest cannot depart owing money unless a staff member explicitly
+    //    overrides, and that override is recorded on the event and the audit.
+    const balancePaise = await this.folio.balancePaise(id, before.totalPaise, this.db);
+    const overrode = balancePaise > 0 && !!dto.allowOutstanding;
+    if (balancePaise > 0 && !dto.allowOutstanding) {
+      throw ReservationErrors.balanceOutstanding(balancePaise);
+    }
+
     const row = await this.db.transaction(async (tx) => {
       const handle = tx as unknown as Tx;
-      const paidPaise = before.paidPaise + (dto.collectedPaise ?? 0);
       const [updated] = await handle
         .update(reservations)
-        .set({ status: 'CHECKED_OUT', checkedOutAt: now, paidPaise, updatedAt: now })
+        .set({ status: 'CHECKED_OUT', checkedOutAt: now, updatedAt: now })
         .where(eq(reservations.id, id))
         .returning();
 
@@ -737,14 +764,61 @@ export class ReservationsService {
       await ReservationsService.recordEvent(handle, id, 'checked_out', actorStaffId, {
         roomId: before.roomId,
         collectedPaise: dto.collectedPaise ?? 0,
-        balancePaise: before.totalPaise - paidPaise,
+        balancePaise,
+        outstandingOverride: overrode,
         note: dto.note ?? null,
       });
       return updated;
     });
 
     const [after] = await this.hydrate([row]);
-    return { previousStatus: before.status, ...after };
+    return { previousStatus: before.status, ...after, balancePaise, outstandingOverride: overrode };
+  }
+
+  /**
+   * Records a payment or refund on a stay's folio, out of band from checkout —
+   * an advance at booking, a mid-stay top-up, a partial settlement. Resolves the
+   * reservation by (id, property) first, so one hotel can never touch another's
+   * folio. Returns the payment and the refreshed balance.
+   */
+  async collectPayment(
+    propertyId: string,
+    id: string,
+    input: {
+      method: import('../../database/schema').FolioPaymentMethod;
+      amountPaise: number;
+      direction?: import('../../database/schema').FolioPaymentDirection;
+      reference?: string | null;
+      note?: string | null;
+      idempotencyKey?: string | null;
+    },
+    actorStaffId: string | null,
+  ) {
+    const before = await this.requireReservation(propertyId, id);
+    const { payment, netPaidPaise } = await this.folio.recordPayment({
+      reservationId: id,
+      propertyId,
+      method: input.method,
+      amountPaise: input.amountPaise,
+      direction: input.direction,
+      reference: input.reference ?? null,
+      note: input.note ?? null,
+      collectedBy: actorStaffId,
+      idempotencyKey: input.idempotencyKey ?? null,
+    });
+    const balancePaise = before.totalPaise + (await this.folioAncillary(id)) - netPaidPaise;
+    return { payment, netPaidPaise, balancePaise };
+  }
+
+  /** The full itemised folio for one stay — resolved by (id, property) first. */
+  async folioFor(propertyId: string, id: string) {
+    await this.requireReservation(propertyId, id);
+    return this.folio.summary(id);
+  }
+
+  private async folioAncillary(reservationId: string): Promise<number> {
+    const summary = await this.folio.summary(reservationId);
+    return summary.ancillaryPaise;
   }
 
   /** PENDING/CONFIRMED → CANCELLED, reason recorded on the event. */
