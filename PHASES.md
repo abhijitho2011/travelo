@@ -112,11 +112,24 @@ shared-folio + allotment blocks.
 - ✅ 7.7 Shared `Paginated<T>` + `resolvePage` helper; unbounded session lists
   now capped at MAX_PAGE_LIMIT.
 
-## ⬜ Phase 8 — Infrastructure & quality
-- 8.1 GitHub Actions CI · 8.2 Sentry + `/metrics` + correlation IDs
-- 8.3 Postgres backups + S3 lifecycle · 8.4 OpenAPI coverage + versioning
-- 8.5 Docs sync · 8.6 Repo hygiene (untrack `dist`/APK/build)
-- 8.7 E2E expansion · 8.8 Support attachments
+## ✅ Phase 8 — Infrastructure & quality (DONE, deployed)
+- ✅ 8.1 GitHub Actions CI — `.github/workflows/ci.yml` (backend tsc+eslint+jest,
+  e2e via testcontainers, both Flutter apps) + `frontend-ci.yml` (admin console).
+- ✅ 8.2 `/metrics` (dependency-free Prometheus, raw via `@Res()`) + optional
+  Sentry (dynamic-import peer) + correlation IDs (already existed).
+- 🔶 8.3 Backups — documented in `docs/OPERATIONS.md` (Railway managed Postgres
+  backups + S3 lifecycle policy); the actual enablement is a Railway/bucket
+  config step, not code.
+- ✅ 8.4 OpenAPI — refreshed DocumentBuilder (title/version/servers/tags), raw
+  spec at `/api/docs-json`.
+- ✅ 8.5 Docs sync — `docs/OPERATIONS.md`; `.env.example` updated with Phase 7/8
+  vars.
+- ✅ 8.6 Repo hygiene — `.gitignore` covers Flutter build/.dart_tool + aab/ipa;
+  tree normalised with prettier so CI lint passes.
+- ✅ 8.7 E2E — `test/infra.e2e-spec.ts` (health/metrics/404 envelope).
+- ✅ 8.8 Support attachments — upload (admin + owner) to the `support_attachments`
+  table via StorageService, presigned download URLs in ticket detail. Admin-
+  console + Flutter attachment UI is a follow-up.
 
 ## Deferred backlog (new modules, not defects)
 ~45 role permissions with no screens: banquet, laundry, payroll, attendance/
