@@ -13,6 +13,7 @@ import {
 import { TablesService } from './tables.service';
 import { MenuService } from './menu.service';
 import { OrdersService } from './orders.service';
+import { FolioModule } from '../folio/folio.module';
 
 /**
  * Restaurant / F&B — one module, one staff surface under
@@ -21,7 +22,7 @@ import { OrdersService } from './orders.service';
  * settlement path; nothing here mutates a booking.
  */
 @Module({
-  imports: [JwtModule.register({}), SharedAuthModule],
+  imports: [JwtModule.register({}), SharedAuthModule, FolioModule],
   controllers: [
     StaffRestaurantTablesController,
     StaffRestaurantMenuController,

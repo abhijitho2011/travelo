@@ -1,6 +1,7 @@
 import { mockDb, type MockDb } from '../owner-auth/testing/db.mock';
 import { OrdersService } from './orders.service';
 import { TablesService } from './tables.service';
+import { FolioService } from '../folio/folio.service';
 import type { Database } from '../../database/database.module';
 import type { ConfigService } from '@nestjs/config';
 
@@ -11,7 +12,8 @@ const config = (taxPercent: number = 5) => ({ get: () => taxPercent }) as unknow
 
 function svc(db: MockDb, taxPercent = 5) {
   const tables = new TablesService(db as unknown as Database);
-  return new OrdersService(db as unknown as Database, config(taxPercent), tables);
+  const folio = new FolioService(db as unknown as Database);
+  return new OrdersService(db as unknown as Database, config(taxPercent), tables, folio);
 }
 
 const orderRow = (over: Record<string, unknown> = {}) => ({
@@ -321,15 +323,29 @@ describe('OrdersService — settle + ROOM_CHARGE validation', () => {
         reservations: [[{ id: 'res-1', status: 'CHECKED_IN' }]],
         order_items: [[itemRow()]],
         restaurant_tables: [[tableRow()]],
+        folio_line_items: [[]], // findLineBySource → none yet
       },
     });
-    await svc(db).settle(MY, 'ord-1', { method: 'ROOM_CHARGE', reservationId: 'res-1' }, STAFF);
+    await svc(db).settle(
+      MY,
+      'ord-1',
+      { method: 'ROOM_CHARGE', reservationId: 'res-1' },
+      STAFF,
+    );
     const update = db.updates.find(
       (u) => u.table === 'restaurant_orders' && u.values?.status === 'PAID',
     );
     expect(update?.values).toMatchObject({
       paymentMethod: 'ROOM_CHARGE',
       reservationId: 'res-1',
+    });
+    // The charge POSTS to the guest folio, tagged with the order as its source.
+    const folioPost = db.inserts.find((i) => i.table === 'folio_line_items');
+    expect(folioPost?.values).toMatchObject({
+      reservationId: 'res-1',
+      kind: 'RESTAURANT',
+      sourceType: 'restaurant_order',
+      sourceId: 'ord-1',
     });
   });
 

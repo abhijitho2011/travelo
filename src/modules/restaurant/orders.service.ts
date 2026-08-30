@@ -32,6 +32,7 @@ import {
   roleMaySetKot,
 } from './restaurant-rules';
 import { TablesService, type Tx } from './tables.service';
+import { FolioService } from '../folio/folio.service';
 
 const MAX_LIMIT = 200;
 /** Order numbers are derived from a count; a concurrent create can race. */
@@ -63,6 +64,7 @@ export class OrdersService {
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly config: ConfigService,
     private readonly tables: TablesService,
+    private readonly folio: FolioService,
   ) {}
 
   private taxPercent(): number {
@@ -441,6 +443,25 @@ export class OrdersService {
           updatedAt: new Date(),
         })
         .where(eq(restaurantOrders.id, orderId));
+
+      // ROOM_CHARGE now POSTS to the guest folio, so the amount rides the stay
+      // balance and is collected at checkout. Idempotent by (source, orderId):
+      // a retried settle never double-charges. Deferred no longer.
+      if (reservationId) {
+        await this.folio.postCharge(
+          {
+            reservationId,
+            propertyId,
+            kind: 'RESTAURANT',
+            description: `Restaurant ${order.orderNumber}`,
+            amountPaise: order.totalPaise,
+            sourceType: 'restaurant_order',
+            sourceId: order.id,
+            postedBy: settledByStaffId,
+          },
+          tx,
+        );
+      }
       // Settling frees the table back to OPEN for the next cover.
       if (order.tableId) await TablesService.setStatus(tx, order.tableId, 'OPEN');
 

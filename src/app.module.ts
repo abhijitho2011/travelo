@@ -19,6 +19,7 @@ import { PropertiesModule } from './modules/properties/properties.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { RoomsModule } from './modules/rooms/rooms.module';
 import { ReservationsModule } from './modules/reservations/reservations.module';
+import { FolioModule } from './modules/folio/folio.module';
 import { HousekeepingModule } from './modules/housekeeping/housekeeping.module';
 import { RestaurantModule } from './modules/restaurant/restaurant.module';
 import { SpaModule } from './modules/spa/spa.module';
@@ -101,6 +102,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     StaffModule,
     RoomsModule,
     ReservationsModule,
+    FolioModule,
     HousekeepingModule,
     RestaurantModule,
     SpaModule,

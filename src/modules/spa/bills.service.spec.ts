@@ -1,12 +1,13 @@
 import { mockDb } from '../owner-auth/testing/db.mock';
 import { SpaBillsService } from './bills.service';
+import { FolioService } from '../folio/folio.service';
 import type { Database } from '../../database/database.module';
 import type { ConfigService } from '@nestjs/config';
 
 const MY = 'prop-mine';
 const config = (taxPercent = 5) => ({ get: () => taxPercent }) as unknown as ConfigService;
 const svc = (db: ReturnType<typeof mockDb>, tax = 5) =>
-  new SpaBillsService(db as unknown as Database, config(tax));
+  new SpaBillsService(db as unknown as Database, config(tax), new FolioService(db as unknown as Database));
 
 const apptRow = (over: Record<string, unknown> = {}) => ({
   id: 'appt-1',
@@ -109,12 +110,22 @@ describe('SpaBillsService', () => {
         select: {
           spa_bills: [[billRow()]],
           reservations: [[{ id: 'res-1', status: 'CHECKED_IN' }]],
+          spa_appointments: [[{ name: 'Deep Tissue' }]],
+          folio_line_items: [[]], // findLineBySource → none yet
         },
         update: { spa_bills: [billRow({ status: 'PAID', paymentMethod: 'ROOM_CHARGE' })] },
       });
       await svc(db).settle(MY, 'bill-1', { method: 'ROOM_CHARGE', reservationId: 'res-1' }, 's1');
       const upd = db.updates.find((u) => u.table === 'spa_bills')?.values;
       expect(upd).toMatchObject({ paymentMethod: 'ROOM_CHARGE', reservationId: 'res-1' });
+      // The spa charge POSTS to the guest folio, tagged with the bill as source.
+      const folioPost = db.inserts.find((i) => i.table === 'folio_line_items');
+      expect(folioPost?.values).toMatchObject({
+        reservationId: 'res-1',
+        kind: 'SPA',
+        sourceType: 'spa_bill',
+        sourceId: 'bill-1',
+      });
     });
 
     it('rejects ROOM_CHARGE when the reservation is not in-house', async () => {

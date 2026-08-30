@@ -13,6 +13,7 @@ import {
 import { SpaServicesService } from './services.service';
 import { SpaAppointmentsService } from './appointments.service';
 import { SpaBillsService } from './bills.service';
+import { FolioModule } from '../folio/folio.module';
 
 /**
  * Spa / Wellness — one module, one staff surface under `/api/v1/staff/spa/*`:
@@ -21,7 +22,7 @@ import { SpaBillsService } from './bills.service';
  * mutates a booking.
  */
 @Module({
-  imports: [JwtModule.register({}), SharedAuthModule],
+  imports: [JwtModule.register({}), SharedAuthModule, FolioModule],
   controllers: [
     StaffSpaServicesController,
     StaffSpaDashboardController,

@@ -18,6 +18,7 @@ import {
   resolveSpaTaxPercent,
 } from './spa-rules';
 import { type Tx } from './services.service';
+import { FolioService } from '../folio/folio.service';
 
 const MAX_LIMIT = 200;
 
@@ -39,6 +40,7 @@ export class SpaBillsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly config: ConfigService,
+    private readonly folio: FolioService,
   ) {}
 
   private taxPercent(): number {
@@ -177,6 +179,30 @@ export class SpaBillsService {
         })
         .where(and(eq(spaBills.id, id), eq(spaBills.propertyId, propertyId)))
         .returning();
+
+      // ROOM_CHARGE now POSTS to the guest folio (same rule the restaurant
+      // follows), so the spa charge rides the stay balance to checkout.
+      // Idempotent by (source, billId): a retried settle never double-charges.
+      if (reservationId) {
+        const [appt] = await tx
+          .select({ name: spaAppointments.serviceNameSnapshot })
+          .from(spaAppointments)
+          .where(eq(spaAppointments.id, bill.appointmentId))
+          .limit(1);
+        await this.folio.postCharge(
+          {
+            reservationId,
+            propertyId,
+            kind: 'SPA',
+            description: appt?.name ? `Spa — ${appt.name}` : 'Spa services',
+            amountPaise: bill.totalPaise,
+            sourceType: 'spa_bill',
+            sourceId: bill.id,
+            postedBy: settledByStaffId,
+          },
+          tx,
+        );
+      }
       return { before: bill, after: SpaBillsService.toDto(row) };
     });
   }
