@@ -4,6 +4,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/tavelo_logo.dart';
 
 /// Shared frame for every unauthenticated screen: the Tavelo mark, a centred
 /// card no wider than a comfortable reading column, and the support footer.
@@ -70,40 +71,14 @@ class BrandMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: compact ? 30 : 38,
-          height: compact ? 30 : 38,
-          decoration: BoxDecoration(
-            color: c.primary,
-            borderRadius: R.rMd,
-          ),
-          alignment: Alignment.center,
-          child: Icon(
-            Icons.apartment_rounded,
-            size: compact ? 17 : 21,
-            color: c.primaryForeground,
-          ),
-        ),
-        const SizedBox(width: Sp.md),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              AppConfig.appName,
-              style: AppTypography.display(
-                size: compact ? 17 : 21,
-                color: c.foreground,
-              ),
-            ),
-            Text(
-              AppConfig.tagline.toUpperCase(),
-              style: AppTypography.labelXs(c.mutedForeground),
-            ),
-          ],
+        TaveloLogo(height: compact ? 30 : 40),
+        const SizedBox(height: Sp.sm),
+        Text(
+          AppConfig.tagline.toUpperCase(),
+          style: AppTypography.labelXs(c.mutedForeground),
         ),
       ],
     );
