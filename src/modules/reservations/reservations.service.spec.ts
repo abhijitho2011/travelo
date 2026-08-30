@@ -508,3 +508,53 @@ describe('ReservationsService.collectPayment — out-of-band folio money', () =>
     });
   });
 });
+
+describe('ReservationsService — extend stay (4.5)', () => {
+  it('pushes check-out later, recomputes the total, and records it', async () => {
+    const db = mockDb({
+      select: {
+        reservations: [[resRow({ status: 'CHECKED_IN', roomId: ROOM_ID })]],
+      },
+      update: { reservations: [resRow({ status: 'CHECKED_IN', checkOut: '2026-03-20' })] },
+    });
+    await svc(db).extendStay(MY_PROPERTY, 'res-1', { checkOut: '2026-03-20' }, STAFF_ID);
+    const upd = db.updates.find((u) => u.table === 'reservations')?.values;
+    expect(upd).toMatchObject({ checkOut: '2026-03-20' });
+    // 14th -> 20th is 6 nights x 450000 = 2,700,000
+    expect(upd?.totalPaise).toBe(2_700_000);
+    expect(db.inserts.find((i) => i.table === 'reservation_events')?.values).toMatchObject({
+      type: 'stay_extended',
+    });
+  });
+
+  it('refuses an extension that is not later', async () => {
+    const db = mockDb({ select: { reservations: [[resRow({ status: 'CHECKED_IN' })]] } });
+    await expect(
+      svc(db).extendStay(MY_PROPERTY, 'res-1', { checkOut: '2026-03-16' }, STAFF_ID),
+    ).rejects.toMatchObject({ response: { error: 'EXTENSION_MUST_BE_LATER' } });
+  });
+});
+
+describe('ReservationsService — move room (4.5)', () => {
+  it('moves an in-house guest, old room to DIRTY and new room OCCUPIED', async () => {
+    const db = mockDb({
+      select: {
+        reservations: [[resRow({ status: 'CHECKED_IN', roomId: ROOM_ID })]],
+        rooms: [[roomRow({ id: 'room-2', number: '305', status: 'READY' })]],
+      },
+      update: { reservations: [resRow({ status: 'CHECKED_IN', roomId: 'room-2' })] },
+    });
+    const out = await svc(db).moveRoom(MY_PROPERTY, 'res-1', { roomId: 'room-2' }, STAFF_ID);
+    expect(out.roomNumber).toBe('305');
+    const roomUpdates = db.updates.filter((u) => u.table === 'rooms').map((u) => u.values?.status);
+    expect(roomUpdates).toContain('DIRTY');
+    expect(roomUpdates).toContain('OCCUPIED');
+  });
+
+  it('refuses to move a guest who is not in-house', async () => {
+    const db = mockDb({ select: { reservations: [[resRow({ status: 'CONFIRMED' })]] } });
+    await expect(
+      svc(db).moveRoom(MY_PROPERTY, 'res-1', { roomId: 'room-2' }, STAFF_ID),
+    ).rejects.toMatchObject({ response: { error: 'NOT_IN_HOUSE' } });
+  });
+});

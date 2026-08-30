@@ -55,6 +55,26 @@ export const ReservationErrors = {
       HttpStatus.CONFLICT,
     ),
 
+  /** Extending a stay can only push check-out LATER. */
+  extensionMustBeLater: () =>
+    reservationError(
+      'EXTENSION_MUST_BE_LATER',
+      'A stay extension must move check-out to a later date',
+      HttpStatus.BAD_REQUEST,
+    ),
+
+  /** Room move / extend on a booking that is not in-house. */
+  notInHouse: () =>
+    reservationError(
+      'NOT_IN_HOUSE',
+      'Only a checked-in guest can be moved to another room',
+      HttpStatus.CONFLICT,
+    ),
+
+  /** Moving to the room the guest is already in. */
+  sameRoom: () =>
+    reservationError('SAME_ROOM', 'The guest is already in that room', HttpStatus.BAD_REQUEST),
+
   /** A room whose housekeeping state makes it unusable right now. */
   roomNotReady: (number: string, status: string) =>
     reservationError(

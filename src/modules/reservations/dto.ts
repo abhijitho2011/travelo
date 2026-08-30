@@ -160,6 +160,21 @@ export class CollectPaymentDto {
   @IsOptional() @IsString() @Length(1, 80) idempotencyKey?: string;
 }
 
+export class ExtendStayDto {
+  /** New check-out, must be LATER than the current one. EXCLUSIVE, as ever. */
+  @Matches(ISO_DATE, { message: `checkOut ${DATE_MESSAGE}` }) checkOut!: string;
+
+  /** Optional new per-night rate; otherwise the existing rate carries forward. */
+  @IsOptional() @IsInt() @Min(0) @Max(100_000_000) ratePaise?: number;
+}
+
+export class MoveRoomDto {
+  @IsUUID() roomId!: string;
+
+  /** Re-quote for a different room type; defaults to the new type's base rate. */
+  @IsOptional() @IsInt() @Min(0) @Max(100_000_000) ratePaise?: number;
+}
+
 export class CancelReservationDto {
   /** Required. A cancellation without a stated reason is unauditable. */
   @IsString() @Length(3, 500) reason!: string;

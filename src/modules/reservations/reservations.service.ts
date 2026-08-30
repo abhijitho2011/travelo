@@ -541,6 +541,146 @@ export class ReservationsService {
   // ---------- Transitions ----------
 
   /** PENDING → CONFIRMED. The point at which the booking starts blocking. */
+  /**
+   * Extend an in-house (or still-committed) stay to a later check-out. Re-runs
+   * the availability rules for the room/type over the fuller window (excluding
+   * itself), recomputes the total, and records the change. Early departure is a
+   * separate action — this only ever pushes check-out out.
+   */
+  async extendStay(
+    propertyId: string,
+    id: string,
+    dto: { checkOut: string; ratePaise?: number },
+    actorStaffId: string | null,
+  ) {
+    const before = await this.requireReservation(propertyId, id);
+    if (before.status !== 'CHECKED_IN' && before.status !== 'CONFIRMED') {
+      throw ReservationErrors.datesLocked();
+    }
+    if (dto.checkOut <= (before.checkOut as unknown as string)) {
+      throw ReservationErrors.extensionMustBeLater();
+    }
+    assertDateOrder(before.checkIn as unknown as IsoDate, dto.checkOut as IsoDate);
+    const ratePaise = dto.ratePaise ?? before.ratePaise;
+    const newTotal = totalPaise(ratePaise, before.checkIn as unknown as IsoDate, dto.checkOut as IsoDate);
+
+    const row = await this.db.transaction(async (tx) => {
+      const handle = tx as unknown as Tx;
+      // The extra nights must be free. Probe over the WHOLE new window minus
+      // self, which is exactly the double-booking rule the confirm ran.
+      if (before.roomId) {
+        await ReservationsService.assertRoomFree(
+          handle,
+          propertyId,
+          before.roomId,
+          before.checkIn as unknown as IsoDate,
+          dto.checkOut as IsoDate,
+          id,
+        );
+      } else {
+        await ReservationsService.assertTypeCapacity(
+          handle,
+          propertyId,
+          before.roomTypeId,
+          before.checkIn as unknown as IsoDate,
+          dto.checkOut as IsoDate,
+          id,
+        );
+      }
+      const [updated] = await handle
+        .update(reservations)
+        .set({ checkOut: dto.checkOut, ratePaise, totalPaise: newTotal, updatedAt: new Date() })
+        .where(eq(reservations.id, id))
+        .returning();
+      await ReservationsService.recordEvent(handle, id, 'stay_extended', actorStaffId, {
+        from: before.checkOut,
+        to: dto.checkOut,
+        totalPaise: newTotal,
+      });
+      return updated;
+    });
+    const [after] = await this.hydrate([row]);
+    return { previousCheckOut: before.checkOut, ...after };
+  }
+
+  /**
+   * Move a checked-in guest to a different room. The destination must be
+   * assignable and free for the remaining nights; the old room drops to DIRTY
+   * (it needs a clean) and the new one goes OCCUPIED. A move to a different room
+   * type re-quotes at that type's base rate unless a rate is supplied.
+   */
+  async moveRoom(
+    propertyId: string,
+    id: string,
+    dto: { roomId: string; ratePaise?: number },
+    actorStaffId: string | null,
+    now: Date = new Date(),
+  ) {
+    const before = await this.requireReservation(propertyId, id);
+    if (before.status !== 'CHECKED_IN') throw ReservationErrors.notInHouse();
+    if (before.roomId === dto.roomId) throw ReservationErrors.sameRoom();
+
+    const room = await this.requireRoom(propertyId, dto.roomId);
+    if (!(ASSIGNABLE_ROOM_STATUSES as readonly string[]).includes(room.status)) {
+      throw ReservationErrors.roomNotReady(room.number, room.status);
+    }
+
+    let ratePaise = before.ratePaise;
+    if (room.roomTypeId !== before.roomTypeId) {
+      const type = await this.requireRoomType(propertyId, room.roomTypeId);
+      ratePaise = dto.ratePaise ?? type.baseRate;
+    } else if (dto.ratePaise !== undefined) {
+      ratePaise = dto.ratePaise;
+    }
+    const newTotal = totalPaise(
+      ratePaise,
+      before.checkIn as unknown as IsoDate,
+      before.checkOut as unknown as IsoDate,
+    );
+
+    const row = await this.db.transaction(async (tx) => {
+      const handle = tx as unknown as Tx;
+      await ReservationsService.assertRoomFree(
+        handle,
+        propertyId,
+        room.id,
+        before.checkIn as unknown as IsoDate,
+        before.checkOut as unknown as IsoDate,
+        id,
+      );
+      const [updated] = await handle
+        .update(reservations)
+        .set({
+          roomId: room.id,
+          roomTypeId: room.roomTypeId,
+          ratePaise,
+          totalPaise: newTotal,
+          updatedAt: now,
+        })
+        .where(eq(reservations.id, id))
+        .returning();
+      // The room the guest just left needs making up; the new one is occupied.
+      if (before.roomId) {
+        await handle
+          .update(rooms)
+          .set({ status: 'DIRTY' as RoomStatus, updatedAt: now })
+          .where(eq(rooms.id, before.roomId));
+      }
+      await handle
+        .update(rooms)
+        .set({ status: 'OCCUPIED' as RoomStatus, updatedAt: now })
+        .where(eq(rooms.id, room.id));
+      await ReservationsService.recordEvent(handle, id, 'room_moved', actorStaffId, {
+        fromRoomId: before.roomId,
+        toRoomId: room.id,
+        toRoomNumber: room.number,
+      });
+      return updated;
+    });
+    const [after] = await this.hydrate([row]);
+    return { previousRoomId: before.roomId, ...after, roomNumber: room.number };
+  }
+
   async confirm(propertyId: string, id: string, actorStaffId: string | null) {
     const before = await this.requireReservation(propertyId, id);
     assertTransition(before.status, 'CONFIRMED');

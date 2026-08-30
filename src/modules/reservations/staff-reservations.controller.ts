@@ -31,6 +31,8 @@ import {
   CheckOutDto,
   CollectPaymentDto,
   CreateReservationDto,
+  ExtendStayDto,
+  MoveRoomDto,
   NoShowDto,
   ReservationFilterDto,
   UpdateReservationDto,
@@ -121,6 +123,48 @@ export class StaffReservationsController {
       actorRole: me.role,
     });
     return after;
+  }
+
+  /** Extend an in-house or committed stay to a later check-out. */
+  @Post(':id/extend')
+  @RequireStaffPermissions('reservation.update')
+  async extend(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @Body() dto: ExtendStayDto,
+  ) {
+    const res = await this.reservations.extendStay(me.propertyId, id, dto, me.id);
+    await this.audit.record({
+      action: 'staff.reservation.extended',
+      entity: 'reservation',
+      entityId: id,
+      after: { checkOut: dto.checkOut },
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return res;
+  }
+
+  /** Move a checked-in guest to a different room, re-quoting on a type change. */
+  @Post(':id/move-room')
+  @RequireStaffPermissions('reservation.update')
+  async moveRoom(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @Body() dto: MoveRoomDto,
+  ) {
+    const res = await this.reservations.moveRoom(me.propertyId, id, dto, me.id);
+    await this.audit.record({
+      action: 'staff.reservation.room_moved',
+      entity: 'reservation',
+      entityId: id,
+      after: { roomId: dto.roomId },
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return res;
   }
 
   @Post(':id/confirm')
