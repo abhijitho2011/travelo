@@ -9,12 +9,7 @@ import {
   type MenuItem,
   type MenuItemStatus,
 } from '../../database/schema';
-import {
-  CreateCategoryDto,
-  CreateMenuItemDto,
-  UpdateCategoryDto,
-  UpdateMenuItemDto,
-} from './dto';
+import { CreateCategoryDto, CreateMenuItemDto, UpdateCategoryDto, UpdateMenuItemDto } from './dto';
 import { RestaurantErrors } from './restaurant-errors';
 
 /**

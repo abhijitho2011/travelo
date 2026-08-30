@@ -175,7 +175,9 @@ export const restaurantOrders = pgTable(
       .notNull()
       .default('OPEN')
       .$type<RestaurantOrderStatus>(),
-    waiterStaffId: uuid('waiter_staff_id').references(() => hotelStaff.id, { onDelete: 'set null' }),
+    waiterStaffId: uuid('waiter_staff_id').references(() => hotelStaff.id, {
+      onDelete: 'set null',
+    }),
     guestCount: integer('guest_count').notNull().default(1),
     /** All paise. Zero until the bill is run, then frozen from item snapshots. */
     subtotalPaise: integer('subtotal_paise').notNull().default(0),

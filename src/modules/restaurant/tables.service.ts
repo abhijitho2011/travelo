@@ -74,7 +74,8 @@ export class TablesService {
         .returning();
       return TablesService.toDto(row);
     } catch (err) {
-      if ((err as { code?: string }).code === '23505') throw RestaurantErrors.duplicateName('table');
+      if ((err as { code?: string }).code === '23505')
+        throw RestaurantErrors.duplicateName('table');
       throw err;
     }
   }
@@ -93,7 +94,8 @@ export class TablesService {
         .returning();
       return { before: TablesService.toDto(before), after: TablesService.toDto(after) };
     } catch (err) {
-      if ((err as { code?: string }).code === '23505') throw RestaurantErrors.duplicateName('table');
+      if ((err as { code?: string }).code === '23505')
+        throw RestaurantErrors.duplicateName('table');
       throw err;
     }
   }
@@ -108,11 +110,7 @@ export class TablesService {
   }
 
   /** Move a table's status inside the SAME tx as the order change that drives it. */
-  static async setStatus(
-    tx: Tx,
-    tableId: string,
-    status: RestaurantTableStatus,
-  ): Promise<void> {
+  static async setStatus(tx: Tx, tableId: string, status: RestaurantTableStatus): Promise<void> {
     await tx
       .update(restaurantTables)
       .set({ status, updatedAt: new Date() })

@@ -70,7 +70,9 @@ describe('KOT (kitchen ticket) state machine', () => {
       assertKotTransition('SERVED', 'NEW');
       throw new Error('should have thrown');
     } catch (err) {
-      expect((err as { response: { error: string } }).response.error).toBe('INVALID_KOT_TRANSITION');
+      expect((err as { response: { error: string } }).response.error).toBe(
+        'INVALID_KOT_TRANSITION',
+      );
     }
   });
 });

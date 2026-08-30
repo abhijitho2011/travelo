@@ -11,7 +11,6 @@ import {
   type KotStatus,
   type OrderItem,
   type RestaurantOrder,
-  type RestaurantOrderStatus,
   type RestaurantPaymentMethod,
 } from '../../database/schema';
 import {
@@ -226,10 +225,7 @@ export class OrdersService {
               .select({ id: restaurantOrders.id })
               .from(restaurantOrders)
               .where(
-                and(
-                  eq(restaurantOrders.tableId, dto.tableId),
-                  eq(restaurantOrders.status, 'OPEN'),
-                ),
+                and(eq(restaurantOrders.tableId, dto.tableId), eq(restaurantOrders.status, 'OPEN')),
               )
               .limit(1);
             if (existing.length > 0) throw RestaurantErrors.tableOccupied(table.name);
@@ -427,10 +423,7 @@ export class OrdersService {
           .select({ id: reservations.id, status: reservations.status })
           .from(reservations)
           .where(
-            and(
-              eq(reservations.id, dto.reservationId),
-              eq(reservations.propertyId, propertyId),
-            ),
+            and(eq(reservations.id, dto.reservationId), eq(reservations.propertyId, propertyId)),
           )
           .limit(1);
         if (!res || res.status !== 'CHECKED_IN') throw RestaurantErrors.reservationNotInHouse();
@@ -585,9 +578,7 @@ export class OrdersService {
     const [openRow] = await this.db
       .select({ count: sql<number>`count(*)::int` })
       .from(restaurantOrders)
-      .where(
-        and(eq(restaurantOrders.propertyId, propertyId), eq(restaurantOrders.status, 'OPEN')),
-      );
+      .where(and(eq(restaurantOrders.propertyId, propertyId), eq(restaurantOrders.status, 'OPEN')));
 
     const tableRows = await this.db
       .select({

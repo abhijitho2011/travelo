@@ -26,7 +26,9 @@ import {
 // ---------- Tables ----------
 
 export class TableFilterDto {
-  @IsOptional() @IsIn(restaurantTableStatusValues) status?: (typeof restaurantTableStatusValues)[number];
+  @IsOptional()
+  @IsIn(restaurantTableStatusValues)
+  status?: (typeof restaurantTableStatusValues)[number];
 }
 
 export class CreateTableDto {
@@ -37,7 +39,9 @@ export class CreateTableDto {
 export class UpdateTableDto {
   @IsOptional() @IsString() @Length(1, 64) name?: string;
   @IsOptional() @IsInt() @Min(1) @Max(100) seats?: number;
-  @IsOptional() @IsIn(restaurantTableStatusValues) status?: (typeof restaurantTableStatusValues)[number];
+  @IsOptional()
+  @IsIn(restaurantTableStatusValues)
+  status?: (typeof restaurantTableStatusValues)[number];
 }
 
 // ---------- Menu ----------
@@ -84,7 +88,9 @@ export class SetAvailabilityDto {
 // ---------- Orders ----------
 
 export class OrderFilterDto {
-  @IsOptional() @IsIn(restaurantOrderStatusValues) status?: (typeof restaurantOrderStatusValues)[number];
+  @IsOptional()
+  @IsIn(restaurantOrderStatusValues)
+  status?: (typeof restaurantOrderStatusValues)[number];
   @IsOptional() @IsUUID() tableId?: string;
   /** Only my own orders (the waiter's board). */
   @IsOptional() @Type(() => Boolean) @IsBoolean() mine?: boolean;

@@ -11,20 +11,22 @@ export function restaurantError(code: string, message: string, status: HttpStatu
 
 export const RestaurantErrors = {
   // --- not found: a foreign id looks exactly like a missing one (404, never 403) ---
-  tableNotFound: () =>
-    restaurantError('TABLE_NOT_FOUND', 'Table not found', HttpStatus.NOT_FOUND),
+  tableNotFound: () => restaurantError('TABLE_NOT_FOUND', 'Table not found', HttpStatus.NOT_FOUND),
   categoryNotFound: () =>
     restaurantError('MENU_CATEGORY_NOT_FOUND', 'Menu category not found', HttpStatus.NOT_FOUND),
   menuItemNotFound: () =>
     restaurantError('MENU_ITEM_NOT_FOUND', 'Menu item not found', HttpStatus.NOT_FOUND),
-  orderNotFound: () =>
-    restaurantError('ORDER_NOT_FOUND', 'Order not found', HttpStatus.NOT_FOUND),
+  orderNotFound: () => restaurantError('ORDER_NOT_FOUND', 'Order not found', HttpStatus.NOT_FOUND),
   orderItemNotFound: () =>
     restaurantError('ORDER_ITEM_NOT_FOUND', 'Order item not found', HttpStatus.NOT_FOUND),
 
   // --- conflicts ---
   duplicateName: (what: string) =>
-    restaurantError('DUPLICATE_NAME', `A ${what} with that name already exists`, HttpStatus.CONFLICT),
+    restaurantError(
+      'DUPLICATE_NAME',
+      `A ${what} with that name already exists`,
+      HttpStatus.CONFLICT,
+    ),
 
   /** One OPEN order per table — the headline table rule. */
   tableOccupied: (name?: string) =>
