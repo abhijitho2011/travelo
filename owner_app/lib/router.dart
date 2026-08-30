@@ -16,6 +16,7 @@ import 'features/account/security_screen.dart';
 import 'features/auth/invite_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/dashboard/portfolio_screen.dart';
+import 'features/notifications/notifications_screen.dart';
 import 'features/properties/add_property_screen.dart';
 import 'features/properties/properties_screen.dart';
 import 'features/properties/property_amenities_screen.dart';
@@ -81,6 +82,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, __) => const SubscriptionScreen(),
           ),
           GoRoute(path: '/support', builder: (_, __) => const SupportScreen()),
+          GoRoute(
+            path: '/notifications',
+            builder: (_, __) => const NotificationsScreen(),
+          ),
         ],
       ),
 

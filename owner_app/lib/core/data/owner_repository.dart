@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -145,6 +147,25 @@ class OwnerRepository {
   Future<SubscriptionDetail> subscription() async =>
       SubscriptionDetail.fromJson(await _api.get('/subscription') as Map);
 
+  Future<({List<OwnerNotification> items, int unread})> notifications() async {
+    final d = await _api.get('/notifications');
+    final list = d is Map ? (d['items'] ?? const []) : (d ?? const []);
+    final items = (list as List)
+        .whereType<Map>()
+        .map(OwnerNotification.fromJson)
+        .toList();
+    final unread = d is Map && d['unread'] is num
+        ? (d['unread'] as num).toInt()
+        : items.where((n) => !n.read).length;
+    return (items: items, unread: unread);
+  }
+
+  Future<void> markNotificationRead(String id) =>
+      _api.post('/notifications/$id/read');
+
+  Future<void> markAllNotificationsRead() =>
+      _api.post('/notifications/read-all');
+
   Future<List<Invoice>> invoices() async {
     final d = await _api.get('/subscription/invoices');
     final list = d is Map ? (d['items'] ?? []) : d;
@@ -270,3 +291,66 @@ final ticketProvider =
 final sessionsProvider = FutureProvider.autoDispose<List<OwnerSession>>(
   (ref) => ref.watch(ownerRepositoryProvider).sessions(),
 );
+
+typedef OwnerInbox = ({List<OwnerNotification> items, int unread});
+
+/// The owner's IN_APP inbox. Polls so the bell badge does not sit stale.
+class OwnerNotificationsController extends AsyncNotifier<OwnerInbox> {
+  @override
+  Future<OwnerInbox> build() {
+    final timer = Timer.periodic(
+      const Duration(seconds: 120),
+      (_) => _silentRefresh(),
+    );
+    ref.onDispose(timer.cancel);
+    return ref.watch(ownerRepositoryProvider).notifications();
+  }
+
+  Future<void> _silentRefresh() async {
+    final next = await AsyncValue.guard(
+      () => ref.read(ownerRepositoryProvider).notifications(),
+    );
+    if (next.hasValue) state = next;
+  }
+
+  Future<void> refresh() async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(
+      () => ref.read(ownerRepositoryProvider).notifications(),
+    );
+  }
+
+  Future<void> markRead(String id) async {
+    final current = state.value;
+    if (current == null) return;
+    final items = [
+      for (final n in current.items)
+        if (n.id == id) n.copyWith(read: true) else n,
+    ];
+    state = AsyncValue.data((
+      items: items,
+      unread: items.where((n) => !n.read).length,
+    ));
+    await ref.read(ownerRepositoryProvider).markNotificationRead(id);
+  }
+
+  Future<void> markAllRead() async {
+    final current = state.value;
+    if (current == null) return;
+    state = AsyncValue.data((
+      items: [for (final n in current.items) n.copyWith(read: true)],
+      unread: 0,
+    ));
+    await ref.read(ownerRepositoryProvider).markAllNotificationsRead();
+  }
+}
+
+final ownerNotificationsProvider =
+    AsyncNotifierProvider<OwnerNotificationsController, OwnerInbox>(
+  OwnerNotificationsController.new,
+);
+
+/// Unread count for the top-bar bell badge.
+final ownerUnreadCountProvider = Provider<int>((ref) {
+  return ref.watch(ownerNotificationsProvider).value?.unread ?? 0;
+});

@@ -295,4 +295,17 @@ void main() {
     });
   });
 
+
+  group('OwnerNotification', () {
+    test('reads readAt so a delivered notification is not unread forever', () {
+      expect(
+        OwnerNotification.fromJson({'id': 'n1', 'title': 'Renewal due', 'readAt': null}).read,
+        isFalse,
+      );
+      expect(
+        OwnerNotification.fromJson({'id': 'n2', 'readAt': '2026-08-30T10:00:00Z'}).read,
+        isTrue,
+      );
+    });
+  });
 }

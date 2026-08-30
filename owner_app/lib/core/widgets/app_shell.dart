@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../data/owner_repository.dart';
 import 'package:go_router/go_router.dart';
 
 import '../config/app_config.dart';
@@ -214,8 +215,7 @@ int selectedNavIndex(List<String> routes, String location) {
 
 /// Brand, theme switch, sign-out and the profile avatar.
 ///
-/// There is no notification bell: the owner portal has no notification feed, so
-/// a bell here would be a button that never has anything to say.
+/// Carries a notification bell with an unread badge, wired to the owner inbox.
 class OwnerTopBar extends ConsumerWidget implements PreferredSizeWidget {
   const OwnerTopBar({super.key});
 
@@ -270,6 +270,7 @@ class OwnerTopBar extends ConsumerWidget implements PreferredSizeWidget {
         ],
       ),
       actions: [
+        _NotificationBell(unread: ref.watch(ownerUnreadCountProvider)),
         IconButton(
           onPressed: () => ref.read(themeControllerProvider.notifier).cycle(),
           tooltip: switch (themeMode) {
@@ -414,6 +415,49 @@ class _MoreSheet extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The top-bar bell: opens the inbox, with a dot + count when unread.
+class _NotificationBell extends StatelessWidget {
+  const _NotificationBell({required this.unread});
+  final int unread;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        IconButton(
+          tooltip: 'Notifications',
+          onPressed: () => context.go('/notifications'),
+          icon: const Icon(Icons.notifications_none_rounded, size: 20),
+        ),
+        if (unread > 0)
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
+              decoration: BoxDecoration(
+                color: c.primary,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                unread > 9 ? '9+' : '$unread',
+                style: TextStyle(
+                  color: c.primaryForeground,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

@@ -795,3 +795,41 @@ class Room {
         updatedAt: _asDate(j['updatedAt'] ?? j['updated_at']),
       );
 }
+
+/// An owner's IN_APP notification — subscription reminders, payment receipts,
+/// support replies. The server row carries `type`/`readAt`/`meta`.
+class OwnerNotification {
+  const OwnerNotification({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.type,
+    required this.createdAt,
+    required this.read,
+  });
+
+  final String id;
+  final String title;
+  final String body;
+  final String type;
+  final DateTime? createdAt;
+  final bool read;
+
+  OwnerNotification copyWith({bool? read}) => OwnerNotification(
+        id: id,
+        title: title,
+        body: body,
+        type: type,
+        createdAt: createdAt,
+        read: read ?? this.read,
+      );
+
+  factory OwnerNotification.fromJson(Map j) => OwnerNotification(
+        id: _asStr(j['id']),
+        title: _asStr(j['title']).isEmpty ? 'Notification' : _asStr(j['title']),
+        body: _asStr(j['body']),
+        type: _asStr(j['type']),
+        createdAt: _asDate(j['createdAt']),
+        read: j['readAt'] != null || j['read'] == true,
+      );
+}
