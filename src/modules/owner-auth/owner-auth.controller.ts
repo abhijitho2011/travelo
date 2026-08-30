@@ -4,13 +4,17 @@ import { Public } from '../../common/decorators/public.decorator';
 import { OwnerAuthService } from './owner-auth.service';
 import { OwnerJwtGuard } from './owner-jwt.guard';
 import { CurrentOwner, AuthenticatedOwner } from './current-owner.decorator';
-import { GoogleLoginDto, RefreshDto, RequestOtpDto, VerifyOtpDto } from './dto';
+import { GoogleLoginDto, OwnerMfaChallengeDto, RefreshDto, RequestOtpDto, VerifyOtpDto } from './dto';
 import { AuthThrottle } from '../../common/decorators/auth-throttle.decorator';
+import { OwnerMfaService } from './owner-mfa.service';
 
 @ApiTags('Owner Auth')
 @Controller({ path: 'api/v1/owner/auth', version: VERSION_NEUTRAL })
 export class OwnerAuthController {
-  constructor(private readonly svc: OwnerAuthService) {}
+  constructor(
+    private readonly svc: OwnerAuthService,
+    private readonly mfa: OwnerMfaService,
+  ) {}
 
   @Public()
   @AuthThrottle()
@@ -31,6 +35,18 @@ export class OwnerAuthController {
   @Post('google')
   google(@Body() dto: GoogleLoginDto) {
     return this.svc.google(dto.idToken);
+  }
+
+  /**
+   * The second-factor step. Consumes the challenge token + code and, only then,
+   * mints the session. No tokens are issued anywhere until this succeeds.
+   */
+  @Public()
+  @AuthThrottle()
+  @Post('mfa')
+  async mfaChallenge(@Body() dto: OwnerMfaChallengeDto) {
+    const { ownerId } = await this.mfa.consumeChallenge(dto.mfaToken, dto.code);
+    return this.svc.completeLoginAfterMfa(ownerId);
   }
 
   @Public()

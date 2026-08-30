@@ -52,6 +52,10 @@ export const owners = pgTable(
     districtId: uuid('district_id'),
     pinCode: varchar('pin_code', { length: 6 }),
     createdBy: uuid('created_by').references(() => admins.id, { onDelete: 'set null' }),
+    // Opt-in TOTP two-factor, mirroring the admin design. `mfaSecret` holds an
+    // AES-256-GCM ciphertext keyed by MFA_SECRET_KEY, never a plaintext secret.
+    mfaEnabled: boolean('mfa_enabled').notNull().default(false),
+    mfaSecret: text('mfa_secret'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     lastActiveAt: timestamp('last_active_at', { withTimezone: true }),

@@ -8,6 +8,14 @@ import { FirebaseService } from '../shared-auth/firebase.service';
 import { SMS_PROVIDER, SmsProvider } from '../shared-auth/sms/sms-provider.interface';
 import { OwnerErrors } from './owner-errors';
 import { OwnerImpersonationContext } from './current-owner.decorator';
+import { OwnerMfaService, OwnerMfaChallenge } from './owner-mfa.service';
+
+/** Either a real session (first factor was enough) or an MFA challenge. */
+export type OwnerSignInResult = OwnerTokenPair | OwnerMfaChallenge;
+
+export function isOwnerMfaChallenge(r: OwnerSignInResult): r is OwnerMfaChallenge {
+  return (r as OwnerMfaChallenge).mfaRequired === true;
+}
 
 @Injectable()
 export class OwnerAuthService {
@@ -19,6 +27,7 @@ export class OwnerAuthService {
     private readonly otp: OwnerOtpService,
     private readonly tokens: OwnerTokenService,
     private readonly firebase: FirebaseService,
+    private readonly mfa: OwnerMfaService,
   ) {}
 
   async requestOtp(mobile: string): Promise<{ message: string; expiresAt: string }> {
@@ -39,12 +48,12 @@ export class OwnerAuthService {
     };
   }
 
-  async verifyOtp(mobile: string, otp: string): Promise<OwnerTokenPair> {
+  async verifyOtp(mobile: string, otp: string): Promise<OwnerSignInResult> {
     const resolved = await this.otp.verify(mobile, otp);
-    return this.tokens.issueForOwner(resolved.ownerId, resolved.email);
+    return this.gateOrIssue(resolved.ownerId, resolved.email, 'otp');
   }
 
-  async google(idToken: string): Promise<OwnerTokenPair> {
+  async google(idToken: string): Promise<OwnerSignInResult> {
     const verified = await this.firebase.verifyIdToken(idToken);
     if (!verified.email) throw OwnerErrors.ownerNotFound();
     const [owner] = await this.db
@@ -63,6 +72,44 @@ export class OwnerAuthService {
         .set({ emailVerified: true, updatedAt: new Date() })
         .where(eq(owners.id, owner.id));
     }
+    return this.gateOrIssue(owner.id, owner.email, 'google', owner.mfaEnabled);
+  }
+
+  /**
+   * THE GATE. An owner who has enrolled in MFA never receives tokens from the
+   * first factor alone — only `completeLoginAfterMfa`, reached through POST
+   * /owner/auth/mfa, can mint a session for them.
+   */
+  private async gateOrIssue(
+    ownerId: string,
+    email: string,
+    method: 'google' | 'otp',
+    mfaEnabled?: boolean,
+  ): Promise<OwnerSignInResult> {
+    let enrolled = mfaEnabled;
+    if (enrolled === undefined) {
+      const [row] = await this.db
+        .select({ mfaEnabled: owners.mfaEnabled })
+        .from(owners)
+        .where(eq(owners.id, ownerId))
+        .limit(1);
+      enrolled = row?.mfaEnabled ?? false;
+    }
+    if (enrolled) return this.mfa.issueChallenge(ownerId, method);
+    return this.tokens.issueForOwner(ownerId, email);
+  }
+
+  /**
+   * The other side of the gate: called ONLY after OwnerMfaService has verified
+   * a TOTP or a recovery code against a live challenge token.
+   */
+  async completeLoginAfterMfa(ownerId: string): Promise<OwnerTokenPair> {
+    const [owner] = await this.db
+      .select({ id: owners.id, email: owners.email })
+      .from(owners)
+      .where(and(eq(owners.id, ownerId), isNull(owners.deletedAt)))
+      .limit(1);
+    if (!owner) throw OwnerErrors.ownerNotFound();
     return this.tokens.issueForOwner(owner.id, owner.email);
   }
 

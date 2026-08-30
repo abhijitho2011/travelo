@@ -6,6 +6,7 @@ import {
   timestamp,
   integer,
   text,
+  boolean,
   index,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
@@ -137,6 +138,10 @@ export const hotelStaff = pgTable(
     department: varchar('department', { length: 64 }),
     employeeId: varchar('employee_id', { length: 64 }),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+    // Opt-in TOTP two-factor, mirroring the admin/owner design. `mfaSecret`
+    // holds an AES-256-GCM ciphertext keyed by MFA_SECRET_KEY, never plaintext.
+    mfaEnabled: boolean('mfa_enabled').notNull().default(false),
+    mfaSecret: text('mfa_secret'),
     createdBy: uuid('created_by').references(() => owners.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -205,6 +210,49 @@ export const staffOtps = pgTable(
   }),
 );
 
+// ---------- Owner MFA recovery codes ----------
+/**
+ * One-time recovery codes for owner TOTP MFA. Mirrors
+ * `admin_mfa_recovery_codes`: ten minted at enrolment, shown once, stored only
+ * as argon2id hashes, single-use via `used_at`.
+ */
+export const ownerMfaRecoveryCodes = pgTable(
+  'owner_mfa_recovery_codes',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => owners.id, { onDelete: 'cascade' }),
+    codeHash: varchar('code_hash', { length: 512 }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    ownerIdx: index('owner_mfa_recovery_owner_idx').on(t.ownerId),
+  }),
+);
+
+// ---------- Staff MFA recovery codes ----------
+export const staffMfaRecoveryCodes = pgTable(
+  'staff_mfa_recovery_codes',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    staffId: uuid('staff_id')
+      .notNull()
+      .references(() => hotelStaff.id, { onDelete: 'cascade' }),
+    codeHash: varchar('code_hash', { length: 512 }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    staffIdx: index('staff_mfa_recovery_staff_idx').on(t.staffId),
+  }),
+);
+
 // ---------- Location reference data (admin-managed) ----------
 export const locationStates = pgTable('location_states', {
   id: uuid('id')
@@ -237,5 +285,7 @@ export type OwnerSession = typeof ownerSessions.$inferSelect;
 export type StaffOtp = typeof staffOtps.$inferSelect;
 export type StaffSession = typeof staffSessions.$inferSelect;
 export type HotelStaff = typeof hotelStaff.$inferSelect;
+export type OwnerMfaRecoveryCode = typeof ownerMfaRecoveryCodes.$inferSelect;
+export type StaffMfaRecoveryCode = typeof staffMfaRecoveryCodes.$inferSelect;
 export type LocationState = typeof locationStates.$inferSelect;
 export type LocationDistrict = typeof locationDistricts.$inferSelect;

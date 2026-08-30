@@ -9,6 +9,14 @@ import { StaffOtpService } from './staff-otp.service';
 import { StaffTokenService, StaffTokenPair } from './staff-token.service';
 import { accountStatusError, StaffErrors } from './staff-errors';
 import { permissionsForRole } from './role-permissions';
+import { StaffMfaService, StaffMfaChallenge } from './staff-mfa.service';
+
+/** Either a real session (first factor was enough) or an MFA challenge. */
+export type StaffSignInResult = StaffTokenPair | StaffMfaChallenge;
+
+export function isStaffMfaChallenge(r: StaffSignInResult): r is StaffMfaChallenge {
+  return (r as StaffMfaChallenge).mfaRequired === true;
+}
 
 @Injectable()
 export class StaffAuthService {
@@ -20,6 +28,7 @@ export class StaffAuthService {
     private readonly otp: StaffOtpService,
     private readonly tokens: StaffTokenService,
     private readonly firebase: FirebaseService,
+    private readonly mfa: StaffMfaService,
   ) {}
 
   /**
@@ -54,9 +63,10 @@ export class StaffAuthService {
    * error: possession of the number is already proved, so naming the status
    * tells the holder nothing new and lets the app show the right screen.
    */
-  async verifyOtp(mobile: string, otp: string): Promise<StaffTokenPair> {
+  async verifyOtp(mobile: string, otp: string): Promise<StaffSignInResult> {
     const staff = await this.otp.verify(mobile, otp);
     if (staff.status !== 'ACTIVE') throw accountStatusError(staff.status);
+    if (staff.mfaEnabled) return this.mfa.issueChallenge(staff.id, 'otp');
     return this.tokens.issueForStaff({
       id: staff.id,
       propertyId: staff.propertyId,
@@ -69,10 +79,30 @@ export class StaffAuthService {
    * match a live `hotel_staff` row — staff exist because an owner or a GM
    * created them, never because someone showed up with a Google identity.
    */
-  async google(idToken: string): Promise<StaffTokenPair> {
+  async google(idToken: string): Promise<StaffSignInResult> {
     const verified = await this.firebase.verifyIdToken(idToken);
     if (!verified.email) throw StaffErrors.staffNotFound();
     const staff = await this.findByEmail(verified.email.toLowerCase());
+    if (!staff) throw StaffErrors.staffNotFound();
+    if (staff.status !== 'ACTIVE') throw accountStatusError(staff.status);
+    if (staff.mfaEnabled) return this.mfa.issueChallenge(staff.id, 'google');
+    return this.tokens.issueForStaff({
+      id: staff.id,
+      propertyId: staff.propertyId,
+      role: staff.role,
+    });
+  }
+
+  /**
+   * The other side of the MFA gate: called ONLY after StaffMfaService has
+   * verified a TOTP or a recovery code against a live challenge token.
+   */
+  async completeLoginAfterMfa(staffId: string): Promise<StaffTokenPair> {
+    const [staff] = await this.db
+      .select()
+      .from(hotelStaff)
+      .where(and(eq(hotelStaff.id, staffId), isNull(hotelStaff.deletedAt)))
+      .limit(1);
     if (!staff) throw StaffErrors.staffNotFound();
     if (staff.status !== 'ACTIVE') throw accountStatusError(staff.status);
     return this.tokens.issueForStaff({

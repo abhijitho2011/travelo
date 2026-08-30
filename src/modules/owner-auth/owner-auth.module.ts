@@ -26,6 +26,8 @@ import { OwnerJwtGuard } from './owner-jwt.guard';
 import { SubscriptionStatusGuard } from '../../common/guards/subscription-status.guard';
 import { OwnerNotificationsController } from './owner-notifications.controller';
 import { OwnerDeviceTokensController } from './owner-device-tokens.controller';
+import { OwnerMfaController } from './owner-mfa.controller';
+import { OwnerMfaService } from './owner-mfa.service';
 
 @Module({
   // EntitlementsModule supplies the shared feature resolver so the owner's
@@ -50,9 +52,11 @@ import { OwnerDeviceTokensController } from './owner-device-tokens.controller';
     AdminLocationsController,
     OwnerNotificationsController,
     OwnerDeviceTokensController,
+    OwnerMfaController,
   ],
   providers: [
     OwnerAuthService,
+    OwnerMfaService,
     OwnerOtpService,
     OwnerTokenService,
     OwnerPortalService,

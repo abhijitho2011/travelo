@@ -85,6 +85,7 @@ describe('StaffAuthService — OTP request non-disclosure', () => {
       otp as never,
       makeTokens() as never,
       {} as never,
+      { issueChallenge: jest.fn() } as never,
     );
     return { svc, sms, otp };
   }
@@ -130,6 +131,7 @@ describe('StaffAuthService — OTP request non-disclosure', () => {
           otp as never,
           makeTokens() as never,
           {} as never,
+          { issueChallenge: jest.fn() } as never,
         ),
       };
     })();
@@ -154,6 +156,7 @@ describe('StaffAuthService — OTP verify status gating', () => {
       otp as never,
       tokens as never,
       {} as never,
+      { issueChallenge: jest.fn() } as never,
     );
     return { svc, tokens };
   }
@@ -203,6 +206,7 @@ describe('StaffAuthService — Google sign-in', () => {
       {} as never,
       tokens as never,
       firebase as never,
+      { issueChallenge: jest.fn() } as never,
     );
     return { svc, db, tokens };
   }
@@ -235,6 +239,7 @@ describe('StaffAuthService — Google sign-in', () => {
       {} as never,
       makeTokens() as never,
       { verifyIdToken: jest.fn(async () => ({ email: null })) } as never,
+      { issueChallenge: jest.fn() } as never,
     );
     await expectRejectionCode(svc.google('id-token'), 'STAFF_NOT_FOUND');
     expect(db.insert).not.toHaveBeenCalled();
@@ -259,6 +264,7 @@ describe('StaffAuthService.me — the app’s role-detection payload', () => {
       {} as never,
       makeTokens() as never,
       {} as never,
+      { issueChallenge: jest.fn() } as never,
     );
     const me = await svc.me('staff-1');
 
@@ -302,6 +308,7 @@ describe('StaffAuthService.me — the app’s role-detection payload', () => {
       {} as never,
       makeTokens() as never,
       {} as never,
+      { issueChallenge: jest.fn() } as never,
     );
     expect((await svc.me('staff-1')).organization.name).toBe('Ravi Owner');
   });

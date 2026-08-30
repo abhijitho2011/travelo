@@ -4,13 +4,23 @@ import { Public } from '../../common/decorators/public.decorator';
 import { StaffAuthService } from './staff-auth.service';
 import { StaffJwtGuard } from './staff-jwt.guard';
 import { CurrentStaff, AuthenticatedStaff } from './current-staff.decorator';
-import { StaffGoogleLoginDto, StaffRefreshDto, StaffRequestOtpDto, StaffVerifyOtpDto } from './dto';
+import {
+  StaffGoogleLoginDto,
+  StaffMfaChallengeDto,
+  StaffRefreshDto,
+  StaffRequestOtpDto,
+  StaffVerifyOtpDto,
+} from './dto';
 import { AuthThrottle } from '../../common/decorators/auth-throttle.decorator';
+import { StaffMfaService } from './staff-mfa.service';
 
 @ApiTags('Staff Auth')
 @Controller({ path: 'api/v1/staff/auth', version: VERSION_NEUTRAL })
 export class StaffAuthController {
-  constructor(private readonly svc: StaffAuthService) {}
+  constructor(
+    private readonly svc: StaffAuthService,
+    private readonly mfa: StaffMfaService,
+  ) {}
 
   @Public()
   @AuthThrottle()
@@ -31,6 +41,18 @@ export class StaffAuthController {
   @Post('google')
   google(@Body() dto: StaffGoogleLoginDto) {
     return this.svc.google(dto.idToken);
+  }
+
+  /**
+   * The second-factor step. Consumes the challenge token + code and, only then,
+   * mints the session. No tokens are issued anywhere until this succeeds.
+   */
+  @Public()
+  @AuthThrottle()
+  @Post('mfa')
+  async mfaChallenge(@Body() dto: StaffMfaChallengeDto) {
+    const { staffId } = await this.mfa.consumeChallenge(dto.mfaToken, dto.code);
+    return this.svc.completeLoginAfterMfa(staffId);
   }
 
   @Public()

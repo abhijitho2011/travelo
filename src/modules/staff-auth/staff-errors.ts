@@ -48,6 +48,40 @@ export const StaffErrors = {
     staffError('ACCOUNT_NOT_ACTIVE', 'Account is not active', HttpStatus.FORBIDDEN),
   forbidden: (message = 'Insufficient permissions') =>
     staffError('STAFF_FORBIDDEN', message, HttpStatus.FORBIDDEN),
+  // ---------- Sessions ----------
+  sessionNotFound: () => staffError('SESSION_NOT_FOUND', 'Session not found', HttpStatus.NOT_FOUND),
+
+  // ---------- TOTP MFA ----------
+  mfaNotConfigured: () =>
+    staffError(
+      'MFA_NOT_CONFIGURED',
+      'Two-factor authentication is not available on this deployment (no encryption key is configured). Contact your platform operator.',
+      HttpStatus.SERVICE_UNAVAILABLE,
+    ),
+  mfaNotEnrolled: () =>
+    staffError('MFA_NOT_ENROLLED', 'Start enrolment before verifying a code', HttpStatus.BAD_REQUEST),
+  mfaAlreadyEnabled: () =>
+    staffError(
+      'MFA_ALREADY_ENABLED',
+      'Two-factor authentication is already enabled',
+      HttpStatus.CONFLICT,
+    ),
+  mfaNotEnabled: () =>
+    staffError('MFA_NOT_ENABLED', 'Two-factor authentication is not enabled', HttpStatus.BAD_REQUEST),
+  mfaInvalidCode: () =>
+    staffError('MFA_INVALID_CODE', 'Invalid or expired code', HttpStatus.UNAUTHORIZED),
+  mfaChallengeInvalid: () =>
+    staffError(
+      'MFA_CHALLENGE_INVALID',
+      'This sign-in attempt has expired. Start again.',
+      HttpStatus.UNAUTHORIZED,
+    ),
+  mfaLocked: (seconds: number) =>
+    staffError(
+      'MFA_LOCKED',
+      `Too many incorrect codes. Try again in ${Math.ceil(seconds / 60)} minute(s).`,
+      HttpStatus.TOO_MANY_REQUESTS,
+    ),
   /**
    * Also returned when the target row belongs to ANOTHER property: a 404 keeps
    * property membership from leaking, where a 403 would confirm the row exists.

@@ -6,10 +6,14 @@ import { StaffAuthController } from './staff-auth.controller';
 import { StaffTeamController } from './staff-team.controller';
 import { StaffNotificationsController } from './staff-notifications.controller';
 import { StaffDeviceTokensController } from './staff-device-tokens.controller';
+import { StaffSessionsController } from './staff-sessions.controller';
+import { StaffMfaController } from './staff-mfa.controller';
 import { StaffAuthService } from './staff-auth.service';
 import { StaffOtpService } from './staff-otp.service';
 import { StaffTokenService } from './staff-token.service';
 import { StaffTeamService } from './staff-team.service';
+import { StaffSessionsService } from './staff-sessions.service';
+import { StaffMfaService } from './staff-mfa.service';
 import { StaffJwtGuard } from './staff-jwt.guard';
 import { StaffPermissionsGuard } from './staff-permissions.guard';
 
@@ -25,12 +29,16 @@ import { StaffPermissionsGuard } from './staff-permissions.guard';
     StaffTeamController,
     StaffNotificationsController,
     StaffDeviceTokensController,
+    StaffSessionsController,
+    StaffMfaController,
   ],
   providers: [
     StaffAuthService,
     StaffOtpService,
     StaffTokenService,
     StaffTeamService,
+    StaffSessionsService,
+    StaffMfaService,
     StaffJwtGuard,
     StaffPermissionsGuard,
   ],

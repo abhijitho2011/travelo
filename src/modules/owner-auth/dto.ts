@@ -37,6 +37,17 @@ export class RefreshDto {
   @IsString() @Length(10, 8192) refreshToken!: string;
 }
 
+/** A TOTP (or, for disable, a recovery code) supplied from the Security page. */
+export class OwnerMfaCodeDto {
+  @IsString() @Length(6, 32) code!: string;
+}
+
+/** The challenge token from first-factor sign-in plus the second factor. */
+export class OwnerMfaChallengeDto {
+  @IsString() @Length(10, 8192) mfaToken!: string;
+  @IsString() @Length(6, 32) code!: string;
+}
+
 export class AddressDto {
   @IsString() @Length(1, 255) line1!: string;
   @IsString() @Length(1, 128) city!: string;

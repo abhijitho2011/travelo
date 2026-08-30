@@ -83,4 +83,36 @@ export const OwnerErrors = {
 
   // ---------- Sessions ----------
   sessionNotFound: () => ownerError('SESSION_NOT_FOUND', 'Session not found', HttpStatus.NOT_FOUND),
+
+  // ---------- TOTP MFA ----------
+  mfaNotConfigured: () =>
+    ownerError(
+      'MFA_NOT_CONFIGURED',
+      'Two-factor authentication is not available on this deployment (no encryption key is configured). Contact your platform operator.',
+      HttpStatus.SERVICE_UNAVAILABLE,
+    ),
+  mfaNotEnrolled: () =>
+    ownerError('MFA_NOT_ENROLLED', 'Start enrolment before verifying a code', HttpStatus.BAD_REQUEST),
+  mfaAlreadyEnabled: () =>
+    ownerError(
+      'MFA_ALREADY_ENABLED',
+      'Two-factor authentication is already enabled',
+      HttpStatus.CONFLICT,
+    ),
+  mfaNotEnabled: () =>
+    ownerError('MFA_NOT_ENABLED', 'Two-factor authentication is not enabled', HttpStatus.BAD_REQUEST),
+  mfaInvalidCode: () =>
+    ownerError('MFA_INVALID_CODE', 'Invalid or expired code', HttpStatus.UNAUTHORIZED),
+  mfaChallengeInvalid: () =>
+    ownerError(
+      'MFA_CHALLENGE_INVALID',
+      'This sign-in attempt has expired. Start again.',
+      HttpStatus.UNAUTHORIZED,
+    ),
+  mfaLocked: (seconds: number) =>
+    ownerError(
+      'MFA_LOCKED',
+      `Too many incorrect codes. Try again in ${Math.ceil(seconds / 60)} minute(s).`,
+      HttpStatus.TOO_MANY_REQUESTS,
+    ),
 };

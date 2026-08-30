@@ -7,6 +7,7 @@ import {
   hotelStaffStatusValues,
   owners,
   properties,
+  staffSessions,
   HotelStaffRole,
   HotelStaffStatus,
 } from '../../database/schema';
@@ -183,6 +184,35 @@ export class StaffService {
     });
 
     return { id, status, previousStatus: existing.status };
+  }
+
+  /**
+   * Force-sign-out a staff member from EVERY device, platform-wide. Reserved
+   * for `staff.manage` — the same power that can block an account. Revokes all
+   * live `staff_sessions` so the very next request on any device 401s.
+   */
+  async revokeAllSessions(id: string) {
+    const [existing] = await this.db
+      .select({ id: hotelStaff.id })
+      .from(hotelStaff)
+      .where(and(eq(hotelStaff.id, id), isNull(hotelStaff.deletedAt)))
+      .limit(1);
+    if (!existing) throw new NotFoundException('Staff member not found');
+
+    const revoked = await this.db
+      .update(staffSessions)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(staffSessions.staffId, id), isNull(staffSessions.revokedAt)))
+      .returning({ id: staffSessions.id });
+
+    await this.audit.record({
+      action: 'staff.sessions.revoked_all',
+      entity: 'hotel_staff',
+      entityId: id,
+      after: { revoked: revoked.map((r) => r.id) },
+    });
+
+    return { id, revoked: revoked.length };
   }
 
   /** Exposed for reuse/testing — the values a filter may legitimately carry. */

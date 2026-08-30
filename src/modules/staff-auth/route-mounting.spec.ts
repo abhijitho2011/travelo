@@ -7,6 +7,7 @@ import { StaffAuthController } from './staff-auth.controller';
 import { StaffTeamController } from './staff-team.controller';
 import { StaffAuthService } from './staff-auth.service';
 import { StaffTeamService } from './staff-team.service';
+import { StaffMfaService } from './staff-mfa.service';
 import { StaffJwtGuard } from './staff-jwt.guard';
 import { StaffPermissionsGuard } from './staff-permissions.guard';
 
@@ -26,6 +27,7 @@ describe('staff surface route mounting', () => {
         StaffPermissionsGuard,
         { provide: StaffAuthService, useValue: {} },
         { provide: StaffTeamService, useValue: {} },
+        { provide: StaffMfaService, useValue: {} },
         { provide: JwtService, useValue: {} },
         { provide: ConfigService, useValue: { get: () => undefined, getOrThrow: () => 'x' } },
         { provide: DRIZZLE, useValue: {} },

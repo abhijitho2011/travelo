@@ -35,4 +35,15 @@ export class StaffController {
   setStatus(@Param('id') id: string, @Body() dto: SetStaffStatusAdminDto) {
     return this.svc.setStatus(id, dto.status, dto.reason);
   }
+
+  /**
+   * Force-sign-out a staff member from every device. Same `staff.manage` power
+   * that can block them — a compromised staff account can be cut off instantly
+   * without waiting for the 15-minute access token to expire.
+   */
+  @Post(':id/sessions/revoke-all')
+  @RequirePermissions('staff.manage')
+  revokeAllSessions(@Param('id') id: string) {
+    return this.svc.revokeAllSessions(id);
+  }
 }
