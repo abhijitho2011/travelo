@@ -46,6 +46,7 @@ import '../../features/restaurant/presentation/pos_screen.dart';
 import '../../features/restaurant/presentation/restaurant_cleaning_screen.dart';
 import '../../features/restaurant/presentation/restaurant_screen.dart';
 import '../../features/restaurant/presentation/order_screen.dart';
+import '../../features/restaurant/presentation/orders_screen.dart';
 import '../../features/restaurant/presentation/menu_management_screen.dart';
 import '../../features/restaurant/presentation/tables_management_screen.dart';
 import '../../features/rooms/presentation/bulk_rooms_screen.dart';
@@ -331,6 +332,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: Routes.restaurantTables,
             builder: (_, _) => const TablesManagementScreen(),
+          ),
+          GoRoute(
+            path: Routes.restaurantOrders,
+            builder: (_, _) => const RestaurantOrdersScreen(),
           ),
           GoRoute(
             path: Routes.restaurantOrderPattern,
