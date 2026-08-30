@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/data/owner_repository.dart';
@@ -109,6 +110,8 @@ class _Detail extends ConsumerWidget {
         children: [
           _Header(property: property),
           gapMd,
+          _Photos(propertyId: propertyId),
+          gapSection,
           _ManagersTile(propertyId: propertyId),
           gapSection,
           _Facilities(propertyId: propertyId),
@@ -547,6 +550,146 @@ class _RoomsSummary extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The property's photo gallery, with add and delete. Photos were write-once at
+/// creation before this; the endpoints (list/upload/delete) already existed.
+class _Photos extends ConsumerStatefulWidget {
+  const _Photos({required this.propertyId});
+  final String propertyId;
+
+  @override
+  ConsumerState<_Photos> createState() => _PhotosState();
+}
+
+class _PhotosState extends ConsumerState<_Photos> {
+  bool _busy = false;
+
+  Future<void> _add() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final picker = ImagePicker();
+    final imgs = await picker.pickMultiImage(imageQuality: 80);
+    if (imgs.isEmpty) return;
+    setState(() => _busy = true);
+    try {
+      for (final img in imgs) {
+        await ref.read(ownerRepositoryProvider).uploadPropertyPhoto(widget.propertyId, img);
+      }
+      ref.invalidate(propertyPhotosProvider(widget.propertyId));
+      ref.invalidate(propertiesProvider); // cover photo / completeness may change
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message.isEmpty ? 'Upload failed.' : e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _delete(String photoId) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete this photo?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ref.read(ownerRepositoryProvider).deletePropertyPhoto(widget.propertyId, photoId);
+      ref.invalidate(propertyPhotosProvider(widget.propertyId));
+      ref.invalidate(propertiesProvider);
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message.isEmpty ? 'Delete failed.' : e.message)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final async = ref.watch(propertyPhotosProvider(widget.propertyId));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: SectionHeader(title: 'Photos', icon: Icons.photo_library_outlined),
+            ),
+            TextButton.icon(
+              onPressed: _busy ? null : _add,
+              icon: _busy
+                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.add_a_photo_outlined, size: 18),
+              label: const Text('Add'),
+            ),
+          ],
+        ),
+        async.when(
+          loading: () => const SizedBox(height: 110, child: Center(child: CircularProgressIndicator())),
+          error: (_, __) => Text(
+            'Could not load photos.',
+            style: AppTypography.body(size: 13, color: c.mutedForeground),
+          ),
+          data: (photos) {
+            if (photos.isEmpty) {
+              return Text(
+                'No photos yet. Add a few to help this listing stand out.',
+                style: AppTypography.body(size: 13, color: c.mutedForeground),
+              );
+            }
+            return SizedBox(
+              height: 110,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: photos.length,
+                separatorBuilder: (_, __) => const SizedBox(width: Sp.sm),
+                itemBuilder: (_, i) {
+                  final p = photos[i];
+                  final url = p['url'] as String?;
+                  return Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: R.rMd,
+                        child: url == null
+                            ? Container(width: 150, height: 110, color: c.muted)
+                            : Image.network(
+                                url,
+                                width: 150,
+                                height: 110,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    Container(width: 150, height: 110, color: c.muted),
+                              ),
+                      ),
+                      Positioned(
+                        top: 2,
+                        right: 2,
+                        child: Material(
+                          color: Colors.black54,
+                          shape: const CircleBorder(),
+                          child: InkWell(
+                            customBorder: const CircleBorder(),
+                            onTap: () => _delete('${p['id']}'),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: Icon(Icons.close, size: 16, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }

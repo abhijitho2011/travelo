@@ -259,6 +259,12 @@ final propertyRoomsProvider =
   (ref, propertyId) => ref.watch(ownerRepositoryProvider).propertyRooms(propertyId),
 );
 
+/// The property's photos (each carries a short-lived presigned `url`).
+final propertyPhotosProvider =
+    FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>(
+  (ref, propertyId) => ref.watch(ownerRepositoryProvider).propertyPhotos(propertyId),
+);
+
 final ownerAccountProvider = FutureProvider.autoDispose<OwnerAccount>(
   (ref) => ref.watch(ownerRepositoryProvider).profile(),
 );
