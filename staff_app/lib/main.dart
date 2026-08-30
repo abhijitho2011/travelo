@@ -44,9 +44,9 @@ class _TaveloStaffAppState extends ConsumerState<TaveloStaffApp> {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeControllerProvider);
 
-    // Whenever the device comes back online, give the queue a chance to drain.
-    // With no module handlers registered yet this is a no-op that leaves every
-    // operation queued — see README, "Offline".
+    // Whenever the device comes back online, drain the queue. The push handler
+    // is registered in syncQueueProvider, so queued housekeeping, work-order and
+    // security ops are replayed here rather than stranded.
     ref.listen(isOnlineProvider, (previous, next) {
       if (next.value == true && previous?.value != true) {
         ref.read(syncQueueProvider).drain();

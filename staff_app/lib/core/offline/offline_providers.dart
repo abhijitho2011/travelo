@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers.dart';
 import 'connectivity_service.dart';
+import 'staff_sync_handler.dart';
 import 'sync_queue.dart';
 
 final connectivityServiceProvider = Provider<ConnectivityService>(
@@ -18,6 +19,10 @@ final isOnlineProvider = StreamProvider<bool>((ref) async* {
 
 final syncQueueProvider = ChangeNotifierProvider<SyncQueue>((ref) {
   final queue = SyncQueue(ref.watch(localStoreProvider));
+  // Register the push handler so queued offline mutations actually drain. This
+  // is the one wiring that was missing: without it every op stayed pending
+  // forever. Reconnect triggers drain() from main.dart.
+  queue.registerHandler(StaffSyncHandler(ref.watch(apiClientProvider)));
   // Fire and forget — the queue notifies once the disk read completes.
   queue.load();
   return queue;
