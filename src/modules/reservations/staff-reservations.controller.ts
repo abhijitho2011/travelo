@@ -22,6 +22,7 @@ import { AuditService } from '../audit/audit.service';
 import { DeskService } from './desk.service';
 import { ReservationsService } from './reservations.service';
 import { FolioReceiptService } from '../folio/folio-receipt.service';
+import { ReportsService } from './reports.service';
 import {
   AssignRoomDto,
   AvailabilityQueryDto,
@@ -387,5 +388,38 @@ export class StaffDashboardController {
   @RequireStaffPermissions('dashboard.read')
   dashboard(@CurrentStaff() me: AuthenticatedStaff) {
     return this.desk.dashboard(me.propertyId);
+  }
+}
+
+/**
+ * Hotel reporting — occupancy / ADR / RevPAR history and the arrivals /
+ * departures manifest. `reports.read`, which management and accounts hold.
+ */
+@ApiTags('Staff Reports')
+@ApiBearerAuth()
+@UseGuards(StaffJwtGuard, StaffPermissionsGuard)
+@Controller({ path: 'api/v1/staff/reports', version: VERSION_NEUTRAL })
+export class StaffReportsController {
+  constructor(private readonly reports: ReportsService) {}
+
+  @Get('occupancy')
+  @RequireStaffPermissions('reports.read')
+  occupancy(@CurrentStaff() me: AuthenticatedStaff, @Query('days') days?: string) {
+    return this.reports.occupancyHistory(me.propertyId, days ? Number(days) : 30);
+  }
+
+  @Get('summary')
+  @RequireStaffPermissions('reports.read')
+  summary(@CurrentStaff() me: AuthenticatedStaff, @Query('days') days?: string) {
+    return this.reports.summary(me.propertyId, days ? Number(days) : 30);
+  }
+
+  @Get('manifest')
+  @RequireStaffPermissions('reports.read')
+  manifest(@CurrentStaff() me: AuthenticatedStaff, @Query('date') date?: string) {
+    const d = date && /^\d{4}-\d{2}-\d{2}$/.test(date)
+      ? date
+      : new Date().toISOString().slice(0, 10);
+    return this.reports.manifest(me.propertyId, d);
   }
 }

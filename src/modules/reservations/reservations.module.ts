@@ -6,10 +6,12 @@ import { StaffPermissionsGuard } from '../staff-auth/staff-permissions.guard';
 import {
   StaffDashboardController,
   StaffDeskController,
+  StaffReportsController,
   StaffReservationsController,
 } from './staff-reservations.controller';
 import { DeskService } from './desk.service';
 import { ReservationsService } from './reservations.service';
+import { ReportsService } from './reports.service';
 import { FolioModule } from '../folio/folio.module';
 
 /**
@@ -25,8 +27,13 @@ import { FolioModule } from '../folio/folio.module';
  */
 @Module({
   imports: [JwtModule.register({}), SharedAuthModule, FolioModule],
-  controllers: [StaffReservationsController, StaffDeskController, StaffDashboardController],
-  providers: [ReservationsService, DeskService, StaffJwtGuard, StaffPermissionsGuard],
+  controllers: [
+    StaffReservationsController,
+    StaffDeskController,
+    StaffDashboardController,
+    StaffReportsController,
+  ],
+  providers: [ReservationsService, DeskService, ReportsService, StaffJwtGuard, StaffPermissionsGuard],
   exports: [ReservationsService, DeskService],
 })
 export class ReservationsModule {}
