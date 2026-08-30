@@ -1,8 +1,183 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Loader2, Plus } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
 import { AsyncSection, PageHeader, StatusBadge } from "@/components/admin/primitives";
-import { usePermissions, useRoles } from "@/hooks/api/use-access";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import type { Permission, Role } from "@/hooks/api/types";
+import {
+  useCreateRole,
+  usePermissions,
+  useRoles,
+  useUpdateRole,
+} from "@/hooks/api/use-access";
+import { errorMessage } from "@/lib/api";
 import { humanise } from "@/lib/format";
+
+function groupPermissions(permissions: Permission[]) {
+  return permissions.reduce<Record<string, string[]>>((acc, permission) => {
+    const group = permission.group || "other";
+    (acc[group] ??= []).push(permission.key);
+    return acc;
+  }, {});
+}
+
+/** Create (no role) or edit (role passed) a role and its permission set. */
+function RoleEditorDialog({ role, permissions }: { role?: Role; permissions: Permission[] }) {
+  const editing = !!role;
+  const [open, setOpen] = useState(false);
+  const [key, setKey] = useState(role?.key ?? "");
+  const [name, setName] = useState(role?.name ?? "");
+  const [description, setDescription] = useState(role?.description ?? "");
+  const [selected, setSelected] = useState<string[]>(role?.permissions ?? []);
+  const create = useCreateRole();
+  const update = useUpdateRole();
+  const busy = create.isPending || update.isPending;
+
+  const groups = groupPermissions(permissions);
+  const wildcard = selected.includes("*");
+
+  const openDialog = () => {
+    setKey(role?.key ?? "");
+    setName(role?.name ?? "");
+    setDescription(role?.description ?? "");
+    setSelected(role?.permissions ?? []);
+    setOpen(true);
+  };
+
+  const toggle = (permKey: string) =>
+    setSelected((cur) =>
+      cur.includes(permKey) ? cur.filter((k) => k !== permKey) : [...cur, permKey],
+    );
+
+  const invalid = !editing && (key.trim().length < 2 || name.trim().length < 2);
+
+  const submit = async () => {
+    try {
+      if (editing) {
+        await update.mutateAsync({
+          id: role.id,
+          name: name.trim(),
+          description: description.trim() || undefined,
+          permissions: selected,
+        });
+      } else {
+        const trimmedDescription = description.trim();
+        await create.mutateAsync({
+          key: key.trim(),
+          name: name.trim(),
+          permissions: selected,
+          ...(trimmedDescription ? { description: trimmedDescription } : {}),
+        });
+      }
+      toast.success(editing ? "Role updated" : "Role created", { description: name.trim() });
+      setOpen(false);
+    } catch (error) {
+      toast.error("Could not save role", { description: errorMessage(error) });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        {editing ? (
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={openDialog}>
+            Edit
+          </Button>
+        ) : (
+          <Button size="sm" className="h-8" onClick={openDialog}>
+            <Plus aria-hidden className="mr-1.5 size-3.5" /> New role
+          </Button>
+        )}
+      </DialogTrigger>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{editing ? `Edit ${role.name}` : "New role"}</DialogTitle>
+          <DialogDescription>
+            Permissions are enforced by the backend on every request.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="role-key">Key</Label>
+              <Input
+                id="role-key"
+                value={key}
+                disabled={editing}
+                onChange={(e) => setKey(e.target.value)}
+                placeholder="regional_manager"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="role-name">Name</Label>
+              <Input id="role-name" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="role-desc">Description</Label>
+            <Textarea
+              id="role-desc"
+              rows={2}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+          {wildcard ? (
+            <p className="rounded-md border border-success/25 bg-success-soft px-3 py-2 text-sm text-success">
+              This role holds the <code>*</code> wildcard — every permission. Remove it below to
+              scope the role.
+            </p>
+          ) : null}
+          <fieldset className="space-y-3">
+            <legend className="text-sm font-semibold">Permissions</legend>
+            {Object.entries(groups).map(([group, keys]) => (
+              <div key={group}>
+                <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {humanise(group)}
+                </h3>
+                <div className="mt-1.5 grid gap-1 sm:grid-cols-2">
+                  {keys.map((permKey) => (
+                    <label key={permKey} className="flex items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(permKey)}
+                        onChange={() => toggle(permKey)}
+                      />
+                      <code className="text-muted-foreground">{permKey}</code>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </fieldset>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={busy}>
+            Cancel
+          </Button>
+          <Button disabled={invalid || busy} onClick={() => void submit()}>
+            {busy && <Loader2 aria-hidden className="mr-2 size-4 animate-spin" />}
+            {editing ? "Save changes" : "Create role"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export const Route = createFileRoute("/roles")({
   head: () => ({
@@ -25,17 +200,14 @@ function RolesPage() {
   const permissions = permissionsQuery.data ?? [];
 
   // Group permissions so the matrix reads by domain rather than as a flat list.
-  const groups = permissions.reduce<Record<string, string[]>>((acc, permission) => {
-    const group = permission.group || "other";
-    (acc[group] ??= []).push(permission.key);
-    return acc;
-  }, {});
+  const groups = groupPermissions(permissions);
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="Roles & permissions"
         description="Permissions are enforced by the backend on every request — the UI only reflects them."
+        actions={<RoleEditorDialog permissions={permissions} />}
       />
 
       <AsyncSection
@@ -58,6 +230,11 @@ function RolesPage() {
                 {typeof role.adminCount === "number" && (
                   <span className="text-xs text-muted-foreground">
                     {role.adminCount} admin{role.adminCount === 1 ? "" : "s"}
+                  </span>
+                )}
+                {!role.isSystem && (
+                  <span className="ml-auto">
+                    <RoleEditorDialog role={role} permissions={permissions} />
                   </span>
                 )}
               </div>
