@@ -4,6 +4,7 @@ import { DRIZZLE, Database } from '../../database/database.module';
 import { invoices, properties, subscriptionPlans, subscriptions } from '../../database/schema';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { StorageService } from '../storage/storage.service';
+import { BillingService } from '../billing/billing.service';
 import { OwnerErrors } from './owner-errors';
 import { OwnerPortalService } from './owner-portal.service';
 
@@ -11,9 +12,9 @@ import { OwnerPortalService } from './owner-portal.service';
 const INVOICE_URL_TTL_SECONDS = 900;
 
 /**
- * Read-only subscription view for the owner app. Owners cannot self-upgrade —
- * plan changes are an admin action — so there is deliberately no write path
- * here.
+ * The owner app's subscription surface: the current plan, invoices, and — since
+ * Phase 2 — the ability to PAY for the next period. Plan changes remain an admin
+ * action; renewal payment is the one write an owner can self-serve.
  */
 @Injectable()
 export class OwnerSubscriptionService {
@@ -26,7 +27,28 @@ export class OwnerSubscriptionService {
      * the row is unaffected.
      */
     @Optional() private readonly storage?: StorageService,
+    /** Optional for the same reason — order creation needs it, reads do not. */
+    @Optional() private readonly billing?: BillingService,
   ) {}
+
+  /**
+   * Creates a gateway order for the owner's OWN subscription's next period, so
+   * the owner app can collect the renewal in-app. Resolves the owner's current
+   * subscription server-side — the client never names one — then delegates to
+   * the single BillingService order path (which parks a PENDING payment the
+   * webhook later settles). Returns exactly what a checkout widget needs.
+   */
+  async createOrder(ownerId: string, gateway?: 'RAZORPAY' | 'CASHFREE') {
+    if (!this.billing) throw OwnerErrors.subscriptionNotFound();
+    const [row] = await this.db
+      .select({ id: subscriptions.id })
+      .from(subscriptions)
+      .where(eq(subscriptions.ownerId, ownerId))
+      .orderBy(desc(subscriptions.createdAt))
+      .limit(1);
+    if (!row) throw OwnerErrors.subscriptionNotFound();
+    return this.billing.createGatewayOrder({ ownerId, subscriptionId: row.id, gateway });
+  }
 
   /** Whole days left in the current period, floored at 0 once it has lapsed. */
   static daysRemaining(periodEnd: Date, now: Date = new Date()): number {

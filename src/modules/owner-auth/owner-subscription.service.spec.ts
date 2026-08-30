@@ -166,3 +166,40 @@ describe('OwnerSubscriptionService.invoices', () => {
     await expect(svc.invoices('own-1', { limit: 5000 })).resolves.toMatchObject({ limit: 100 });
   });
 });
+
+describe('OwnerSubscriptionService.createOrder', () => {
+  it('resolves the owner\'s own subscription and delegates to billing', async () => {
+    const db = mockDb({ select: { subscriptions: [[{ id: 'sub-1' }]] } });
+    const billing = { createGatewayOrder: jest.fn(async () => ({ paymentId: 'pay-1', gateway: 'RAZORPAY', orderId: 'order_1' })) };
+    const svc = new OwnerSubscriptionService(
+      db as never,
+      { resolve: async () => ({}) } as never,
+      undefined,
+      billing as never,
+    );
+    const out = await svc.createOrder('own-1', 'RAZORPAY');
+    expect(billing.createGatewayOrder).toHaveBeenCalledWith({
+      ownerId: 'own-1',
+      subscriptionId: 'sub-1',
+      gateway: 'RAZORPAY',
+    });
+    expect(out).toMatchObject({ orderId: 'order_1' });
+    // The lookup is scoped to the owner.
+    expect(sqlText(db.wheresFor('subscriptions')[0])).toContain('own-1');
+  });
+
+  it('404s when the owner has no subscription', async () => {
+    const db = mockDb({ select: { subscriptions: [[]] } });
+    const billing = { createGatewayOrder: jest.fn() };
+    const svc = new OwnerSubscriptionService(
+      db as never,
+      { resolve: async () => ({}) } as never,
+      undefined,
+      billing as never,
+    );
+    await expect(svc.createOrder('own-1')).rejects.toMatchObject({
+      response: { error: 'SUBSCRIPTION_NOT_FOUND' },
+    });
+    expect(billing.createGatewayOrder).not.toHaveBeenCalled();
+  });
+});

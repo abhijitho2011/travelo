@@ -5,6 +5,7 @@ import { EntitlementsModule } from '../entitlements/entitlements.module';
 import { ImpersonationModule } from '../impersonation/impersonation.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PropertiesModule } from '../properties/properties.module';
+import { BillingModule } from '../billing/billing.module';
 import { OwnerAuthController } from './owner-auth.controller';
 import { OwnerPortalController } from './owner-portal.controller';
 import { OwnerAccountController } from './owner-account.controller';
@@ -36,6 +37,7 @@ import { OwnerNotificationsController } from './owner-notifications.controller';
     ImpersonationModule,
     NotificationsModule,
     PropertiesModule,
+    BillingModule,
   ],
   controllers: [
     OwnerAuthController,

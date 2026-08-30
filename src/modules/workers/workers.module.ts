@@ -40,6 +40,20 @@ export class SubscriptionLifecycleWorker {
    *  GRACE_PERIOD -> SUSPENDED when now >= currentPeriodEnd + 14 days
    */
   async run(now: Date = new Date()) {
+    // TRIALS. Previously the DEFAULT status was TRIAL and the lifecycle never
+    // touched it, so a trial lived forever. Capture the trials lapsing THIS run
+    // before flipping them (so their origin is still known for the "trial
+    // ended" note), then expire them. A trial that is paid for converts to
+    // ACTIVE via settlement, so it never reaches here.
+    const expiredTrials = await this.audience(
+      sql`s.status='TRIAL' AND s.current_period_end <= ${now}::timestamptz`,
+    );
+    await this.db.execute(sql`
+      UPDATE subscriptions
+      SET status='EXPIRED', updated_at=now()
+      WHERE status='TRIAL' AND current_period_end <= ${now}::timestamptz
+    `);
+
     await this.db.execute(sql`
       UPDATE subscriptions
       SET status='EXPIRING', updated_at=now()
@@ -51,10 +65,17 @@ export class SubscriptionLifecycleWorker {
       SET status='EXPIRED', updated_at=now()
       WHERE status IN ('ACTIVE','EXPIRING') AND current_period_end <= ${now}::timestamptz
     `);
+    // Only a subscription that has EVER been paid earns a grace period. A
+    // never-paid trial that just expired stays EXPIRED — it does not get 14 more
+    // days of access dressed up as grace.
     await this.db.execute(sql`
       UPDATE subscriptions
       SET status='GRACE_PERIOD', updated_at=now()
       WHERE status='EXPIRED' AND current_period_end > ${new Date(now.getTime() - 7 * 86400_000)}::timestamptz
+        AND EXISTS (
+          SELECT 1 FROM payments pay
+          WHERE pay.subscription_id = subscriptions.id AND pay.status = 'SUCCESS'
+        )
     `);
     await this.db.execute(sql`
       UPDATE subscriptions
@@ -64,7 +85,7 @@ export class SubscriptionLifecycleWorker {
 
     // Telling the owner is strictly downstream of the state machine above:
     // it runs after every UPDATE has landed and can only log on failure.
-    await this.announce(now);
+    await this.announce(now, expiredTrials);
     return { ok: true };
   }
 
@@ -74,8 +95,37 @@ export class SubscriptionLifecycleWorker {
    * crashed halfway through last night still catches up — `notifyOnceQuietly`
    * is what stops that from becoming a daily repeat.
    */
-  private async announce(now: Date): Promise<void> {
+  private async announce(now: Date, expiredTrials: LifecycleRecipient[] = []): Promise<void> {
     try {
+      // Trials about to end (reminders), then the ones that ended this run.
+      for (const days of [3, 1]) {
+        const from = new Date(now.getTime() + (days - 1) * 86400_000);
+        const to = new Date(now.getTime() + days * 86400_000);
+        const rows = await this.audience(
+          sql`s.status='TRIAL'
+              AND s.current_period_end > ${from}::timestamptz
+              AND s.current_period_end <= ${to}::timestamptz`,
+        );
+        for (const r of rows) {
+          await this.notifications.notifyOnceQuietly({
+            key: 'subscription.trial_ending',
+            relatedType: `subscription.trial_ending.${days}`,
+            relatedId: r.subscriptionId,
+            targets: this.ownerTargets(r),
+            vars: { ...this.ownerVars(r), days },
+          });
+        }
+      }
+      for (const r of expiredTrials) {
+        await this.notifications.notifyOnceQuietly({
+          key: 'subscription.trial_expired',
+          relatedType: 'subscription.trial_expired',
+          relatedId: r.subscriptionId,
+          targets: this.ownerTargets(r),
+          vars: this.ownerVars(r),
+        });
+      }
+
       for (const days of SubscriptionLifecycleWorker.EXPIRY_WARNING_DAYS) {
         const from = new Date(now.getTime() + (days - 1) * 86400_000);
         const to = new Date(now.getTime() + days * 86400_000);

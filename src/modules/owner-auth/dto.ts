@@ -142,3 +142,8 @@ export class PaginationDto {
   @IsOptional() @IsInt() @Min(1) @Max(100) limit?: number;
   @IsOptional() @IsInt() @Min(0) offset?: number;
 }
+
+export class CreateSubscriptionOrderDto {
+  /** Which gateway to raise the order with. Defaults to RAZORPAY server-side. */
+  @IsOptional() @IsIn(['RAZORPAY', 'CASHFREE']) gateway?: 'RAZORPAY' | 'CASHFREE';
+}
