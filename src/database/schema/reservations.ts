@@ -8,6 +8,7 @@ import {
   text,
   date,
   jsonb,
+  boolean,
   index,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
@@ -189,3 +190,39 @@ export const propertyDailySnapshots = pgTable(
 );
 
 export type PropertyDailySnapshot = typeof propertyDailySnapshots.$inferSelect;
+
+/**
+ * The guest CRM overlay — the fields that are ABOUT a guest rather than one
+ * stay (notes, blacklist), keyed by (property, phone). Stay history is the
+ * reservations themselves, grouped by phone; this is only what those rows
+ * cannot carry.
+ */
+export const guestProfiles = pgTable(
+  'guest_profiles',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    propertyId: uuid('property_id')
+      .notNull()
+      .references(() => properties.id, { onDelete: 'cascade' }),
+    phone: varchar('phone', { length: 32 }).notNull(),
+    name: varchar('name', { length: 160 }),
+    email: varchar('email', { length: 254 }),
+    idType: varchar('id_type', { length: 32 }),
+    idNumber: varchar('id_number', { length: 64 }),
+    notes: text('notes'),
+    blacklisted: boolean('blacklisted').notNull().default(false),
+    blacklistReason: text('blacklist_reason'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    propertyPhoneUnique: uniqueIndex('guest_profiles_property_phone_unique').on(
+      t.propertyId,
+      t.phone,
+    ),
+  }),
+);
+
+export type GuestProfile = typeof guestProfiles.$inferSelect;

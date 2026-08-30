@@ -21,6 +21,7 @@ import { RoomsModule } from './modules/rooms/rooms.module';
 import { ReservationsModule } from './modules/reservations/reservations.module';
 import { FolioModule } from './modules/folio/folio.module';
 import { ManagementModule } from './modules/management/management.module';
+import { GuestsModule } from './modules/guests/guests.module';
 import { HousekeepingModule } from './modules/housekeeping/housekeeping.module';
 import { RestaurantModule } from './modules/restaurant/restaurant.module';
 import { SpaModule } from './modules/spa/spa.module';
@@ -105,6 +106,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     ReservationsModule,
     FolioModule,
     ManagementModule,
+    GuestsModule,
     HousekeepingModule,
     RestaurantModule,
     SpaModule,
