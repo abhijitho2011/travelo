@@ -43,10 +43,9 @@ Legend: ✅ done & deployed · 🔶 partial (remainder noted) · ⬜ not started
 - ✅ 3.6 Owner notification inbox + bell
 - ✅ 3.7 Owner photo management (view/add/delete after creation)
 - ✅ 3.8 Owner 401→signOut bridge; staff transient-vs-expired refresh
-- 🔶 3.9 Small: ✅ `lowStock` bool coercion fixed. Remaining (latent/low-value,
-  light follow-up): `/restaurant/orders` list route (needs an orders-list
-  screen), lost-found update UI, supplier screens, admin jobs-retry consumer,
-  `isMissingEndpoint` logging.
+- ✅ 3.9 Small: `lowStock` coercion, `/restaurant/orders` list screen,
+  lost-found status action, inventory supplier screens, admin jobs-retry
+  re-drives the queue, 404 debug logging — all done.
 - ✅ 3.10 Owner property GET/PATCH/DELETE (edit + archive); model parses
   `contact`, dead `starRating` chip removed
 
