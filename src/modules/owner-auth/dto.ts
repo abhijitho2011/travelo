@@ -161,6 +161,21 @@ export class TicketFilterDto {
   @IsOptional() @IsInt() @Min(0) offset?: number;
 }
 
+/**
+ * The read-only calendar window. Both bounds are optional — the service falls
+ * back to today .. today + 14 nights — but a supplied bound must be a plain
+ * ISO date, because it is compared against `date` columns.
+ */
+export class CalendarRangeDto {
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'from must be YYYY-MM-DD' })
+  from?: string;
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'to must be YYYY-MM-DD' })
+  to?: string;
+}
+
 export class PaginationDto {
   @IsOptional() @IsInt() @Min(1) @Max(100) limit?: number;
   @IsOptional() @IsInt() @Min(0) offset?: number;

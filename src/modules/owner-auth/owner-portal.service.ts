@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, gt, inArray, isNull, lt, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, lt, ne, sql } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import {
   hotelStaff,
@@ -24,6 +24,12 @@ import { PropertyPhotosService } from './property-photos.service';
 
 // Subscription statuses that grant the plan's property allowance.
 const USABLE_SUB_STATUSES = ['TRIAL', 'ACTIVE', 'EXPIRING', 'GRACE_PERIOD'];
+
+/** Hard cap on calendar reads — one property's rooms and a fortnight of stays. */
+const OWNER_CALENDAR_MAX_ROWS = 500;
+
+/** Default window when the caller sends no dates: today .. today + 14 nights. */
+const OWNER_CALENDAR_WINDOW_DAYS = 14;
 
 @Injectable()
 export class OwnerPortalService {
@@ -284,6 +290,60 @@ export class OwnerPortalService {
       inHouse: counts?.inHouse ?? 0,
       history: history.slice().reverse(),
     };
+  }
+
+  /**
+   * The bars of that tape chart: every reservation whose stay TOUCHES the
+   * window, not merely those arriving inside it — a guest already in-house on
+   * the 3rd belongs on a 3rd–17th chart. Same strict-inequality overlap rule
+   * the reservations module uses (`check_in < to AND check_out > from`), so the
+   * two surfaces can never disagree about what a night contains.
+   */
+  async propertyReservations(ownerId: string, id: string, range: { from?: string; to?: string }) {
+    await this.assertOwnedProperty(ownerId, id);
+    const { from, to } = OwnerPortalService.calendarWindow(range);
+    const rows = await this.db
+      .select({
+        id: reservations.id,
+        reservationNumber: reservations.reservationNumber,
+        guestName: reservations.guestName,
+        status: reservations.status,
+        checkIn: reservations.checkIn,
+        checkOut: reservations.checkOut,
+        roomId: reservations.roomId,
+        roomTypeId: reservations.roomTypeId,
+      })
+      .from(reservations)
+      .where(
+        and(
+          eq(reservations.propertyId, id),
+          isNull(reservations.deletedAt),
+          lt(reservations.checkIn, to),
+          gt(reservations.checkOut, from),
+        ),
+      )
+      .orderBy(asc(reservations.checkIn))
+      .limit(OWNER_CALENDAR_MAX_ROWS);
+    return { from, to, items: rows };
+  }
+
+  /**
+   * Validates the window. Anything unparseable is ignored rather than 400'd —
+   * a calendar with no dates is a calendar of today, which is what an owner
+   * opening the screen cold expects.
+   */
+  static calendarWindow(range: { from?: string; to?: string }): { from: string; to: string } {
+    const today = new Date();
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const parse = (v: string | undefined): string | null =>
+      v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? v : null;
+
+    const from = parse(range.from) ?? iso(today);
+    const fallbackTo = iso(new Date(Date.parse(from) + OWNER_CALENDAR_WINDOW_DAYS * 86_400_000));
+    const to = parse(range.to);
+    // An inverted or empty window would return everything or nothing by
+    // accident; fall back to the default fortnight instead.
+    return { from, to: to !== null && to > from ? to : fallbackTo };
   }
 
   /** Partial edit: only the provided fields change. Recomputes the listing score. */

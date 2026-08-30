@@ -840,3 +840,61 @@ class OwnerNotification {
         read: j['readAt'] != null || j['read'] == true,
       );
 }
+
+/// One reservation as the READ-ONLY owner calendar needs it: who, when, and
+/// which room. Deliberately thinner than the front-desk record — an owner reads
+/// the tape chart, they do not work it, so rates, folios and guest contact
+/// details never travel to this screen.
+class CalendarReservation {
+  const CalendarReservation({
+    required this.id,
+    required this.reservationNumber,
+    required this.guestName,
+    required this.status,
+    required this.checkIn,
+    required this.checkOut,
+    required this.roomId,
+    required this.roomTypeId,
+  });
+
+  final String id;
+  final String reservationNumber;
+  final String guestName;
+  final String status;
+
+  /// Date-only, local. A stay is [checkIn, checkOut) — the departure date is
+  /// exclusive, so a 1st–3rd booking occupies two nights, not three.
+  final DateTime? checkIn;
+  final DateTime? checkOut;
+
+  /// Empty when the front desk has not assigned a room yet.
+  final String roomId;
+  final String roomTypeId;
+
+  /// Nights actually occupied, floored at 1 so a same-day row is still visible.
+  int get nights {
+    final a = checkIn, b = checkOut;
+    if (a == null || b == null) return 1;
+    final n = b.difference(a).inDays;
+    return n < 1 ? 1 : n;
+  }
+
+  factory CalendarReservation.fromJson(Map j) => CalendarReservation(
+        id: _asStr(j['id']),
+        reservationNumber: _asStr(j['reservationNumber'] ?? j['reservation_number']),
+        guestName: _asStr(j['guestName'] ?? j['guest_name']),
+        status: _asStr(j['status']).toUpperCase(),
+        checkIn: _asDateOnly(j['checkIn'] ?? j['check_in']),
+        checkOut: _asDateOnly(j['checkOut'] ?? j['check_out']),
+        roomId: _asStr(j['roomId'] ?? j['room_id']),
+        roomTypeId: _asStr(j['roomTypeId'] ?? j['room_type_id']),
+      );
+}
+
+/// `check_in` / `check_out` are DATE columns, not instants. Parsing them as
+/// timestamps and converting to local time can shift a stay by a day either
+/// way, so the calendar keeps them at midnight local.
+DateTime? _asDateOnly(dynamic v) {
+  final raw = DateTime.tryParse(v?.toString() ?? '');
+  return raw == null ? null : DateTime(raw.year, raw.month, raw.day);
+}

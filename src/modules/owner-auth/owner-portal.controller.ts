@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Patch,
+  Query,
   Post,
   Res,
   UploadedFiles,
@@ -27,6 +28,7 @@ import {
   type UploadedPhoto,
 } from './property-photos.service';
 import {
+  CalendarRangeDto,
   CreatePropertyDto,
   CreateStaffDto,
   SetStaffStatusDto,
@@ -68,6 +70,21 @@ export class OwnerPortalController {
   @Get('properties/:id/operations')
   operations(@CurrentOwner() owner: AuthenticatedOwner, @Param('id') id: string) {
     return this.portal.propertyOperations(owner.id, id);
+  }
+
+  // NOTE: the calendar's ROW AXIS is `GET properties/:id/rooms`, which already
+  // exists on OwnerRoomsController (owner-scoped, 404 on another owner's
+  // hotel). It is deliberately not re-declared here — two controllers claiming
+  // one path would shadow each other silently.
+
+  /** Reservations OVERLAPPING the window — the bars of that calendar. */
+  @Get('properties/:id/reservations')
+  calendarReservations(
+    @CurrentOwner() owner: AuthenticatedOwner,
+    @Param('id') id: string,
+    @Query() range: CalendarRangeDto,
+  ) {
+    return this.portal.propertyReservations(owner.id, id, range);
   }
 
   @Patch('properties/:id')

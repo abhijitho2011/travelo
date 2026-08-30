@@ -130,6 +130,28 @@ class OwnerRepository {
     return (list as List).map((e) => Room.fromJson(e as Map)).toList();
   }
 
+  /// Reservations OVERLAPPING [from, to) for the read-only booking calendar.
+  /// The server applies the same strict overlap rule the front desk uses, so a
+  /// guest already in-house when the window opens still appears.
+  Future<List<CalendarReservation>> propertyReservations(
+    String propertyId, {
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    String d(DateTime t) =>
+        '${t.year.toString().padLeft(4, '0')}-'
+        '${t.month.toString().padLeft(2, '0')}-'
+        '${t.day.toString().padLeft(2, '0')}';
+    final res = await _api.get(
+      '/properties/$propertyId/reservations',
+      query: {'from': d(from), 'to': d(to)},
+    );
+    final list = res is Map ? (res['items'] ?? res['data'] ?? []) : res;
+    return (list as List)
+        .map((e) => CalendarReservation.fromJson(e as Map))
+        .toList();
+  }
+
   /// Admin-managed state → districts reference. Falls back to a bundled asset
   /// (loaded by the caller) when the endpoint is unavailable.
   Future<Map<String, List<String>>> locations() async {

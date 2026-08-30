@@ -126,6 +126,8 @@ class _Detail extends ConsumerWidget {
           gapSection,
           _Operations(propertyId: propertyId),
           gapSection,
+          _CalendarTile(propertyId: propertyId, propertyName: property.name),
+          gapSection,
           _ManagersTile(propertyId: propertyId),
           gapSection,
           _Facilities(propertyId: propertyId),
@@ -214,6 +216,41 @@ class _Header extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Entry point to the read-only occupancy chart.
+class _CalendarTile extends StatelessWidget {
+  const _CalendarTile({required this.propertyId, required this.propertyName});
+  final String propertyId;
+  final String propertyName;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return SoftCard(
+      padding: EdgeInsets.zero,
+      child: DataRow2(
+        title: 'Calendar',
+        subtitle: 'Occupancy and bookings, a fortnight at a time',
+        leading: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(color: c.accent, borderRadius: R.rSm),
+          alignment: Alignment.center,
+          child: Icon(
+            Icons.calendar_month_outlined,
+            size: 19,
+            color: c.accentForeground,
+          ),
+        ),
+        trailing: Icon(Icons.chevron_right, size: 18, color: c.mutedForeground),
+        onTap: () => context.push(
+          '/properties/$propertyId/calendar',
+          extra: propertyName,
+        ),
       ),
     );
   }

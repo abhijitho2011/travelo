@@ -24,6 +24,7 @@ import 'features/notifications/notifications_screen.dart';
 import 'features/properties/add_property_screen.dart';
 import 'features/properties/properties_screen.dart';
 import 'features/properties/property_amenities_screen.dart';
+import 'features/properties/property_calendar_screen.dart';
 import 'features/properties/property_detail_screen.dart';
 import 'features/staff/add_staff_screen.dart';
 import 'features/staff/edit_staff_screen.dart';
@@ -112,6 +113,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/properties/:pid/amenities',
         builder: (_, s) =>
             PropertyAmenitiesScreen(propertyId: s.pathParameters['pid']!),
+      ),
+      GoRoute(
+        // Read-only occupancy chart. The property name travels as `extra` so
+        // the header names the hotel without a second fetch.
+        path: '/properties/:pid/calendar',
+        builder: (_, s) => PropertyCalendarScreen(
+          propertyId: s.pathParameters['pid']!,
+          propertyName: s.extra is String ? s.extra as String : null,
+        ),
       ),
       GoRoute(
         path: '/properties/:pid/staff',

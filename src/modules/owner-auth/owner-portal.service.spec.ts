@@ -482,3 +482,61 @@ describe('OwnerPortalService — property edit / archive (3.10)', () => {
     expect(propsStub.recomputeCompleteness).toHaveBeenCalledWith('p1');
   });
 });
+
+describe('OwnerPortalService — read-only booking calendar', () => {
+  const auditStub = { record: async () => undefined };
+  const photosStub = { coverUrls: async () => new Map() };
+
+  function portal(db: MockDb) {
+    return new OwnerPortalService(
+      db as unknown as Database,
+      photosStub as never,
+      auditStub as never,
+      propsStub as never,
+    );
+  }
+
+  it('404s the reservations read for a property belonging to another owner', async () => {
+    // assertOwnedProperty finds nothing: cross-tenant is a 404, never a 403.
+    const db = mockDb({ select: { properties: [[]] } });
+    await expect(
+      portal(db).propertyReservations('own-1', 'someone-elses', {}),
+    ).rejects.toMatchObject({ status: 404 });
+    expect(db.selects.some((s) => s.table === 'reservations')).toBe(false);
+  });
+
+  it('applies the strict overlap predicate check_in < to AND check_out > from', async () => {
+    const db = mockDb({ select: { properties: [[{ id: 'p1' }]], reservations: [[]] } });
+    await portal(db).propertyReservations('own-1', 'p1', { from: '2026-03-01', to: '2026-03-15' });
+
+    const where = sqlText(db.wheresFor('reservations')[0]);
+    expect(where).toContain('check_in <');
+    expect(where).toContain('check_out >');
+    // Inclusive bounds would drag in a stay that ends the morning the window
+    // opens — a night nobody occupied.
+    expect(where).not.toContain('<=');
+    expect(where).not.toContain('>=');
+    expect(where).toContain('deleted_at is null');
+  });
+
+  it('defaults to a fortnight and ignores a nonsense or inverted window', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const dflt = OwnerPortalService.calendarWindow({});
+    expect(dflt.from).toBe(today);
+    expect(dflt.to > dflt.from).toBe(true);
+
+    expect(OwnerPortalService.calendarWindow({ from: 'not-a-date' }).from).toBe(today);
+    // `to` before `from` would select everything or nothing by accident.
+    const inverted = OwnerPortalService.calendarWindow({ from: '2026-03-10', to: '2026-03-01' });
+    expect(inverted.to > inverted.from).toBe(true);
+  });
+
+  it('echoes the resolved window alongside the reservations', async () => {
+    const db = mockDb({ select: { properties: [[{ id: 'p1' }]], reservations: [[]] } });
+    const out = await portal(db).propertyReservations('own-1', 'p1', {
+      from: '2026-03-01',
+      to: '2026-03-15',
+    });
+    expect(out).toMatchObject({ from: '2026-03-01', to: '2026-03-15', items: [] });
+  });
+});

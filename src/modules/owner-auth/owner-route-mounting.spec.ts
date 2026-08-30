@@ -104,6 +104,10 @@ describe('owner surface route mounting', () => {
     expect(has('PATCH', '/api/v1/owner/properties/:id/staff/:sid')).toBe(true);
   });
 
+  it('exposes the read-only booking calendar feed', () => {
+    expect(has('GET', '/api/v1/owner/properties/:id/reservations')).toBe(true);
+  });
+
   it('exposes the profile endpoints', () => {
     expect(has('GET', '/api/v1/owner/profile')).toBe(true);
     expect(has('PATCH', '/api/v1/owner/profile')).toBe(true);
