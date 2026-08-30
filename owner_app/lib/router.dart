@@ -13,6 +13,7 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/app_typography.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/widgets/app_shell.dart';
+import 'core/widgets/tavelo_logo.dart';
 import 'core/widgets/impersonation_banner.dart';
 import 'features/account/profile_screen.dart';
 import 'features/account/security_screen.dart';
@@ -244,26 +245,8 @@ class _SplashGateState extends ConsumerState<SplashGate> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: c.primary,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              alignment: Alignment.center,
-              child: Icon(
-                Icons.apartment_rounded,
-                color: c.primaryForeground,
-                size: 30,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Tavelo',
-              style: AppTypography.display(size: 20, color: c.foreground),
-            ),
-            const SizedBox(height: 20),
+            const TaveloLogo(height: 44),
+            const SizedBox(height: 24),
             SizedBox(
               width: 22,
               height: 22,

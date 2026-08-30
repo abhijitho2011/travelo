@@ -9,6 +9,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import '../theme/theme_controller.dart';
+import 'tavelo_logo.dart';
 import '../utils/formatting.dart';
 
 /// One destination in the owner portal's navigation.
@@ -235,17 +236,7 @@ class OwnerTopBar extends ConsumerWidget implements PreferredSizeWidget {
       automaticallyImplyLeading: false,
       title: Row(
         children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(color: c.primary, borderRadius: R.rSm),
-            alignment: Alignment.center,
-            child: Icon(
-              Icons.apartment_rounded,
-              size: 16,
-              color: c.primaryForeground,
-            ),
-          ),
+          const TaveloMark(size: 28),
           const SizedBox(width: Sp.sm),
           Expanded(
             child: Column(

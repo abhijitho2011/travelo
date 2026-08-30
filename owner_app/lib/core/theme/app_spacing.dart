@@ -39,9 +39,9 @@ class Sp {
 class R {
   R._();
 
-  static const double sm = 10; // calc(var(--radius) - 4px)
-  static const double md = 12; // calc(var(--radius) - 2px)
-  static const double lg = 14; // var(--radius)
+  static const double sm = 6; // tv-radius-sm
+  static const double md = 9; // tv-radius-md (buttons, inputs)
+  static const double lg = 14; // tv-radius-lg (cards)
   static const double xl = 18; // calc(var(--radius) + 4px)
   static const double xxl = 22; // calc(var(--radius) + 8px)
   static const double pill = 999;

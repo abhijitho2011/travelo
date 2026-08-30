@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Type scale ported from HF.
+/// Type scale — Tavelo design system (Outfit display + Poppins body).
 ///
-/// `--font-display: Sora` drives headings, KPI numerals and the brand mark;
-/// `--font-sans: Manrope` drives everything else. Headings carry HF's
-/// `letter-spacing: -0.015em`, KPI numerals its `-0.03em`.
+/// Outfit drives headings, KPI numerals and the brand mark; Poppins drives
+/// everything else. Headings carry -0.015em tracking, KPI numerals -0.03em.
 class AppTypography {
   AppTypography._();
 
@@ -14,7 +13,7 @@ class AppTypography {
     FontWeight weight = FontWeight.w600,
     Color? color,
     double height = 1.2,
-  }) => GoogleFonts.sora(
+  }) => GoogleFonts.outfit(
     fontSize: size,
     fontWeight: weight,
     color: color,
@@ -22,12 +21,12 @@ class AppTypography {
     letterSpacing: size * -0.015,
   );
 
-  /// The `.kpi` utility: Sora, tabular numerals, tight tracking.
+  /// The `.kpi` utility: Outfit, tabular numerals, tight tracking.
   static TextStyle kpi({
     double size = 26,
     Color? color,
     FontWeight weight = FontWeight.w600,
-  }) => GoogleFonts.sora(
+  }) => GoogleFonts.outfit(
     fontSize: size,
     fontWeight: weight,
     color: color,
@@ -41,7 +40,7 @@ class AppTypography {
     double size = 13,
     Color? color,
     FontWeight weight = FontWeight.w500,
-  }) => GoogleFonts.manrope(
+  }) => GoogleFonts.poppins(
     fontSize: size,
     fontWeight: weight,
     color: color,
@@ -50,7 +49,7 @@ class AppTypography {
   );
 
   /// The `.label-xs` utility: 11px, 600, uppercase, wide tracking, muted.
-  static TextStyle labelXs(Color color) => GoogleFonts.manrope(
+  static TextStyle labelXs(Color color) => GoogleFonts.poppins(
     fontSize: 11,
     height: 1.45,
     fontWeight: FontWeight.w600,
@@ -63,7 +62,7 @@ class AppTypography {
     FontWeight weight = FontWeight.w400,
     Color? color,
     double height = 1.45,
-  }) => GoogleFonts.manrope(
+  }) => GoogleFonts.poppins(
     fontSize: size,
     fontWeight: weight,
     color: color,

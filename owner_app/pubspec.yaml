@@ -33,6 +33,7 @@ dependencies:
   # Open invoice PDFs and hosted gateway checkout in the browser
   url_launcher: ^6.3.0
   firebase_messaging: ^15.2.10
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -43,3 +44,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/data/
+    - assets/brand/

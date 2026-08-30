@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
-/// The HF design tokens, converted from `oklch()` to sRGB.
+/// The Tavelo design-system tokens (`--tv-*`), as sRGB.
 ///
-/// Every value here is a direct conversion of a custom property in
-/// `HF/src/styles.css` — the oklch source is kept in the trailing comment so a
-/// future token change can be re-derived rather than eyeballed.
+/// Every value here is a direct transcription of a `--tv-*` custom property in
+/// the Tavelo design system (brand `#006847`, accent `#23A926`; Outfit +
+/// Poppins). Field names are the app's own semantic slots; the trailing comment
+/// records which `--tv-*` token each maps to so a token change can be re-applied
+/// rather than eyeballed.
 ///
 /// Instances are resolved per brightness; widgets read them through
 /// `Theme.of(context).extension<AppColors>()` (see `context.colors`).
@@ -94,58 +96,64 @@ class AppColors extends ThemeExtension<AppColors> {
   // ------------------------------------------------------------------ light
 
   static const light = AppColors(
-    background: Color(0xFFF4F8F6), // oklch(0.975 0.004 165)
-    foreground: Color(0xFF0F1613), // oklch(0.19 0.012 170)
-    surface: Color(0xFFEDF1EF), // oklch(0.955 0.006 165)
-    card: Color(0xFFFFFFFF), // oklch(1 0 0)
-    cardForeground: Color(0xFF0F1613),
+    background: Color(0xFFF5F7F6), // tv-canvas = n-50
+    foreground: Color(0xFF141A18), // tv text = n-900
+    surface: Color(0xFFEDF0EE), // tv-subtle = n-100
+    card: Color(0xFFFFFFFF), // tv-surface = n-0
+    cardForeground: Color(0xFF141A18),
     popover: Color(0xFFFFFFFF),
-    primary: Color(0xFF139E6F), // oklch(0.62 0.13 163)
+    primary: Color(0xFF006847), // tv-action = brand-600
     primaryForeground: Color(0xFFFFFFFF),
-    secondary: Color(0xFFE8EFEB), // oklch(0.945 0.008 165)
-    secondaryForeground: Color(0xFF1A2722), // oklch(0.26 0.02 170)
-    muted: Color(0xFFEDF1EF), // oklch(0.955 0.006 165)
-    mutedForeground: Color(0xFF5C6662), // oklch(0.5 0.014 170)
-    accent: Color(0xFFD6EFE3), // oklch(0.93 0.03 165)
-    accentForeground: Color(0xFF122F25), // oklch(0.28 0.04 168)
-    destructive: Color(0xFFC73332), // oklch(0.55 0.185 26)
-    destructiveForeground: Color(0xFFFDFCF8), // oklch(0.99 0.005 90)
-    border: Color(0xFFD9E0DD), // oklch(0.9 0.008 168)
-    input: Color(0xFFD9E0DD),
-    ring: Color(0xFF139E6F),
-    sidebar: Color(0xFF09110E), // oklch(0.17 0.014 168)
-    sidebarForeground: Color(0xFFD2DAD6), // oklch(0.88 0.01 168)
-    sidebarPrimary: Color(0xFF35BF8B), // oklch(0.72 0.14 163)
-    sidebarAccent: Color(0xFF172822), // oklch(0.26 0.026 168)
-    sidebarAccentForeground: Color(0xFFECF4F0), // oklch(0.96 0.01 165)
-    stAvailable: Color(0xFF139E6F), // oklch(0.62 0.13 163)
-    stOccupied: Color(0xFF3A6FA3), // oklch(0.53 0.1 250)
-    stDirty: Color(0xFFCC7D1B), // oklch(0.66 0.14 65)
-    stCleaning: Color(0xFF31A4AF), // oklch(0.66 0.1 205)
-    stInspected: Color(0xFF7F75B8), // oklch(0.6 0.1 290)
-    stMaintenance: Color(0xFFCB6440), // oklch(0.62 0.14 40)
-    stOoo: Color(0xFF5F6B74), // oklch(0.52 0.02 240)
-    healthy: Color(0xFF139E6F), // oklch(0.62 0.13 163)
-    warning: Color(0xFFCD9219), // oklch(0.7 0.14 78)
-    critical: Color(0xFFCC3333), // oklch(0.56 0.19 26)
+    secondary: Color(0xFFEDF0EE), // n-100
+    secondaryForeground: Color(0xFF232B28), // n-800
+    muted: Color(0xFFEDF0EE), // n-100
+    mutedForeground: Color(0xFF6E7B76), // n-500
+    accent: Color(0xFFE9F5F0), // tv-selected = brand-50
+    accentForeground: Color(0xFF00432C), // brand-800
+    destructive: Color(0xFFC8372D), // tv-danger
+    destructiveForeground: Color(0xFFFFFFFF),
+    border: Color(0xFFDFE4E1), // tv-border = n-200
+    input: Color(0xFFDFE4E1),
+    ring: Color(0xFF23A926), // tv-focus = accent-500
+    sidebar: Color(0xFF002E1E), // brand-900 (branded dark rail)
+    sidebarForeground: Color(0xFFC6CDC9), // n-300
+    sidebarPrimary: Color(0xFF23A926), // accent-500
+    sidebarAccent: Color(0xFF00432C), // brand-800
+    sidebarAccentForeground: Color(0xFFE9F5F0), // brand-50
+    stAvailable: Color(0xFF1B8A1E), // success-600
+    stOccupied: Color(0xFF2563A8), // info
+    stDirty: Color(0xFFE08A1E), // warning
+    stCleaning: Color(0xFF0D7A55), // brand-500
+    stInspected: Color(0xFF7F75B8),
+    stMaintenance: Color(0xFFCB6440),
+    stOoo: Color(0xFF6E7B76), // n-500
+    healthy: Color(0xFF1B8A1E), // success
+    warning: Color(0xFFE08A1E), // tv-warning
+    critical: Color(0xFFC8372D), // tv-danger
     elevation1: [
+      // tv-shadow-raised
       BoxShadow(
-        color: Color(0x0D111A16),
+        color: Color(0x0F141A18),
         blurRadius: 2,
         offset: Offset(0, 1),
       ),
       BoxShadow(
-        color: Color(0x08111A16),
-        blurRadius: 1,
-        offset: Offset(0, 1),
+        color: Color(0x0D141A18),
+        blurRadius: 6,
+        offset: Offset(0, 2),
       ),
     ],
     elevation2: [
+      // tv-shadow-overlay
       BoxShadow(
-        color: Color(0x38111A16),
-        blurRadius: 34,
-        spreadRadius: -14,
-        offset: Offset(0, 12),
+        color: Color(0x1A141A18),
+        blurRadius: 24,
+        offset: Offset(0, 8),
+      ),
+      BoxShadow(
+        color: Color(0x0F141A18),
+        blurRadius: 6,
+        offset: Offset(0, 2),
       ),
     ],
   );
@@ -153,53 +161,57 @@ class AppColors extends ThemeExtension<AppColors> {
   // ------------------------------------------------------------------- dark
 
   static const dark = AppColors(
-    background: Color(0xFF070B09), // oklch(0.145 0.008 168)
-    foreground: Color(0xFFEBF0ED), // oklch(0.95 0.006 165)
-    surface: Color(0xFF0C1210), // oklch(0.175 0.01 168)
-    card: Color(0xFF0E1412), // oklch(0.185 0.011 168)
-    cardForeground: Color(0xFFEBF0ED),
-    popover: Color(0xFF0E1412),
-    primary: Color(0xFF35CE95), // oklch(0.76 0.15 163)
-    primaryForeground: Color(0xFF020C08), // oklch(0.14 0.02 170)
-    secondary: Color(0xFF19201D), // oklch(0.235 0.012 168)
-    secondaryForeground: Color(0xFFE6EDEA), // oklch(0.94 0.008 165)
-    muted: Color(0xFF161E1B), // oklch(0.225 0.012 168)
-    mutedForeground: Color(0xFF97A19D), // oklch(0.7 0.014 168)
-    accent: Color(0xFF182B23), // oklch(0.27 0.03 165)
-    accentForeground: Color(0xFFECF4F0), // oklch(0.96 0.01 165)
-    destructive: Color(0xFFE86059), // oklch(0.66 0.17 26)
-    destructiveForeground: Color(0xFFFAF8F5), // oklch(0.98 0.005 90)
-    border: Color(0x1AFFFFFF), // oklch(1 0 0 / 10%)
-    input: Color(0x24FFFFFF), // oklch(1 0 0 / 14%)
-    ring: Color(0xFF35CE95),
-    sidebar: Color(0xFF040807), // oklch(0.13 0.01 168)
-    sidebarForeground: Color(0xFFD2DAD6),
-    sidebarPrimary: Color(0xFF35CE95),
-    sidebarAccent: Color(0xFF15201B), // oklch(0.23 0.018 168)
-    sidebarAccentForeground: Color(0xFFEDF4F0),
-    stAvailable: Color(0xFF35CE95), // oklch(0.76 0.15 163)
-    stOccupied: Color(0xFF6FA2DB), // oklch(0.7 0.1 252)
-    stDirty: Color(0xFFEEA753), // oklch(0.78 0.13 68)
-    stCleaning: Color(0xFF57C3CF), // oklch(0.76 0.1 205)
-    stInspected: Color(0xFFAA9FEC), // oklch(0.74 0.11 290)
-    stMaintenance: Color(0xFFEE8F63), // oklch(0.74 0.13 45)
-    stOoo: Color(0xFF88949D), // oklch(0.66 0.02 240)
-    healthy: Color(0xFF35CE95),
-    warning: Color(0xFFE9B452), // oklch(0.8 0.13 80)
-    critical: Color(0xFFF66D64), // oklch(0.7 0.17 26)
+    background: Color(0xFF0B100E), // tv-canvas = n-950
+    foreground: Color(0xFFF5F7F6), // n-50
+    surface: Color(0xFF232B28), // tv-subtle = n-800
+    card: Color(0xFF141A18), // tv-surface = n-900
+    cardForeground: Color(0xFFF5F7F6),
+    popover: Color(0xFF141A18),
+    primary: Color(0xFF52C34E), // tv-action dark = accent-400
+    primaryForeground: Color(0xFF0B100E),
+    secondary: Color(0xFF232B28), // n-800
+    secondaryForeground: Color(0xFFC6CDC9), // n-300
+    muted: Color(0xFF232B28), // n-800
+    mutedForeground: Color(0xFF9AA5A0), // n-400
+    accent: Color(0xFF0F2E22), // tv-selected dark
+    accentForeground: Color(0xFFE9F5F0),
+    destructive: Color(0xFFE4655A), // tv-danger dark
+    destructiveForeground: Color(0xFFFAF8F5),
+    border: Color(0xFF2C3733), // tv-border dark
+    input: Color(0xFF3E4A45), // tv-border-strong dark
+    ring: Color(0xFF23A926),
+    sidebar: Color(0xFF060B09), // near-black brand
+    sidebarForeground: Color(0xFFC6CDC9),
+    sidebarPrimary: Color(0xFF52C34E),
+    sidebarAccent: Color(0xFF00432C), // brand-800
+    sidebarAccentForeground: Color(0xFFE9F5F0),
+    stAvailable: Color(0xFF52C34E), // accent-400
+    stOccupied: Color(0xFF5A9BE0), // info dark
+    stDirty: Color(0xFFF0A93E), // warning dark
+    stCleaning: Color(0xFF3D9E78), // brand-400
+    stInspected: Color(0xFFAA9FEC),
+    stMaintenance: Color(0xFFEE8F63),
+    stOoo: Color(0xFF9AA5A0), // n-400
+    healthy: Color(0xFF52C34E),
+    warning: Color(0xFFF0A93E),
+    critical: Color(0xFFE4655A),
     elevation1: [
       BoxShadow(
         color: Color(0x73000000),
         blurRadius: 2,
         offset: Offset(0, 1),
       ),
+      BoxShadow(
+        color: Color(0x40000000),
+        blurRadius: 6,
+        offset: Offset(0, 2),
+      ),
     ],
     elevation2: [
       BoxShadow(
-        color: Color(0xB3000000),
-        blurRadius: 34,
-        spreadRadius: -14,
-        offset: Offset(0, 14),
+        color: Color(0x99000000),
+        blurRadius: 24,
+        offset: Offset(0, 8),
       ),
     ],
   );

@@ -4,6 +4,7 @@ import '../config/app_config.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import 'tavelo_logo.dart';
 
 /// Shared frame for every unauthenticated screen: the Tavelo mark, a centred
 /// card no wider than a comfortable reading column, and the support footer.
@@ -75,17 +76,7 @@ class BrandMark extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Container(
-          width: compact ? 30 : 38,
-          height: compact ? 30 : 38,
-          decoration: BoxDecoration(color: c.primary, borderRadius: R.rMd),
-          alignment: Alignment.center,
-          child: Icon(
-            Icons.apartment_rounded,
-            size: compact ? 17 : 21,
-            color: c.primaryForeground,
-          ),
-        ),
+        TaveloMark(size: compact ? 30 : 38),
         const SizedBox(width: Sp.md),
         // Flexible so a long tagline — or a large system text scale — narrows
         // the wordmark instead of running off the edge of a small phone.
