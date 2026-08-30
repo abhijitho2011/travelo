@@ -16,6 +16,7 @@ import type { Response } from 'express';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { OwnerJwtGuard } from './owner-jwt.guard';
+import { SubscriptionStatusGuard } from '../../common/guards/subscription-status.guard';
 import { CurrentOwner, AuthenticatedOwner } from './current-owner.decorator';
 import { OwnerPortalService } from './owner-portal.service';
 import { LocationsService } from './locations.service';
@@ -29,7 +30,7 @@ import { CreatePropertyDto, CreateStaffDto, SetStaffStatusDto, UpdateStaffDto } 
 
 @ApiTags('Owner Portal')
 @ApiBearerAuth()
-@UseGuards(OwnerJwtGuard)
+@UseGuards(OwnerJwtGuard, SubscriptionStatusGuard)
 @Controller({ path: 'api/v1/owner', version: VERSION_NEUTRAL })
 export class OwnerPortalController {
   constructor(

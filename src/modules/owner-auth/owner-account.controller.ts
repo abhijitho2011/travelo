@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { OwnerJwtGuard } from './owner-jwt.guard';
+import { SubscriptionStatusGuard } from '../../common/guards/subscription-status.guard';
 import { CurrentOwner, AuthenticatedOwner } from './current-owner.decorator';
 import { OwnerProfileService } from './owner-profile.service';
 import { OwnerSessionsService } from './owner-sessions.service';
@@ -23,7 +24,7 @@ import { UpdateOwnerProfileDto } from './dto';
  */
 @ApiTags('Owner Account')
 @ApiBearerAuth()
-@UseGuards(OwnerJwtGuard)
+@UseGuards(OwnerJwtGuard, SubscriptionStatusGuard)
 @Controller({ path: 'api/v1/owner', version: VERSION_NEUTRAL })
 export class OwnerAccountController {
   constructor(

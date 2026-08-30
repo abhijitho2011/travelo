@@ -23,6 +23,7 @@ import { OwnerSupportService } from './owner-support.service';
 import { LocationsService } from './locations.service';
 import { PropertyPhotosService } from './property-photos.service';
 import { OwnerJwtGuard } from './owner-jwt.guard';
+import { SubscriptionStatusGuard } from '../../common/guards/subscription-status.guard';
 import { OwnerNotificationsController } from './owner-notifications.controller';
 
 @Module({
@@ -60,6 +61,7 @@ import { OwnerNotificationsController } from './owner-notifications.controller';
     LocationsService,
     PropertyPhotosService,
     OwnerJwtGuard,
+    SubscriptionStatusGuard,
   ],
 })
 export class OwnerAuthModule {}
