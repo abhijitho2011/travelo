@@ -190,6 +190,12 @@ class RoleConfig {
     Routes.profile,
     Routes.notifications,
     Routes.support,
+    // The two hubs are universal chrome. Their sub-routes are not listed here:
+    // `/rooms/new` and `/rooms/bulk` canonicalise to `/rooms` (so only a
+    // room.read role reaches them), and `/room-types` is granted to GM/AGM via
+    // extraRoutes — keeping every rooms_test surface boundary intact.
+    Routes.settings,
+    Routes.roomSettings,
     Routes.accessDenied,
     Routes.welcome,
   };
@@ -215,37 +221,22 @@ class RoleConfig {
   // Shared fragments
   // ---------------------------------------------------------------------
 
-  static const _profileItem = NavItem(
-    label: 'Profile',
-    icon: Icons.person_outline,
-    route: Routes.profile,
-  );
-  static const _notificationsItem = NavItem(
-    label: 'Alerts',
-    icon: Icons.notifications_none,
-    route: Routes.notifications,
-  );
-  static const _supportItem = NavItem(
-    label: 'Help & support',
-    icon: Icons.help_outline,
-    route: Routes.support,
+  static const _settingsItem = NavItem(
+    label: 'Settings',
+    icon: Icons.settings_outlined,
+    route: Routes.settings,
   );
 
   /// The tail every More menu ends with. No role may have an empty More list —
   /// the shell hides the More destination entirely rather than opening an
-  /// empty sheet, and these three make sure it never has to.
-  static const List<NavItem> _commonMore = [
-    _notificationsItem,
-    _profileItem,
-    _supportItem,
-  ];
+  /// empty sheet. Settings folds Profile + Help & support (and, where the role
+  /// holds it, Room settings) behind one destination; Alerts is the top-bar
+  /// bell, not a nav entry.
+  static const List<NavItem> _commonMore = [_settingsItem];
 
-  /// The same tail minus Profile, for roles that already carry Profile as a
-  /// primary destination — a duplicate entry in the sheet only confuses.
-  static const List<NavItem> _commonMoreNoProfile = [
-    _notificationsItem,
-    _supportItem,
-  ];
+  /// The same tail, kept as a distinct constant for roles that already carry
+  /// Profile as a primary destination.
+  static const List<NavItem> _commonMoreNoProfile = [_settingsItem];
 
   /// A one-destination role: its module, any secondary modules its permissions
   /// already reach, and the common items.
@@ -289,14 +280,6 @@ class RoleConfig {
     requires: [P.roomRead],
   );
 
-  /// The catalogue behind the rooms. Only GM and AGM hold `roomtype.read`, so
-  /// only they ever see it — no role check needed to arrange that.
-  static const _roomTypesMore = NavItem(
-    label: 'Room types',
-    icon: Icons.bed_outlined,
-    route: Routes.roomTypes,
-    requires: [P.roomTypeRead],
-  );
   static const _myTasksMore = NavItem(
     label: 'My tasks',
     icon: Icons.checklist_outlined,
@@ -363,6 +346,7 @@ class RoleConfig {
       homeRoute: Routes.management,
       homeModuleLabel: 'Management Dashboard',
       built: true,
+      extraRoutes: const {Routes.roomTypes},
       bottomNav: const [
         NavItem(
           label: 'Dashboard',
@@ -397,7 +381,6 @@ class RoleConfig {
           requires: [P.reservationRead],
         ),
         _roomsMore,
-        _roomTypesMore,
         NavItem(
           label: 'Housekeeping',
           icon: Icons.cleaning_services_outlined,
@@ -458,6 +441,7 @@ class RoleConfig {
       homeRoute: Routes.management,
       homeModuleLabel: 'Management Dashboard',
       built: true,
+      extraRoutes: const {Routes.roomTypes},
       bottomNav: const [
         NavItem(
           label: 'Dashboard',
@@ -492,7 +476,6 @@ class RoleConfig {
           requires: [P.reservationRead],
         ),
         _roomsMore,
-        _roomTypesMore,
         NavItem(
           label: 'Housekeeping',
           icon: Icons.cleaning_services_outlined,

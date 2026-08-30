@@ -208,19 +208,27 @@ void main() {
       }
     });
 
-    test('every role can reach help, alerts and its own profile', () {
+    test('every role reaches Settings, which reaches profile and support', () {
       for (final role in StaffRole.values) {
         final config = RoleConfig.of(role);
         final reachable = {
           ...config.bottomNav.map((i) => i.route),
           ...config.moreMenu.map((i) => i.route),
         };
+        // Settings is the one nav/more destination every role now carries; it
+        // is the hub that in turn links to Profile and Help & support.
+        expect(
+          reachable,
+          contains(Routes.settings),
+          reason: '${role.wire} → ${Routes.settings}',
+        );
+        // Settings, Profile and Help & support all stay inside the role's
+        // allowed routes so the hub can always link to them.
         for (final route in [
-          Routes.support,
-          Routes.notifications,
+          Routes.settings,
           Routes.profile,
+          Routes.support,
         ]) {
-          expect(reachable, contains(route), reason: '${role.wire} → $route');
           expect(config.allowedRoutes, contains(route), reason: role.wire);
         }
       }
@@ -232,8 +240,8 @@ void main() {
       final visible = gm.visibleMore(frontDeskOnly).map((i) => i.route);
       expect(visible, contains(Routes.reservations));
       expect(visible, isNot(contains(Routes.accounts)));
-      // The ungated common tail survives any permission set.
-      expect(visible, contains(Routes.support));
+      // The ungated common tail (Settings) survives any permission set.
+      expect(visible, contains(Routes.settings));
     });
   });
 

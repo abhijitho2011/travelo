@@ -638,17 +638,15 @@ void main() {
         StaffRole.assistantGeneralManager,
       ]) {
         final config = RoleConfig.of(role);
+        // The board is still a More destination; the catalogue has moved into
+        // the Room settings hub, so it reaches the role through extraRoutes
+        // rather than a More entry — but it must stay in allowedRoutes so the
+        // hub can link to it and the guard admits it.
         expect(moreRoutesOf(role), contains(Routes.rooms), reason: role.wire);
-        expect(
-          moreRoutesOf(role),
-          contains(Routes.roomTypes),
-          reason: role.wire,
-        );
         final visible = config
             .visibleMore(managementPermissions)
             .map((i) => i.route);
         expect(visible, contains(Routes.rooms), reason: role.wire);
-        expect(visible, contains(Routes.roomTypes), reason: role.wire);
         expect(config.allowedRoutes, contains(Routes.rooms), reason: role.wire);
         expect(
           config.allowedRoutes,
@@ -743,7 +741,10 @@ void main() {
     test('each destination declares the permission the guard must check', () {
       final gm = RoleConfig.of(StaffRole.generalManager);
       expect(gm.requirementsFor(Routes.rooms), [P.roomRead]);
-      expect(gm.requirementsFor(Routes.roomTypes), [P.roomTypeRead]);
+      // Room types is no longer a nav item (it lives in the Room settings hub),
+      // so it carries no route-level requirement — the RoomTypesScreen and its
+      // API gate the catalogue on roomtype.read directly.
+      expect(gm.requirementsFor(Routes.roomTypes), isNull);
       expect(
         RoleConfig.of(StaffRole.receptionist).requirementsFor(Routes.rooms),
         [P.roomRead],

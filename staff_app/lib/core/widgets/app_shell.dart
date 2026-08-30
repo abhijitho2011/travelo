@@ -12,6 +12,7 @@ import '../theme/app_typography.dart';
 import '../theme/theme_controller.dart';
 import 'offline_indicator.dart';
 import 'tavelo_logo.dart';
+import 'tavelo_sidebar.dart';
 
 /// The chrome every signed-in screen sits inside.
 ///
@@ -92,38 +93,24 @@ class AppShell extends ConsumerWidget {
           top: false,
           child: Row(
             children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  border: Border(right: BorderSide(color: c.border)),
-                ),
-                // A NavigationRail does not scroll on its own: a role with many
-                // destinations would overflow a short landscape tablet and take
-                // the last one — More — off screen with it. Wrapping it in a
-                // min-height scroll view keeps every destination reachable.
-                child: LayoutBuilder(
-                  builder: (context, constraints) => SingleChildScrollView(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight,
-                      ),
-                      child: IntrinsicHeight(
-                        child: NavigationRail(
-                          selectedIndex: index,
-                          onDestinationSelected: onSelect,
-                          labelType: NavigationRailLabelType.all,
-                          backgroundColor: c.surface,
-                          destinations: [
-                            for (final d in destinations)
-                              NavigationRailDestination(
-                                icon: d.icon,
-                                label: Text(d.label),
-                              ),
-                          ],
+              // The Tavelo light sidebar: every destination listed directly,
+              // scrolls on its own, and reads the active route by prefix.
+              TaveloSidebar(
+                currentLocation: location,
+                isActive: (route) => _routeActive(route, location),
+                sections: [
+                  SidebarSection(
+                    entries: [
+                      for (final item in items)
+                        SidebarEntry(
+                          label: item.label,
+                          icon: item.icon,
+                          route: item.route,
+                          onTap: () => context.go(item.route),
                         ),
-                      ),
-                    ),
+                    ],
                   ),
-                ),
+                ],
               ),
               // Keep line length readable rather than letting a list span the
               // full width of a landscape tablet.
@@ -185,6 +172,17 @@ class AppShell extends ConsumerWidget {
     }
     return best;
   }
+}
+
+/// True when [route] is the active sidebar row for [location]: an exact match,
+/// or a parent whose detail screens (`/route/...`) keep it lit. `/` matches only
+/// itself, never every route.
+bool _routeActive(String route, String location) {
+  if (route == '/') return location == '/';
+  return location == route ||
+      (location.startsWith(route) &&
+          location.length > route.length &&
+          location[route.length] == '/');
 }
 
 class _TopBar extends ConsumerWidget implements PreferredSizeWidget {

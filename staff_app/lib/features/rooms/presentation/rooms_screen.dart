@@ -62,24 +62,6 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
           eyebrow: ref.watch(sessionProvider)?.hotel?.name ?? 'Your hotel',
           title: 'Rooms',
           subtitle: 'Every room at this property and where it stands today.',
-          actions: [
-            PermissionGate(
-              permission: P.roomCreate,
-              child: FilledButton.icon(
-                onPressed: () => context.go(Routes.roomNew),
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('Add room'),
-              ),
-            ),
-            PermissionGate(
-              permission: P.roomCreate,
-              child: OutlinedButton.icon(
-                onPressed: () => context.go(Routes.roomBulk),
-                icon: const Icon(Icons.playlist_add, size: 16),
-                label: const Text('Bulk add'),
-              ),
-            ),
-          ],
         ),
         gapSection,
 
@@ -138,17 +120,16 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                       ? 'No rooms yet'
                       : 'No rooms match those filters',
                   hint: filter.isEmpty
-                      ? 'Add rooms one at a time, or create a whole floor at '
-                            'once with Bulk add.'
+                      ? 'Add rooms from Room settings.'
                       : 'Try clearing the status or room-type filter.',
                   icon: Icons.meeting_room_outlined,
                   action: filter.isEmpty
                       ? PermissionGate(
                           permission: P.roomCreate,
                           child: FilledButton.icon(
-                            onPressed: () => context.go(Routes.roomBulk),
-                            icon: const Icon(Icons.playlist_add, size: 16),
-                            label: const Text('Bulk add rooms'),
+                            onPressed: () => context.go(Routes.roomSettings),
+                            icon: const Icon(Icons.settings_outlined, size: 16),
+                            label: const Text('Room settings'),
                           ),
                         )
                       : null,

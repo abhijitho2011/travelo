@@ -19,6 +19,7 @@ class Routes {
   static const notifications = '/notifications';
   static const profile = '/profile';
   static const support = '/support';
+  static const settings = '/settings';
 
   // --- management (GM / AGM) — built ---
   static const management = '/management';
@@ -55,6 +56,7 @@ class Routes {
   // inherits `/room-types` — the two never collide because `/room-types` does
   // not start with `/rooms`.
   static const rooms = '/rooms';
+  static const roomSettings = '/room-settings';
   static const roomNew = '/rooms/new';
   static const roomBulk = '/rooms/bulk';
   static const roomPattern = '/rooms/:id';

@@ -52,9 +52,11 @@ import '../../features/restaurant/presentation/tables_management_screen.dart';
 import '../../features/rooms/presentation/bulk_rooms_screen.dart';
 import '../../features/rooms/presentation/room_form_screen.dart';
 import '../../features/rooms/presentation/room_type_form_screen.dart';
+import '../../features/rooms/presentation/room_settings_screen.dart';
 import '../../features/rooms/presentation/room_types_screen.dart';
 import '../../features/rooms/presentation/rooms_screen.dart';
 import '../../features/sales/presentation/sales_screen.dart';
+import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/sales/presentation/lead_detail_screen.dart';
 import '../../features/security/presentation/gate_log_screen.dart';
 import '../../features/security/presentation/gate_screen.dart';
@@ -256,6 +258,14 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, _) => const NotificationsScreen(),
           ),
           GoRoute(path: Routes.support, builder: (_, _) => const SupportScreen()),
+          GoRoute(
+            path: Routes.settings,
+            builder: (_, _) => const SettingsScreen(),
+          ),
+          GoRoute(
+            path: Routes.roomSettings,
+            builder: (_, _) => const RoomSettingsScreen(),
+          ),
 
           // ------------------- operations domains ---------------------------
           GoRoute(path: Routes.accounts, builder: (_, _) => const AccountsScreen()),

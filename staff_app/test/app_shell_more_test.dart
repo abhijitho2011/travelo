@@ -12,6 +12,7 @@ import 'package:tavelo_staff/core/providers.dart';
 import 'package:tavelo_staff/core/routing/routes.dart';
 import 'package:tavelo_staff/core/theme/app_theme.dart';
 import 'package:tavelo_staff/core/widgets/app_shell.dart';
+import 'package:tavelo_staff/core/widgets/tavelo_sidebar.dart';
 
 /// The shell's navigation, on both form factors.
 ///
@@ -45,6 +46,7 @@ void main() {
     Routes.profile,
     Routes.notifications,
     Routes.support,
+    Routes.settings,
   };
 
   Future<void> pumpShell(
@@ -117,7 +119,7 @@ void main() {
   });
   const hrPermissions = PermissionSet({'staff.read'});
 
-  testWidgets('the tablet rail lists every destination, with no More entry', (
+  testWidgets('the tablet sidebar lists every destination, with no More entry', (
     tester,
   ) async {
     await pumpShell(
@@ -127,13 +129,15 @@ void main() {
       surface: shortTablet,
     );
 
-    expect(find.byType(NavigationRail), findsOneWidget);
+    // The tablet now renders the Tavelo sidebar in place of a NavigationRail,
+    // and the phone-only bottom bar / More entry never appear beside it.
+    expect(find.byType(TaveloSidebar), findsOneWidget);
+    expect(find.byType(NavigationRail), findsNothing);
     expect(find.byType(NavigationBar), findsNothing);
-    // The rail has room for everything, so More is never rendered on a tablet.
     expect(find.text('More'), findsNothing);
   });
 
-  testWidgets('rail destinations that used to live under More navigate', (
+  testWidgets('sidebar destinations that live under More navigate', (
     tester,
   ) async {
     await pumpShell(
@@ -143,17 +147,17 @@ void main() {
       surface: shortTablet,
     );
 
-    // 'Help & support' is a moreMenu entry — on a tablet it is a rail
-    // destination reachable in one tap rather than two.
-    await tester.scrollUntilVisible(find.text('Help & support'), 200,
+    // 'Settings' is a moreMenu entry — on a tablet it is a sidebar destination
+    // reachable in one tap rather than through the More sheet.
+    await tester.scrollUntilVisible(find.text('Settings'), 200,
         scrollable: find.byType(Scrollable).first);
-    await tester.tap(find.text('Help & support'));
+    await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
 
-    expect(find.text('page ${Routes.support}'), findsOneWidget);
+    expect(find.text('page ${Routes.settings}'), findsOneWidget);
   });
 
-  testWidgets('the rail scrolls, so a long list stays reachable', (
+  testWidgets('the sidebar scrolls, so a long list stays reachable', (
     tester,
   ) async {
     await pumpShell(
@@ -164,8 +168,8 @@ void main() {
     );
 
     expect(
-      find.ancestor(
-        of: find.byType(NavigationRail),
+      find.descendant(
+        of: find.byType(TaveloSidebar),
         matching: find.byType(SingleChildScrollView),
       ),
       findsOneWidget,
@@ -206,11 +210,13 @@ void main() {
 
     await tester.tap(find.text('More'));
     await tester.pumpAndSettle();
-    expect(find.text('Alerts'), findsOneWidget);
-    expect(find.text('Help & support'), findsOneWidget);
+    // Alerts is no longer a nav destination (it is the top-bar bell), and
+    // Profile + Help & support now sit behind a single Settings entry.
+    expect(find.text('Alerts'), findsNothing);
+    expect(find.text('Settings'), findsOneWidget);
   });
 
-  testWidgets('sitting on a More destination lights More, not the first tab', (
+  testWidgets('the sidebar reflects the active destination', (
     tester,
   ) async {
     await pumpShell(
@@ -218,10 +224,13 @@ void main() {
       config: hr,
       permissions: hrPermissions,
       surface: shortTablet,
-      at: Routes.support,
+      at: Routes.settings,
     );
 
-    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(rail.selectedIndex, rail.destinations.length - 1);
+    // Sitting on Settings, the sidebar computes that row as the active route.
+    final sidebar = tester.widget<TaveloSidebar>(find.byType(TaveloSidebar));
+    expect(sidebar.currentLocation, Routes.settings);
+    expect(sidebar.isActive(Routes.settings), isTrue);
+    expect(sidebar.isActive(Routes.team), isFalse);
   });
 }
