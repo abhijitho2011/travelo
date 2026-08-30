@@ -329,7 +329,18 @@ export const invoices = pgTable(
     billingPeriodStart: timestamp('billing_period_start', { withTimezone: true }).notNull(),
     billingPeriodEnd: timestamp('billing_period_end', { withTimezone: true }).notNull(),
     subtotal: integer('subtotal').notNull(),
+    /** Total GST = cgst + sgst + igst, kept for backward compatibility. */
     tax: integer('tax').notNull().default(0),
+    /** Central GST (paise); populated for intra-state supplies. */
+    cgstPaise: integer('cgst_paise').notNull().default(0),
+    /** State GST (paise); populated for intra-state supplies. */
+    sgstPaise: integer('sgst_paise').notNull().default(0),
+    /** Integrated GST (paise); populated for inter-state supplies. */
+    igstPaise: integer('igst_paise').notNull().default(0),
+    /** Place of supply (state name/code), when known. */
+    placeOfSupply: varchar('place_of_supply', { length: 64 }),
+    /** SAC/HSN code for the supply. */
+    hsnCode: varchar('hsn_code', { length: 16 }),
     discount: integer('discount').notNull().default(0),
     total: integer('total').notNull(),
     currency: varchar('currency', { length: 8 }).notNull().default('INR'),

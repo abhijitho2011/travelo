@@ -5,6 +5,7 @@ import { OwnerAuthService } from './owner-auth.service';
 import { OwnerJwtGuard } from './owner-jwt.guard';
 import { CurrentOwner, AuthenticatedOwner } from './current-owner.decorator';
 import { GoogleLoginDto, RefreshDto, RequestOtpDto, VerifyOtpDto } from './dto';
+import { AuthThrottle } from '../../common/decorators/auth-throttle.decorator';
 
 @ApiTags('Owner Auth')
 @Controller({ path: 'api/v1/owner/auth', version: VERSION_NEUTRAL })
@@ -12,18 +13,21 @@ export class OwnerAuthController {
   constructor(private readonly svc: OwnerAuthService) {}
 
   @Public()
+  @AuthThrottle()
   @Post('otp/request')
   requestOtp(@Body() dto: RequestOtpDto) {
     return this.svc.requestOtp(dto.mobile);
   }
 
   @Public()
+  @AuthThrottle()
   @Post('otp/verify')
   verifyOtp(@Body() dto: VerifyOtpDto) {
     return this.svc.verifyOtp(dto.mobile, dto.otp);
   }
 
   @Public()
+  @AuthThrottle()
   @Post('google')
   google(@Body() dto: GoogleLoginDto) {
     return this.svc.google(dto.idToken);

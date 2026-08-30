@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Headers, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { GstCategory } from './gst';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
@@ -40,6 +41,11 @@ class CreateInvoiceDto {
   @IsOptional() @IsInt() discount?: number;
   @IsOptional() @IsString() currency?: string;
   @IsOptional() @IsString() dueDate?: string;
+  /** GST category for auto-computation; defaults to accommodation. */
+  @IsOptional() @IsIn(['accommodation', 'restaurant', 'saas', 'other']) category?: GstCategory;
+  /** true (default) → CGST+SGST split; false → IGST. */
+  @IsOptional() @IsBoolean() intraState?: boolean;
+  @IsOptional() @IsString() placeOfSupply?: string;
 }
 
 @ApiTags('Billing')
@@ -162,6 +168,9 @@ export class BillingController {
       discount: dto.discount,
       currency: dto.currency,
       dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+      category: dto.category,
+      intraState: dto.intraState,
+      placeOfSupply: dto.placeOfSupply,
     });
   }
 

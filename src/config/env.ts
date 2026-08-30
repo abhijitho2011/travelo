@@ -34,6 +34,14 @@ const envSchema = z.object({
 
   THROTTLE_TTL: z.coerce.number().int().positive().default(60),
   THROTTLE_LIMIT: z.coerce.number().int().positive().default(120),
+  // The tighter tier for auth endpoints (login/OTP/MFA), opted into with
+  // @AuthThrottle(). Per-IP, independent of the broad default ceiling.
+  AUTH_THROTTLE_TTL: z.coerce.number().int().positive().default(60),
+  AUTH_THROTTLE_LIMIT: z.coerce.number().int().positive().default(10),
+  // Data-retention windows (days). The retention worker prunes rows older than
+  // these once a day. 0 disables pruning for that table.
+  AUDIT_RETENTION_DAYS: z.coerce.number().int().min(0).default(365),
+  DELIVERY_RETENTION_DAYS: z.coerce.number().int().min(0).default(90),
 
   // ---------- Restaurant / F&B ----------
   // Flat sales-tax percentage applied to a restaurant bill's subtotal. A single
@@ -178,6 +186,20 @@ const envSchema = z.object({
             'production — the default is public and would make tokens forgeable.',
         });
       }
+    }
+
+    // A production deployment that accepts Channex webhooks must verify them.
+    // Without the shared secret the webhook endpoint is `@Public()` and would
+    // ingest bookings from anyone who finds the URL. Unset is fine only when
+    // the integration is off.
+    if (env.CHANNEX_ENABLED && !env.CHANNEX_WEBHOOK_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['CHANNEX_WEBHOOK_SECRET'],
+        message:
+          'CHANNEX_WEBHOOK_SECRET is required in production when CHANNEX_ENABLED ' +
+          'is true — otherwise the public webhook endpoint accepts unverified events.',
+      });
     }
   });
 

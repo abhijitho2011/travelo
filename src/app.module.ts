@@ -81,12 +81,27 @@ import { ScheduleModule } from '@nestjs/schedule';
         },
       }),
     }),
+    // Two tiers. `default` is the broad per-IP ceiling every route inherits;
+    // `auth` is a much tighter bucket that sensitive endpoints opt into with
+    // `@AuthThrottle()` (login, OTP, MFA) so credential-stuffing and OTP-farming
+    // are capped independently of ordinary API traffic.
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => [
         {
+          name: 'default',
           ttl: Number(config.get<number>('THROTTLE_TTL') ?? 60) * 1000,
           limit: Number(config.get<number>('THROTTLE_LIMIT') ?? 120),
+        },
+        {
+          // The `auth` bucket is inert globally (a high ceiling every route
+          // trivially clears) and only bites where a route opts in with
+          // @AuthThrottle(), which overrides this limit down to
+          // AUTH_THROTTLE_LIMIT for that route. It must exist here for the
+          // named override to resolve.
+          name: 'auth',
+          ttl: Number(config.get<number>('AUTH_THROTTLE_TTL') ?? 60) * 1000,
+          limit: 1_000_000,
         },
       ],
     }),

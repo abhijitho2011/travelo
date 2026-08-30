@@ -4,6 +4,7 @@ import { DRIZZLE, Database } from '../../database/database.module';
 import { ownerSessions } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { OwnerErrors } from './owner-errors';
+import { MAX_PAGE_LIMIT } from '../../common/pagination';
 
 /**
  * The owner's own device list, backed by `owner_sessions` — the same rows the
@@ -23,7 +24,9 @@ export class OwnerSessionsService {
       .select()
       .from(ownerSessions)
       .where(and(eq(ownerSessions.ownerId, ownerId), isNull(ownerSessions.revokedAt)))
-      .orderBy(desc(ownerSessions.createdAt));
+      .orderBy(desc(ownerSessions.createdAt))
+      // A principal's live device list is small, but never return it unbounded.
+      .limit(MAX_PAGE_LIMIT);
     return rows.map((s) => ({
       id: s.id,
       ip: s.ip,

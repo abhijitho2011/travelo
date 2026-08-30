@@ -15,6 +15,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentAdmin, AuthenticatedAdmin } from '../../common/decorators/current-admin.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { PermissionsService } from '../permissions/permissions.service';
+import { AuthThrottle } from '../../common/decorators/auth-throttle.decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -61,6 +62,7 @@ export class AuthController {
    * number is the allowlisted super-admin mobile.
    */
   @Public()
+  @AuthThrottle()
   @Post('otp/request')
   @HttpCode(200)
   async requestOtp(@Body() dto: AdminRequestOtpDto) {
@@ -68,6 +70,7 @@ export class AuthController {
   }
 
   @Public()
+  @AuthThrottle()
   @Post('otp/verify')
   @HttpCode(200)
   async verifyOtp(@Body() dto: AdminVerifyOtpDto) {
@@ -75,6 +78,7 @@ export class AuthController {
   }
 
   @Public()
+  @AuthThrottle()
   @Post('google')
   @HttpCode(200)
   async google(@Body() dto: AdminGoogleLoginDto) {
@@ -86,6 +90,7 @@ export class AuthController {
    * session. Accepts a TOTP or an unused recovery code (which is burned).
    */
   @Public()
+  @AuthThrottle()
   @Post('mfa')
   @HttpCode(200)
   async mfaChallenge(@Body() dto: AdminMfaChallengeDto) {

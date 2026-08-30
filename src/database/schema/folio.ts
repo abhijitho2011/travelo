@@ -53,6 +53,13 @@ export const folioLineItems = pgTable(
     /** Paise. Positive = charged to the guest; negative = a credit/adjustment. */
     amountPaise: integer('amount_paise').notNull(),
     /**
+     * GST on this line, in paise. Future step: folio posting does not yet
+     * compute per-line GST — the column is available now with a 0 default.
+     */
+    taxPaise: integer('tax_paise').notNull().default(0),
+    /** SAC/HSN code for the line, when folio GST is wired up. */
+    hsnCode: varchar('hsn_code', { length: 16 }),
+    /**
      * What produced this line — `restaurant_order` / `spa_bill` / `manual`.
      * With `source_id` it is the idempotency key for posting: a restaurant order
      * settled on ROOM_CHARGE posts to the folio exactly once, however many times

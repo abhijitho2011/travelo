@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, Module, OnModuleInit } from '@nestjs/common';
 import { and, eq, isNull, lte, sql, type SQL } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
+import { loadEnv } from '../../config/env';
 import {
   announcements,
   backgroundJobs,
@@ -512,6 +513,52 @@ export class NightAuditWorker {
 }
 
 @Injectable()
+/**
+ * Data retention. Two append-only tables grow forever without pruning:
+ * `audit_logs` and `notification_deliveries`. This trims rows older than their
+ * configured window (AUDIT_RETENTION_DAYS / DELIVERY_RETENTION_DAYS) once a day.
+ *
+ * Only SETTLED deliveries are pruned — a PENDING row is still owed a send, so it
+ * is spared regardless of age. Audit rows are pruned purely by age (they are
+ * terminal by nature). A window of 0 disables pruning for that table, so a
+ * deployment with a compliance hold simply sets it to 0.
+ */
+@Injectable()
+export class RetentionWorker {
+  private readonly logger = new Logger(RetentionWorker.name);
+  constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+
+  async run(): Promise<{ audit: number; deliveries: number }> {
+    const env = loadEnv();
+    const audit = await this.pruneAudit(env.AUDIT_RETENTION_DAYS);
+    const deliveries = await this.pruneDeliveries(env.DELIVERY_RETENTION_DAYS);
+    return { audit, deliveries };
+  }
+
+  private async pruneAudit(days: number): Promise<number> {
+    if (days <= 0) return 0;
+    const res = await this.db.execute(sql`
+      DELETE FROM audit_logs WHERE created_at < now() - ${`${days} days`}::interval
+    `);
+    const count = (res as unknown as { rowCount?: number }).rowCount ?? 0;
+    if (count > 0) this.logger.log(`Pruned ${count} audit_logs row(s) older than ${days}d`);
+    return count;
+  }
+
+  private async pruneDeliveries(days: number): Promise<number> {
+    if (days <= 0) return 0;
+    const res = await this.db.execute(sql`
+      DELETE FROM notification_deliveries
+       WHERE created_at < now() - ${`${days} days`}::interval
+         AND status IN ('SENT','FAILED','SKIPPED')
+    `);
+    const count = (res as unknown as { rowCount?: number }).rowCount ?? 0;
+    if (count > 0)
+      this.logger.log(`Pruned ${count} settled notification_deliveries row(s) older than ${days}d`);
+    return count;
+  }
+}
+
 export class WorkerSchedulerService {
   private readonly logger = new Logger(WorkerSchedulerService.name);
   private readonly running = new Set<string>();
@@ -524,6 +571,7 @@ export class WorkerSchedulerService {
     private readonly channex: ChannexSyncWorker,
     private readonly billing: BillingService,
     private readonly nightAudit: NightAuditWorker,
+    private readonly retention: RetentionWorker,
   ) {}
 
   /** Queued notifications are user-visible, so they drain often. */
@@ -575,6 +623,12 @@ export class WorkerSchedulerService {
     return this.guard('metrics', () => this.metrics.run());
   }
 
+  /** Trim append-only audit + delivery history past its retention window. */
+  @Cron('45 3 * * *')
+  pruneRetention(): Promise<void> {
+    return this.guard('retention', () => this.retention.run());
+  }
+
   private async guard(name: string, run: () => Promise<unknown>): Promise<void> {
     if (this.running.has(name)) {
       this.logger.warn(`Skipping ${name}: the previous run has not finished`);
@@ -601,6 +655,7 @@ export class WorkerSchedulerService {
     AnnouncementPublisherWorker,
     NotificationDispatchWorker,
     NightAuditWorker,
+    RetentionWorker,
   ],
   exports: [
     ChannexSyncWorker,
@@ -609,6 +664,7 @@ export class WorkerSchedulerService {
     AnnouncementPublisherWorker,
     NotificationDispatchWorker,
     NightAuditWorker,
+    RetentionWorker,
   ],
 })
 export class WorkersModule {}

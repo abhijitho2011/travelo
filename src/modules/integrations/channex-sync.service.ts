@@ -633,6 +633,11 @@ export class ChannexSyncService {
       // header on an endpoint that is already rate-limited; a mismatch is a
       // flat refusal before anything is stored.
       if (input.providedSecret !== input.secret) throw ChannexErrors.badSignature();
+    } else if (process.env.NODE_ENV === 'production') {
+      // Belt-and-suspenders: env validation already blocks a prod boot with the
+      // integration on and no secret, but never ingest an unverified event in
+      // production even if that guard is somehow bypassed.
+      throw ChannexErrors.badSignature();
     } else {
       this.log.warn(
         'CHANNEX_WEBHOOK_SECRET is unset; accepting Channex webhooks unverified (dev only)',

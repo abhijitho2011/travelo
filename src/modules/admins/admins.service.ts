@@ -11,6 +11,7 @@ import { admins, adminRoles, roles, adminSessions } from '../../database/schema'
 import { AuthService } from '../auth/auth.service';
 import { AuditService } from '../audit/audit.service';
 import { PermissionsService } from '../permissions/permissions.service';
+import { MAX_PAGE_LIMIT } from '../../common/pagination';
 
 @Injectable()
 export class AdminsService {
@@ -160,7 +161,9 @@ export class AdminsService {
       .select()
       .from(adminSessions)
       .where(eq(adminSessions.adminId, adminId))
-      .orderBy(desc(adminSessions.createdAt));
+      .orderBy(desc(adminSessions.createdAt))
+      // Bounded: an admin's session history is small, never return it unbounded.
+      .limit(MAX_PAGE_LIMIT);
     return rows.map((s) => ({
       id: s.id,
       ip: s.ip,

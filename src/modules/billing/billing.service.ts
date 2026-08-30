@@ -24,6 +24,7 @@ import { getRequestContext } from '../../common/context/request-context';
 import { NotificationDeliveryService } from '../notifications/notification-delivery.service';
 import { inAppRecipient } from '../notifications/channels/channel.interface';
 import { addMonths } from '../../common/date/add-months';
+import { computeGstForCategory, GstCategory } from './gst';
 
 /** Invoice documents are longer-lived than photos but still not permanent. */
 const INVOICE_URL_TTL_SECONDS = 900;
@@ -181,6 +182,11 @@ export class BillingService {
     }
 
     // ---- 2. The invoice for the period just paid for ----
+    const subGst = computeGstForCategory({
+      category: 'saas',
+      taxableAmountPaise: input.amountPaise,
+      intraState: true,
+    });
     const [invoice] = await tx
       .insert(invoices)
       .values({
@@ -189,13 +195,17 @@ export class BillingService {
         subscriptionId: input.subscriptionId ?? undefined,
         billingPeriodStart: periodStart,
         billingPeriodEnd: periodEnd,
-        // No tax maths is invented here. The amount collected IS the subtotal
-        // and the total; a tax regime, when one exists, must be applied by
-        // whatever builds the charge, not by the settlement path.
+        // A SaaS subscription is a taxable service (SAC 998319, 18% GST). The
+        // subscription price is the taxable subtotal; GST is applied on top and
+        // split intra-state (CGST+SGST) by default.
         subtotal: input.amountPaise,
-        tax: 0,
+        tax: subGst.taxPaise,
+        cgstPaise: subGst.cgstPaise,
+        sgstPaise: subGst.sgstPaise,
+        igstPaise: subGst.igstPaise,
+        hsnCode: subGst.hsnCode,
         discount: 0,
-        total: input.amountPaise,
+        total: input.amountPaise + subGst.taxPaise,
         currency,
         status: 'PAID',
         issuedAt: now,
@@ -861,8 +871,48 @@ export class BillingService {
     discount?: number;
     currency?: string;
     dueDate?: Date;
+    /** GST category for auto-computation; defaults to accommodation. */
+    category?: GstCategory;
+    /** true (default) → CGST+SGST split; false → IGST. */
+    intraState?: boolean;
+    /** Place of supply (state); recorded on the invoice for GST. */
+    placeOfSupply?: string;
   }) {
-    const total = dto.subtotal + (dto.tax ?? 0) - (dto.discount ?? 0);
+    const intraState = dto.intraState ?? true;
+    let cgstPaise = 0;
+    let sgstPaise = 0;
+    let igstPaise = 0;
+    let taxPaise: number;
+    let hsnCode: string | undefined;
+
+    if (dto.tax !== undefined) {
+      // Explicit tax override (e.g. the admin console's manual invoice form):
+      // respect the given total, but still populate the split columns so the
+      // GST breakdown is never blank. Intra-state by default; if placeOfSupply
+      // marks it inter-state the whole amount is stored as IGST.
+      taxPaise = dto.tax;
+      if (intraState) {
+        sgstPaise = Math.floor(taxPaise / 2);
+        cgstPaise = taxPaise - sgstPaise;
+      } else {
+        igstPaise = taxPaise;
+      }
+    } else {
+      // Auto-compute GST from the subtotal via the engine.
+      const category = dto.category ?? 'accommodation';
+      const gst = computeGstForCategory({
+        category,
+        taxableAmountPaise: dto.subtotal,
+        intraState,
+      });
+      cgstPaise = gst.cgstPaise;
+      sgstPaise = gst.sgstPaise;
+      igstPaise = gst.igstPaise;
+      taxPaise = gst.taxPaise;
+      hsnCode = gst.hsnCode;
+    }
+
+    const total = dto.subtotal + taxPaise - (dto.discount ?? 0);
     const invoiceNumber = await this.invNum.next();
     const [row] = await this.db
       .insert(invoices)
@@ -873,7 +923,12 @@ export class BillingService {
         billingPeriodStart: dto.billingPeriodStart,
         billingPeriodEnd: dto.billingPeriodEnd,
         subtotal: dto.subtotal,
-        tax: dto.tax ?? 0,
+        tax: taxPaise,
+        cgstPaise,
+        sgstPaise,
+        igstPaise,
+        hsnCode,
+        placeOfSupply: dto.placeOfSupply,
         discount: dto.discount ?? 0,
         total,
         currency: dto.currency ?? 'INR',

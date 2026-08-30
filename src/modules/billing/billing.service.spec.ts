@@ -170,9 +170,13 @@ describe('BillingService.settleSuccessfulPayment', () => {
       ownerId: 'own-1',
       subscriptionId: 'sub-1',
       subtotal: 3_000_000,
-      tax: 0,
+      // SaaS subscription: 18% GST, intra-state split (CGST 9% + SGST 9%).
+      tax: 540_000,
+      cgstPaise: 270_000,
+      sgstPaise: 270_000,
+      igstPaise: 0,
       discount: 0,
-      total: 3_000_000,
+      total: 3_540_000,
       status: 'PAID',
     });
     expect((inv.billingPeriodStart as Date).toISOString()).toBe('2026-12-01T00:00:00.000Z');
