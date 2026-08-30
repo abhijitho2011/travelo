@@ -12,6 +12,7 @@ import { RolesModule } from './modules/roles/roles.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { HealthModule } from './modules/health/health.module';
+import { MetricsModule } from './modules/metrics/metrics.module';
 import { OwnersModule } from './modules/owners/owners.module';
 import { OwnerAuthModule } from './modules/owner-auth/owner-auth.module';
 import { StaffAuthModule } from './modules/staff-auth/staff-auth.module';
@@ -114,6 +115,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     AdminsModule,
     RolesModule,
     HealthModule,
+    MetricsModule,
     OwnersModule,
     OwnerAuthModule,
     StaffAuthModule,

@@ -1,5 +1,20 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
-import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, ne, or, sql, SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  lte,
+  ne,
+  or,
+  sql,
+  SQL,
+} from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import { FolioService } from '../folio/folio.service';
 import {
@@ -658,7 +673,11 @@ export class ReservationsService {
     }
     assertDateOrder(before.checkIn as unknown as IsoDate, dto.checkOut as IsoDate);
     const ratePaise = dto.ratePaise ?? before.ratePaise;
-    const newTotal = totalPaise(ratePaise, before.checkIn as unknown as IsoDate, dto.checkOut as IsoDate);
+    const newTotal = totalPaise(
+      ratePaise,
+      before.checkIn as unknown as IsoDate,
+      dto.checkOut as IsoDate,
+    );
 
     const row = await this.db.transaction(async (tx) => {
       const handle = tx as unknown as Tx;

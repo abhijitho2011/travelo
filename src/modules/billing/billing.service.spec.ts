@@ -338,7 +338,11 @@ describe('BillingService.createGatewayOrder', () => {
       expect.objectContaining({ amountPaise: 3_000_000, currency: 'INR', customerId: 'own-1' }),
     );
     const parked = insertFor(db, 'payments');
-    expect(parked).toMatchObject({ gateway: 'CASHFREE', gatewayRef: 'cf-order-1', status: 'PENDING' });
+    expect(parked).toMatchObject({
+      gateway: 'CASHFREE',
+      gatewayRef: 'cf-order-1',
+      status: 'PENDING',
+    });
   });
 
   it('returns GATEWAY_NOT_CONFIGURED for Cashfree when its keys are absent', async () => {
@@ -513,14 +517,30 @@ describe('BillingService — gateway refunds', () => {
         refunds: [[{ sum: 0 }]],
       },
       insert: {
-        refunds: [{ id: 'ref-1', paymentId: 'pay-1', amount: 250_000, status: 'PENDING', reason: 'guest left' }],
+        refunds: [
+          {
+            id: 'ref-1',
+            paymentId: 'pay-1',
+            amount: 250_000,
+            status: 'PENDING',
+            reason: 'guest left',
+          },
+        ],
       },
       update: {
         payments: [{ id: 'pay-1' }],
         refunds: [{ id: 'ref-1', status: 'PROCESSED', gatewayRef: 'cfr_1' }],
       },
     });
-    const cashfree = { configured: true, createRefund: jest.fn(async () => ({ cf_refund_id: 'cfr_1', refund_id: 'ref-1', refund_status: 'SUCCESS', refund_amount: 2500 })) };
+    const cashfree = {
+      configured: true,
+      createRefund: jest.fn(async () => ({
+        cf_refund_id: 'cfr_1',
+        refund_id: 'ref-1',
+        refund_status: 'SUCCESS',
+        refund_amount: 2500,
+      })),
+    };
     const svc = new BillingService(
       db as never,
       mockAudit() as never,
@@ -542,7 +562,9 @@ describe('BillingService — gateway refunds', () => {
   it('degrades to MANUAL when Cashfree is not configured', async () => {
     const db = mockDb({
       select: { payments: [[payRow()]], refunds: [[{ sum: 0 }]] },
-      insert: { refunds: [{ id: 'ref-1', paymentId: 'pay-1', amount: 250_000, status: 'PENDING' }] },
+      insert: {
+        refunds: [{ id: 'ref-1', paymentId: 'pay-1', amount: 250_000, status: 'PENDING' }],
+      },
       update: { payments: [{ id: 'pay-1' }], refunds: [{ id: 'ref-1', status: 'MANUAL' }] },
     });
     const svc = new BillingService(
@@ -563,12 +585,22 @@ describe('BillingService — gateway refunds', () => {
   it('retryPendingRefunds re-drives a PENDING refund through the gateway', async () => {
     const db = mockDb({
       select: {
-        refunds: [[{ id: 'ref-1', paymentId: 'pay-1', amount: 250_000, status: 'PENDING', reason: null }]],
+        refunds: [
+          [{ id: 'ref-1', paymentId: 'pay-1', amount: 250_000, status: 'PENDING', reason: null }],
+        ],
         payments: [[payRow()]],
       },
       update: { refunds: [{ id: 'ref-1', status: 'PROCESSED', gatewayRef: 'cfr_9' }] },
     });
-    const cashfree = { configured: true, createRefund: jest.fn(async () => ({ cf_refund_id: 'cfr_9', refund_id: 'ref-1', refund_status: 'SUCCESS', refund_amount: 2500 })) };
+    const cashfree = {
+      configured: true,
+      createRefund: jest.fn(async () => ({
+        cf_refund_id: 'cfr_9',
+        refund_id: 'ref-1',
+        refund_status: 'SUCCESS',
+        refund_amount: 2500,
+      })),
+    };
     const svc = new BillingService(
       db as never,
       mockAudit() as never,

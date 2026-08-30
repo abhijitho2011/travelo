@@ -43,11 +43,7 @@ export class StaffApprovalsController {
 
   @Post(':id/reject')
   @RequireStaffPermissions('approval.act')
-  reject(
-    @CurrentStaff() me: AuthenticatedStaff,
-    @Param('id') id: string,
-    @Body() dto: RejectDto,
-  ) {
+  reject(@CurrentStaff() me: AuthenticatedStaff, @Param('id') id: string, @Body() dto: RejectDto) {
     return this.approvals.decide(me.propertyId, id, false, dto.reason ?? null, me);
   }
 }

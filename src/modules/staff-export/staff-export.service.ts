@@ -44,7 +44,18 @@ export class StaffExportService {
       .where(and(eq(reservations.propertyId, propertyId), isNull(reservations.deletedAt)))
       .orderBy(desc(reservations.checkIn));
     return toCsvDocument(
-      ['reservationNumber', 'guestName', 'guestPhone', 'checkIn', 'checkOut', 'status', 'ratePaise', 'totalPaise', 'paidPaise', 'source'],
+      [
+        'reservationNumber',
+        'guestName',
+        'guestPhone',
+        'checkIn',
+        'checkOut',
+        'status',
+        'ratePaise',
+        'totalPaise',
+        'paidPaise',
+        'source',
+      ],
       rows.map((r) => [
         r.reservationNumber,
         r.guestName,

@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (tsc · lint · unit tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit -p tsconfig.build.json
+      - name: Lint
+        # Fails on lint/prettier errors; unused-import warnings are non-blocking,
+        # matching the repo's existing standard (the `lint` script auto-fixes).
+        run: npx eslint "{src,test}/**/*.ts"
+      - name: Unit tests
+        run: npx jest --ci
+
+  backend-e2e:
+    name: Backend (e2e · testcontainers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # e2e spins up Postgres via testcontainers (Docker is present on the runner).
+      - name: E2E tests
+        run: npm run test:e2e
+
+  owner-app:
+    name: Owner app (analyze · test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - working-directory: owner_app
+        run: flutter pub get
+      - working-directory: owner_app
+        run: flutter analyze
+      - working-directory: owner_app
+        run: flutter test --timeout 60s
+
+  staff-app:
+    name: Staff app (analyze · test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - working-directory: staff_app
+        run: flutter pub get
+      - working-directory: staff_app
+        run: flutter analyze
+      - working-directory: staff_app
+        run: flutter test --timeout 60s

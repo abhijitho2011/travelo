@@ -108,7 +108,9 @@ describe('GST engine', () => {
 
     it('rounds to whole paise (half-up via Math.round)', () => {
       // 5% of 10 = 0.5 → 1
-      expect(computeGst({ taxableAmountPaise: 10, ratePercent: 5, intraState: false }).taxPaise).toBe(1);
+      expect(
+        computeGst({ taxableAmountPaise: 10, ratePercent: 5, intraState: false }).taxPaise,
+      ).toBe(1);
     });
   });
 

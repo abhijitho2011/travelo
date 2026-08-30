@@ -101,7 +101,12 @@ describe('OwnerPortalService.createProperty enforcement', () => {
       [{ status: 'ACTIVE', planLimit: 1, override: null }], // subscription
       [{ count: 1 }], // existing property count == limit
     ]);
-    const svc = new OwnerPortalService(db as never, photosStub as never, auditStub as never, propsStub as never);
+    const svc = new OwnerPortalService(
+      db as never,
+      photosStub as never,
+      auditStub as never,
+      propsStub as never,
+    );
     await expect(svc.createProperty('own1', dto)).rejects.toMatchObject({
       response: { error: 'PROPERTY_LIMIT_REACHED' },
     });
@@ -112,7 +117,12 @@ describe('OwnerPortalService.createProperty enforcement', () => {
     const db = mkDb([[{ status: 'ACTIVE', planLimit: 3, override: null }], [{ count: 1 }]], () => {
       inserted = true;
     });
-    const svc = new OwnerPortalService(db as never, photosStub as never, auditStub as never, propsStub as never);
+    const svc = new OwnerPortalService(
+      db as never,
+      photosStub as never,
+      auditStub as never,
+      propsStub as never,
+    );
     const res = await svc.createProperty('own1', dto);
     expect(inserted).toBe(true);
     expect(res.id).toBe('prop1');
@@ -120,7 +130,12 @@ describe('OwnerPortalService.createProperty enforcement', () => {
 
   it('rejects when the owner has no usable subscription', async () => {
     const db = mkDb([[{ status: 'EXPIRED', planLimit: 3, override: null }], [{ count: 0 }]]);
-    const svc = new OwnerPortalService(db as never, photosStub as never, auditStub as never, propsStub as never);
+    const svc = new OwnerPortalService(
+      db as never,
+      photosStub as never,
+      auditStub as never,
+      propsStub as never,
+    );
     await expect(svc.createProperty('own1', dto)).rejects.toMatchObject({
       response: { error: 'PROPERTY_LIMIT_REACHED' },
     });
@@ -166,7 +181,12 @@ describe('OwnerPortalService.createProperty stores the new field set', () => {
       return c;
     }
 
-    const svc = new OwnerPortalService(db as never, photosStub as never, auditStub as never, propsStub as never);
+    const svc = new OwnerPortalService(
+      db as never,
+      photosStub as never,
+      auditStub as never,
+      propsStub as never,
+    );
     await svc.createProperty('own1', {
       name: 'Seaside Inn',
       city: 'Kochi',
@@ -248,7 +268,12 @@ describe('OwnerPortalService.listStaff — every role, not just GM/AGM', () => {
     const db = {
       select: () => (call++ === 0 ? staffListDb([{ id: 'prop1' }]).select() : inner.select()),
     };
-    const svc = new OwnerPortalService(db as never, photosStub as never, auditStub as never, propsStub as never);
+    const svc = new OwnerPortalService(
+      db as never,
+      photosStub as never,
+      auditStub as never,
+      propsStub as never,
+    );
     const res = await svc.listStaff('own1', 'prop1');
     expect(res.map((s) => s.role)).toEqual([
       'GENERAL_MANAGER',
@@ -264,7 +289,12 @@ describe('OwnerPortalService.listStaff — every role, not just GM/AGM', () => {
     const db = {
       select: () => (call++ === 0 ? staffListDb([{ id: 'prop1' }]).select() : inner.select()),
     };
-    const svc = new OwnerPortalService(db as never, photosStub as never, auditStub as never, propsStub as never);
+    const svc = new OwnerPortalService(
+      db as never,
+      photosStub as never,
+      auditStub as never,
+      propsStub as never,
+    );
     const [s] = await svc.listStaff('own1', 'prop1');
     expect(s).toMatchObject({
       fullName: 'Asha Menon',
@@ -284,7 +314,12 @@ describe('OwnerPortalService.listAllStaff — portfolio-wide directory', () => {
         propertyName: 'Hilltop Retreat',
       },
     ]);
-    const svc = new OwnerPortalService(db as never, photosStub as never, auditStub as never, propsStub as never);
+    const svc = new OwnerPortalService(
+      db as never,
+      photosStub as never,
+      auditStub as never,
+      propsStub as never,
+    );
     const res = await svc.listAllStaff('own1');
     expect(res).toHaveLength(2);
     expect(res[0]).toMatchObject({
@@ -399,7 +434,12 @@ describe('OwnerPortalService — property edit / archive (3.10)', () => {
 
   it('archives a property the owner owns (soft delete)', async () => {
     const db = mockDb({ select: { properties: [[{ id: 'p1' }]] } });
-    const svc = new OwnerPortalService(db as never, photosStub as never, auditStub as never, propsStub as never);
+    const svc = new OwnerPortalService(
+      db as never,
+      photosStub as never,
+      auditStub as never,
+      propsStub as never,
+    );
     const out = await svc.archiveProperty('own-1', 'p1');
     expect(out).toEqual({ deleted: true, id: 'p1' });
     expect(db.updates.find((u) => u.table === 'properties')?.values).toHaveProperty('deletedAt');
@@ -412,11 +452,29 @@ describe('OwnerPortalService — property edit / archive (3.10)', () => {
         properties: [
           [{ id: 'p1' }],
           [{ id: 'p1', country: 'India', contact: { phone: '999', email: null } }],
-          [{ id: 'p1', name: 'New Name', city: 'Kochi', state: 'Kerala', country: 'India', status: 'DRAFT', roomCount: 0, listingCompleteness: 0, contact: { phone: '999' }, address: {} }],
+          [
+            {
+              id: 'p1',
+              name: 'New Name',
+              city: 'Kochi',
+              state: 'Kerala',
+              country: 'India',
+              status: 'DRAFT',
+              roomCount: 0,
+              listingCompleteness: 0,
+              contact: { phone: '999' },
+              address: {},
+            },
+          ],
         ],
       },
     });
-    const svc = new OwnerPortalService(db as never, photosStub as never, auditStub as never, propsStub as never);
+    const svc = new OwnerPortalService(
+      db as never,
+      photosStub as never,
+      auditStub as never,
+      propsStub as never,
+    );
     await svc.updateProperty('own-1', 'p1', { name: 'New Name' });
     const upd = db.updates.find((u) => u.table === 'properties')?.values;
     expect(upd).toMatchObject({ name: 'New Name' });

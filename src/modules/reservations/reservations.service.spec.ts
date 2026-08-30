@@ -9,7 +9,10 @@ const ROOM_ID = '22222222-2222-4222-8222-222222222222';
 const STAFF_ID = 'staff-1';
 
 function svc(db: MockDb) {
-  return new ReservationsService(db as unknown as Database, new FolioService(db as unknown as Database));
+  return new ReservationsService(
+    db as unknown as Database,
+    new FolioService(db as unknown as Database),
+  );
 }
 
 const typeRow = {
@@ -235,10 +238,12 @@ describe('ReservationsService — no double booking', () => {
         // Two sellable rooms of the type...
         rooms: [[{ count: 2 }]],
         // ...and two committed stays covering every night of 14th–17th.
-        reservations: [[
-          { checkIn: '2026-03-14', checkOut: '2026-03-17' },
-          { checkIn: '2026-03-14', checkOut: '2026-03-17' },
-        ]],
+        reservations: [
+          [
+            { checkIn: '2026-03-14', checkOut: '2026-03-17' },
+            { checkIn: '2026-03-14', checkOut: '2026-03-17' },
+          ],
+        ],
       },
     });
     await expect(
@@ -251,10 +256,12 @@ describe('ReservationsService — no double booking', () => {
       select: {
         room_types: [[typeRow]],
         rooms: [[{ count: 2 }]],
-        reservations: [[
-          { checkIn: '2026-03-14', checkOut: '2026-03-17' },
-          { checkIn: '2026-03-14', checkOut: '2026-03-17' },
-        ]],
+        reservations: [
+          [
+            { checkIn: '2026-03-14', checkOut: '2026-03-17' },
+            { checkIn: '2026-03-14', checkOut: '2026-03-17' },
+          ],
+        ],
       },
     });
     await expect(

@@ -5,10 +5,7 @@ import { StaffJwtGuard } from '../staff-auth/staff-jwt.guard';
 import { StaffPermissionsGuard } from '../staff-auth/staff-permissions.guard';
 import { ApprovalsService } from './approvals.service';
 import { AlertsService } from './alerts.service';
-import {
-  StaffApprovalsController,
-  StaffAlertsController,
-} from './staff-management.controller';
+import { StaffApprovalsController, StaffAlertsController } from './staff-management.controller';
 
 /**
  * The GM/AGM management surface: the approval queue (expenses + purchase orders)

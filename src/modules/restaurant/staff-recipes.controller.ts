@@ -33,11 +33,7 @@ export class StaffRecipesController {
 
   @Put(':id/recipe')
   @RequireStaffPermissions('menu.manage')
-  set(
-    @CurrentStaff() me: AuthenticatedStaff,
-    @Param('id') id: string,
-    @Body() dto: SetRecipeDto,
-  ) {
+  set(@CurrentStaff() me: AuthenticatedStaff, @Param('id') id: string, @Body() dto: SetRecipeDto) {
     return this.recipes.set(me.propertyId, id, dto.lines);
   }
 }

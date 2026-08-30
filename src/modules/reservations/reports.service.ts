@@ -34,9 +34,7 @@ export class ReportsService {
       .where(eq(propertyDailySnapshots.propertyId, propertyId))
       .orderBy(desc(propertyDailySnapshots.businessDate))
       .limit(window);
-    return rows
-      .map((r) => this.toRow(r))
-      .sort((a, b) => a.date.localeCompare(b.date));
+    return rows.map((r) => this.toRow(r)).sort((a, b) => a.date.localeCompare(b.date));
   }
 
   /** Aggregate ADR / RevPAR / occupancy over the window. */
@@ -60,7 +58,11 @@ export class ReportsService {
   /** Arrivals and departures for one date — the front desk's daily manifest. */
   async manifest(propertyId: string, date: string) {
     const [arrivals, departures] = await Promise.all([
-      this.stayList(propertyId, eq(reservations.checkIn, date), ['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT']),
+      this.stayList(propertyId, eq(reservations.checkIn, date), [
+        'CONFIRMED',
+        'CHECKED_IN',
+        'CHECKED_OUT',
+      ]),
       this.stayList(propertyId, eq(reservations.checkOut, date), ['CHECKED_IN', 'CHECKED_OUT']),
     ]);
     return { date, arrivals, departures };

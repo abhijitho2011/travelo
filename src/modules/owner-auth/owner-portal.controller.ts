@@ -26,7 +26,13 @@ import {
   PropertyPhotosService,
   type UploadedPhoto,
 } from './property-photos.service';
-import { CreatePropertyDto, CreateStaffDto, SetStaffStatusDto, UpdateStaffDto, UpdatePropertyDto } from './dto';
+import {
+  CreatePropertyDto,
+  CreateStaffDto,
+  SetStaffStatusDto,
+  UpdateStaffDto,
+  UpdatePropertyDto,
+} from './dto';
 
 @ApiTags('Owner Portal')
 @ApiBearerAuth()

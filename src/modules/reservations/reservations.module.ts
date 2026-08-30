@@ -34,7 +34,13 @@ import { NotificationsModule } from '../notifications/notifications.module';
     StaffDashboardController,
     StaffReportsController,
   ],
-  providers: [ReservationsService, DeskService, ReportsService, StaffJwtGuard, StaffPermissionsGuard],
+  providers: [
+    ReservationsService,
+    DeskService,
+    ReportsService,
+    StaffJwtGuard,
+    StaffPermissionsGuard,
+  ],
   exports: [ReservationsService, DeskService],
 })
 export class ReservationsModule {}

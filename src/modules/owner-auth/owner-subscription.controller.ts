@@ -29,10 +29,7 @@ export class OwnerSubscriptionController {
    * webhook settles the parked PENDING payment when the money lands.
    */
   @Post('subscription/orders')
-  createOrder(
-    @CurrentOwner() owner: AuthenticatedOwner,
-    @Body() dto: CreateSubscriptionOrderDto,
-  ) {
+  createOrder(@CurrentOwner() owner: AuthenticatedOwner, @Body() dto: CreateSubscriptionOrderDto) {
     return this.svc.createOrder(owner.id, dto.gateway);
   }
 }

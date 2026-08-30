@@ -15,11 +15,7 @@ import {
   encryptMfaSecret,
   resolveMfaKey,
 } from '../auth/mfa-crypto';
-import {
-  generateRecoveryCode,
-  normalizeRecoveryCode,
-  verifyTotp,
-} from '../auth/admin-mfa.service';
+import { generateRecoveryCode, normalizeRecoveryCode, verifyTotp } from '../auth/admin-mfa.service';
 
 export const STAFF_MFA_CHALLENGE_ISSUER = 'tavelo-staff-mfa';
 export const STAFF_MFA_CHALLENGE_AUDIENCE = 'tavelo-staff-mfa';

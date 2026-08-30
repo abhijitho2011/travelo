@@ -58,7 +58,13 @@ export class JobsService {
     if (before.queue === 'notifications' && this.dispatch) {
       await this.db
         .update(backgroundJobs)
-        .set({ state: 'Running', attempts: before.attempts + 1, error: null, startedAt: new Date(), finishedAt: null })
+        .set({
+          state: 'Running',
+          attempts: before.attempts + 1,
+          error: null,
+          startedAt: new Date(),
+          finishedAt: null,
+        })
         .where(eq(backgroundJobs.id, id));
       let state = 'Completed';
       let error: string | null = null;
@@ -72,14 +78,26 @@ export class JobsService {
         .update(backgroundJobs)
         .set({ state, error, finishedAt: new Date() })
         .where(eq(backgroundJobs.id, id));
-      await this.audit.record({ action: 'job.retried', entity: 'job', entityId: id, before, after: { state } });
+      await this.audit.record({
+        action: 'job.retried',
+        entity: 'job',
+        entityId: id,
+        before,
+        after: { state },
+      });
       return this.get(id);
     }
 
     // Unknown queue — reset to Pending so the row is at least re-queued.
     await this.db
       .update(backgroundJobs)
-      .set({ state: 'Pending', attempts: before.attempts + 1, error: null, startedAt: null, finishedAt: null })
+      .set({
+        state: 'Pending',
+        attempts: before.attempts + 1,
+        error: null,
+        startedAt: null,
+        finishedAt: null,
+      })
       .where(eq(backgroundJobs.id, id));
     await this.audit.record({ action: 'job.retried', entity: 'job', entityId: id, before });
     return this.get(id);

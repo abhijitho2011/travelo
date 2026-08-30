@@ -619,11 +619,9 @@ export class BillingService {
     pay: typeof payments.$inferSelect,
   ) {
     const gateway = pay.gateway as string;
-    const razorpayReady =
-      gateway === 'RAZORPAY' && this.razorpay.configured && !!pay.gatewayRef;
+    const razorpayReady = gateway === 'RAZORPAY' && this.razorpay.configured && !!pay.gatewayRef;
     const cashfreeOrderId = this.cashfreeOrderIdFor(pay);
-    const cashfreeReady =
-      gateway === 'CASHFREE' && this.cashfree.configured && !!cashfreeOrderId;
+    const cashfreeReady = gateway === 'CASHFREE' && this.cashfree.configured && !!cashfreeOrderId;
 
     if (!razorpayReady && !cashfreeReady) {
       const [manual] = await this.db

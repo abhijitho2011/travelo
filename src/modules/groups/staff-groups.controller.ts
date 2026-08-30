@@ -46,11 +46,7 @@ export class StaffGroupsController {
 
   @Post(':id/attach')
   @RequireStaffPermissions('reservation.update')
-  attach(
-    @CurrentStaff() me: AuthenticatedStaff,
-    @Param('id') id: string,
-    @Body() dto: AttachDto,
-  ) {
+  attach(@CurrentStaff() me: AuthenticatedStaff, @Param('id') id: string, @Body() dto: AttachDto) {
     return this.groups.attach(me.propertyId, id, dto.reservationId);
   }
 }

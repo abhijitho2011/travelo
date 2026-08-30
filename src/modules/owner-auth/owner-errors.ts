@@ -92,7 +92,11 @@ export const OwnerErrors = {
       HttpStatus.SERVICE_UNAVAILABLE,
     ),
   mfaNotEnrolled: () =>
-    ownerError('MFA_NOT_ENROLLED', 'Start enrolment before verifying a code', HttpStatus.BAD_REQUEST),
+    ownerError(
+      'MFA_NOT_ENROLLED',
+      'Start enrolment before verifying a code',
+      HttpStatus.BAD_REQUEST,
+    ),
   mfaAlreadyEnabled: () =>
     ownerError(
       'MFA_ALREADY_ENABLED',
@@ -100,7 +104,11 @@ export const OwnerErrors = {
       HttpStatus.CONFLICT,
     ),
   mfaNotEnabled: () =>
-    ownerError('MFA_NOT_ENABLED', 'Two-factor authentication is not enabled', HttpStatus.BAD_REQUEST),
+    ownerError(
+      'MFA_NOT_ENABLED',
+      'Two-factor authentication is not enabled',
+      HttpStatus.BAD_REQUEST,
+    ),
   mfaInvalidCode: () =>
     ownerError('MFA_INVALID_CODE', 'Invalid or expired code', HttpStatus.UNAUTHORIZED),
   mfaChallengeInvalid: () =>

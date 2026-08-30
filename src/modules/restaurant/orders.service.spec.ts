@@ -326,12 +326,7 @@ describe('OrdersService — settle + ROOM_CHARGE validation', () => {
         folio_line_items: [[]], // findLineBySource → none yet
       },
     });
-    await svc(db).settle(
-      MY,
-      'ord-1',
-      { method: 'ROOM_CHARGE', reservationId: 'res-1' },
-      STAFF,
-    );
+    await svc(db).settle(MY, 'ord-1', { method: 'ROOM_CHARGE', reservationId: 'res-1' }, STAFF);
     const update = db.updates.find(
       (u) => u.table === 'restaurant_orders' && u.values?.status === 'PAID',
     );

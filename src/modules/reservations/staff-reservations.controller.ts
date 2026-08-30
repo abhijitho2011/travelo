@@ -461,9 +461,8 @@ export class StaffReportsController {
   @Get('manifest')
   @RequireStaffPermissions('reports.read')
   manifest(@CurrentStaff() me: AuthenticatedStaff, @Query('date') date?: string) {
-    const d = date && /^\d{4}-\d{2}-\d{2}$/.test(date)
-      ? date
-      : new Date().toISOString().slice(0, 10);
+    const d =
+      date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : new Date().toISOString().slice(0, 10);
     return this.reports.manifest(me.propertyId, d);
   }
 }

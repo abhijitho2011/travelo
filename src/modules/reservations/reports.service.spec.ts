@@ -7,8 +7,26 @@ describe('ReportsService', () => {
       select: {
         property_daily_snapshots: [
           [
-            { businessDate: '2026-08-29', occupancyPct: 50, roomsSold: 5, roomsAvailable: 10, arrivals: 2, departures: 1, noShows: 0, revenuePaise: 500000 },
-            { businessDate: '2026-08-28', occupancyPct: 80, roomsSold: 8, roomsAvailable: 10, arrivals: 3, departures: 0, noShows: 1, revenuePaise: 960000 },
+            {
+              businessDate: '2026-08-29',
+              occupancyPct: 50,
+              roomsSold: 5,
+              roomsAvailable: 10,
+              arrivals: 2,
+              departures: 1,
+              noShows: 0,
+              revenuePaise: 500000,
+            },
+            {
+              businessDate: '2026-08-28',
+              occupancyPct: 80,
+              roomsSold: 8,
+              roomsAvailable: 10,
+              arrivals: 3,
+              departures: 0,
+              noShows: 1,
+              revenuePaise: 960000,
+            },
           ],
         ],
       },
@@ -27,8 +45,26 @@ describe('ReportsService', () => {
       select: {
         property_daily_snapshots: [
           [
-            { businessDate: '2026-08-29', occupancyPct: 50, roomsSold: 5, roomsAvailable: 10, arrivals: 0, departures: 0, noShows: 0, revenuePaise: 500000 },
-            { businessDate: '2026-08-28', occupancyPct: 100, roomsSold: 10, roomsAvailable: 10, arrivals: 0, departures: 0, noShows: 0, revenuePaise: 1500000 },
+            {
+              businessDate: '2026-08-29',
+              occupancyPct: 50,
+              roomsSold: 5,
+              roomsAvailable: 10,
+              arrivals: 0,
+              departures: 0,
+              noShows: 0,
+              revenuePaise: 500000,
+            },
+            {
+              businessDate: '2026-08-28',
+              occupancyPct: 100,
+              roomsSold: 10,
+              roomsAvailable: 10,
+              arrivals: 0,
+              departures: 0,
+              noShows: 0,
+              revenuePaise: 1500000,
+            },
           ],
         ],
       },

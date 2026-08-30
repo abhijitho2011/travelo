@@ -5,9 +5,11 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { getRequestContext } from '../context/request-context';
+import { MetricsService } from '../../modules/metrics/metrics.service';
 
 export interface ErrorEnvelope {
   success: false;
@@ -25,6 +27,10 @@ export interface ErrorEnvelope {
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
+
+  // Optional so a direct `new AllExceptionsFilter()` in a unit test still works;
+  // in the running app the @Global MetricsModule always supplies it.
+  constructor(@Optional() private readonly metrics?: MetricsService) {}
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
@@ -52,6 +58,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     const requestId = getRequestContext()?.requestId;
+
+    // Count every error response, and 5xx separately as an unhandled error.
+    this.metrics?.record(status);
+    if (status >= 500) this.metrics?.recordError();
 
     const envelope: ErrorEnvelope = {
       success: false,

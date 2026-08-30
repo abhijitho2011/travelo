@@ -48,9 +48,7 @@ export const HOTEL_GST_SLABS: readonly GstSlab[] = [
 ];
 
 /** Restaurant service, SAC 996331. Standalone restaurant supply is a flat 5%. */
-export const RESTAURANT_GST_SLABS: readonly GstSlab[] = [
-  { maxAmountPaise: null, ratePercent: 5 },
-];
+export const RESTAURANT_GST_SLABS: readonly GstSlab[] = [{ maxAmountPaise: null, ratePercent: 5 }];
 
 /** SaaS / software subscription service, SAC 998319. Flat 18%. */
 export const SAAS_GST_SLABS: readonly GstSlab[] = [{ maxAmountPaise: null, ratePercent: 18 }];

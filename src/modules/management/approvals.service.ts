@@ -87,7 +87,9 @@ export class ApprovalsService {
     const [exp] = await this.db
       .select()
       .from(expenses)
-      .where(and(eq(expenses.id, id), eq(expenses.propertyId, propertyId), isNull(expenses.deletedAt)))
+      .where(
+        and(eq(expenses.id, id), eq(expenses.propertyId, propertyId), isNull(expenses.deletedAt)),
+      )
       .limit(1);
     if (exp) {
       if (exp.status !== 'DRAFT') throw new ConflictException('Expense is not awaiting approval');
@@ -120,7 +122,8 @@ export class ApprovalsService {
       )
       .limit(1);
     if (po) {
-      if (po.status !== 'DRAFT') throw new ConflictException('Purchase order is not awaiting approval');
+      if (po.status !== 'DRAFT')
+        throw new ConflictException('Purchase order is not awaiting approval');
       await this.db
         .update(purchaseOrders)
         .set({ status: approve ? 'SENT' : 'CANCELLED', updatedAt: new Date() })

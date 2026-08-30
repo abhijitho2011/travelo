@@ -6,10 +6,30 @@ describe('GroupsService.get', () => {
     const db = mockDb({
       select: {
         booking_groups: [[{ id: 'g1', name: 'Menon Wedding', propertyId: 'p1' }]],
-        reservations: [[
-          { id: 'r1', reservationNumber: 'RSV-1', guestName: 'A', checkIn: '2026-03-14', checkOut: '2026-03-16', status: 'CONFIRMED', totalPaise: 900000, paidPaise: 400000 },
-          { id: 'r2', reservationNumber: 'RSV-2', guestName: 'B', checkIn: '2026-03-14', checkOut: '2026-03-16', status: 'CONFIRMED', totalPaise: 900000, paidPaise: 900000 },
-        ]],
+        reservations: [
+          [
+            {
+              id: 'r1',
+              reservationNumber: 'RSV-1',
+              guestName: 'A',
+              checkIn: '2026-03-14',
+              checkOut: '2026-03-16',
+              status: 'CONFIRMED',
+              totalPaise: 900000,
+              paidPaise: 400000,
+            },
+            {
+              id: 'r2',
+              reservationNumber: 'RSV-2',
+              guestName: 'B',
+              checkIn: '2026-03-14',
+              checkOut: '2026-03-16',
+              status: 'CONFIRMED',
+              totalPaise: 900000,
+              paidPaise: 900000,
+            },
+          ],
+        ],
       },
     });
     const g = await new GroupsService(db as never).get('p1', 'g1');
@@ -21,6 +41,8 @@ describe('GroupsService.get', () => {
 
   it('404s for a group at another property', async () => {
     const db = mockDb({ select: { booking_groups: [[]] } });
-    await expect(new GroupsService(db as never).get('p1', 'g1')).rejects.toMatchObject({ status: 404 });
+    await expect(new GroupsService(db as never).get('p1', 'g1')).rejects.toMatchObject({
+      status: 404,
+    });
   });
 });

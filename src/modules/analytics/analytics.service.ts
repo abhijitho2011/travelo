@@ -55,8 +55,7 @@ export class AnalyticsService {
       // each of the durationMonths. The legacy annual_price column is NOT the
       // source of truth and is deliberately not read here.
       const months = r.durationMonths > 0 ? r.durationMonths : 1;
-      const base =
-        r.override != null ? Math.round(r.override / months) : r.monthly;
+      const base = r.override != null ? Math.round(r.override / months) : r.monthly;
       mrr += base;
     }
     const arr = mrr * 12;

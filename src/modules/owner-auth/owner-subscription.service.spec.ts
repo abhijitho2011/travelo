@@ -168,9 +168,15 @@ describe('OwnerSubscriptionService.invoices', () => {
 });
 
 describe('OwnerSubscriptionService.createOrder', () => {
-  it('resolves the owner\'s own subscription and delegates to billing', async () => {
+  it("resolves the owner's own subscription and delegates to billing", async () => {
     const db = mockDb({ select: { subscriptions: [[{ id: 'sub-1' }]] } });
-    const billing = { createGatewayOrder: jest.fn(async () => ({ paymentId: 'pay-1', gateway: 'RAZORPAY', orderId: 'order_1' })) };
+    const billing = {
+      createGatewayOrder: jest.fn(async () => ({
+        paymentId: 'pay-1',
+        gateway: 'RAZORPAY',
+        orderId: 'order_1',
+      })),
+    };
     const svc = new OwnerSubscriptionService(
       db as never,
       { resolve: async () => ({}) } as never,

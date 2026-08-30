@@ -59,7 +59,11 @@ export const StaffErrors = {
       HttpStatus.SERVICE_UNAVAILABLE,
     ),
   mfaNotEnrolled: () =>
-    staffError('MFA_NOT_ENROLLED', 'Start enrolment before verifying a code', HttpStatus.BAD_REQUEST),
+    staffError(
+      'MFA_NOT_ENROLLED',
+      'Start enrolment before verifying a code',
+      HttpStatus.BAD_REQUEST,
+    ),
   mfaAlreadyEnabled: () =>
     staffError(
       'MFA_ALREADY_ENABLED',
@@ -67,7 +71,11 @@ export const StaffErrors = {
       HttpStatus.CONFLICT,
     ),
   mfaNotEnabled: () =>
-    staffError('MFA_NOT_ENABLED', 'Two-factor authentication is not enabled', HttpStatus.BAD_REQUEST),
+    staffError(
+      'MFA_NOT_ENABLED',
+      'Two-factor authentication is not enabled',
+      HttpStatus.BAD_REQUEST,
+    ),
   mfaInvalidCode: () =>
     staffError('MFA_INVALID_CODE', 'Invalid or expired code', HttpStatus.UNAUTHORIZED),
   mfaChallengeInvalid: () =>

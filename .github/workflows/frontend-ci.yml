@@ -1,0 +1,29 @@
+name: Frontend CI
+
+# The admin console lives on the `frontend` branch (deployed by the `travelo`
+# Railway service), so its CI is scoped to that branch.
+on:
+  push:
+    branches: [frontend]
+  pull_request:
+    branches: [frontend]
+
+concurrency:
+  group: frontend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  admin-console:
+    name: Admin console (tsc · build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Build
+        run: npm run build

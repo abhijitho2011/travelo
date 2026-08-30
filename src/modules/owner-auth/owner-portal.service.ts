@@ -216,11 +216,7 @@ export class OwnerPortalService {
       .select()
       .from(properties)
       .where(
-        and(
-          eq(properties.id, id),
-          eq(properties.ownerId, ownerId),
-          isNull(properties.deletedAt),
-        ),
+        and(eq(properties.id, id), eq(properties.ownerId, ownerId), isNull(properties.deletedAt)),
       )
       .limit(1);
     if (!row) throw OwnerErrors.propertyNotFound();
@@ -293,11 +289,7 @@ export class OwnerPortalService {
   /** Partial edit: only the provided fields change. Recomputes the listing score. */
   async updateProperty(ownerId: string, id: string, dto: UpdatePropertyDto) {
     await this.assertOwnedProperty(ownerId, id);
-    const [current] = await this.db
-      .select()
-      .from(properties)
-      .where(eq(properties.id, id))
-      .limit(1);
+    const [current] = await this.db.select().from(properties).where(eq(properties.id, id)).limit(1);
 
     const patch: Partial<typeof properties.$inferInsert> = { updatedAt: new Date() };
     if (dto.name !== undefined) patch.name = dto.name;

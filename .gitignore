@@ -13,3 +13,12 @@ tsconfig.tsbuildinfo
 
 # Agent worktrees and local Claude state — never part of the repo
 .claude/
+
+# Flutter build outputs
+*.aab
+*.ipa
+owner_app/build/
+staff_app/build/
+.dart_tool/
+owner_app/.dart_tool/
+staff_app/.dart_tool/

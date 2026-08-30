@@ -65,7 +65,11 @@ export class FolioReceiptService {
 
     const folio = await this.folio.summary(reservationId);
     return {
-      property: { name: prop?.name ?? 'Tavelo', city: prop?.city ?? null, state: prop?.state ?? null },
+      property: {
+        name: prop?.name ?? 'Tavelo',
+        city: prop?.city ?? null,
+        state: prop?.state ?? null,
+      },
       guest: { name: res.guestName, phone: res.guestPhone, email: res.guestEmail },
       reservationNumber: res.reservationNumber,
       checkIn: res.checkIn,

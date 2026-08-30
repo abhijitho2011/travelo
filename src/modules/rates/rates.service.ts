@@ -18,7 +18,13 @@ export class RatesService {
 
   async create(
     propertyId: string,
-    dto: { roomTypeId: string; startDate: string; endDate: string; ratePaise: number; label?: string },
+    dto: {
+      roomTypeId: string;
+      startDate: string;
+      endDate: string;
+      ratePaise: number;
+      label?: string;
+    },
   ) {
     if (dto.endDate < dto.startDate) {
       throw new BadRequestException('endDate must not be before startDate');

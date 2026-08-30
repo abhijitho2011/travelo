@@ -119,7 +119,11 @@ describe('PropertyPhotosService', () => {
   it('points at the owner-scoped raw route under the local driver', async () => {
     const db = mkDb();
     db.setOwner(OWNER_A);
-    const svc = new PropertyPhotosService(db as never, mkStorage('local') as never, propsStub as never);
+    const svc = new PropertyPhotosService(
+      db as never,
+      mkStorage('local') as never,
+      propsStub as never,
+    );
     const [photo] = await svc.upload(OWNER_A, PROPERTY_A, [png()]);
     expect(photo.url).toBe(`/api/v1/owner/properties/${PROPERTY_A}/photos/${photo.id}/raw`);
   });

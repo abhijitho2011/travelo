@@ -25,7 +25,7 @@ describe('NotificationsService — owner/staff inbox scoping', () => {
     expect(where).not.toContain('owner_id');
   });
 
-  it('markReadForRecipient throws NotFound when the row is not the recipient\'s', async () => {
+  it("markReadForRecipient throws NotFound when the row is not the recipient's", async () => {
     const db = mockDb({ select: { notifications: [[]] } }); // lookup returns nothing
     const svc = new NotificationsService(db as never, audit);
     await expect(svc.markReadForRecipient('owner', 'owner-1', 'notif-x')).rejects.toThrow(

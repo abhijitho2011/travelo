@@ -421,7 +421,9 @@ export class OrdersService {
       .select({ menuItemId: orderItems.menuItemId, qty: orderItems.qty })
       .from(orderItems)
       .where(and(eq(orderItems.orderId, orderId), ne(orderItems.kotStatus, 'CANCELLED')));
-    const menuItemIds = [...new Set(lines.map((l) => l.menuItemId).filter((x): x is string => !!x))];
+    const menuItemIds = [
+      ...new Set(lines.map((l) => l.menuItemId).filter((x): x is string => !!x)),
+    ];
     if (menuItemIds.length === 0) return;
 
     const recipes = await tx

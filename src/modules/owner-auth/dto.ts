@@ -72,7 +72,10 @@ export class UpdatePropertyDto {
   @IsOptional() @ValidateNested() @Type(() => AddressDto) address?: AddressDto;
   @IsOptional() @IsString() @Length(1, 128) city?: string;
   @IsOptional() @IsString() @Length(1, 128) state?: string;
-  @IsOptional() @IsString() @Matches(MOBILE_REGEX, { message: 'phone must be 10-15 digits' }) phone?: string;
+  @IsOptional()
+  @IsString()
+  @Matches(MOBILE_REGEX, { message: 'phone must be 10-15 digits' })
+  phone?: string;
   @IsOptional() @IsEmail() email?: string;
 }
 

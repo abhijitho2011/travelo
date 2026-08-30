@@ -448,7 +448,9 @@ export class NightAuditWorker {
       .where(isNull(properties.deletedAt));
 
     for (const p of props) {
-      const [row] = await this.db.execute(sql`
+      const [row] = await this.db
+        .execute(
+          sql`
         SELECT
           (SELECT count(*) FROM reservations r WHERE r.property_id = ${p.id}
              AND r.check_in = ${date}::date AND r.status IN ('CHECKED_IN','CHECKED_OUT'))::int AS arrivals,
@@ -464,7 +466,9 @@ export class NightAuditWorker {
           (SELECT coalesce(sum(r.rate_paise),0) FROM reservations r WHERE r.property_id = ${p.id}
              AND r.check_in <= ${date}::date AND r.check_out > ${date}::date
              AND r.status IN ('CHECKED_IN','CHECKED_OUT'))::int AS revenue_paise
-      `).then((x) => (x as unknown as { rows: Record<string, number>[] }).rows);
+      `,
+        )
+        .then((x) => (x as unknown as { rows: Record<string, number>[] }).rows);
 
       const arrivals = row?.arrivals ?? 0;
       const departures = row?.departures ?? 0;

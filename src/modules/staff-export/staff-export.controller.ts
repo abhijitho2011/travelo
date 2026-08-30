@@ -1,4 +1,12 @@
-import { Controller, ForbiddenException, Get, Param, Res, UseGuards, VERSION_NEUTRAL } from '@nestjs/common';
+import {
+  Controller,
+  ForbiddenException,
+  Get,
+  Param,
+  Res,
+  UseGuards,
+  VERSION_NEUTRAL,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { StaffJwtGuard } from '../staff-auth/staff-jwt.guard';
@@ -42,7 +50,10 @@ export class StaffExportController {
       actorRole: me.role,
     });
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${StaffExportService.filename(entity)}"`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${StaffExportService.filename(entity)}"`,
+    );
     res.setHeader('Cache-Control', 'no-store');
     res.send(csv);
   }

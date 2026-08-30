@@ -69,7 +69,11 @@ export class AlertsService {
         .select({ n: sql<number>`count(*)::int` })
         .from(expenses)
         .where(
-          and(eq(expenses.propertyId, propertyId), eq(expenses.status, 'DRAFT'), isNull(expenses.deletedAt)),
+          and(
+            eq(expenses.propertyId, propertyId),
+            eq(expenses.status, 'DRAFT'),
+            isNull(expenses.deletedAt),
+          ),
         ),
       this.db
         .select({ n: sql<number>`count(*)::int` })

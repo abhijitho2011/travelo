@@ -169,7 +169,10 @@ export class SubscriptionsService {
     newPeriodEnd: Date;
   } {
     const DAY = 86_400_000;
-    const totalDays = Math.max(1, Math.round((input.periodEnd.getTime() - input.periodStart.getTime()) / DAY));
+    const totalDays = Math.max(
+      1,
+      Math.round((input.periodEnd.getTime() - input.periodStart.getTime()) / DAY),
+    );
     const remainingDays = Math.min(
       totalDays,
       Math.max(0, Math.round((input.periodEnd.getTime() - input.now.getTime()) / DAY)),
@@ -183,7 +186,10 @@ export class SubscriptionsService {
 
     if (amountDuePaise < 0) {
       // Leftover credit buys extra days on the new plan rather than a refund.
-      const newPeriodDays = Math.max(1, Math.round((newPeriodEnd.getTime() - newPeriodStart.getTime()) / DAY));
+      const newPeriodDays = Math.max(
+        1,
+        Math.round((newPeriodEnd.getTime() - newPeriodStart.getTime()) / DAY),
+      );
       const newDailyRate = newCostPaise / newPeriodDays;
       const extraDays = newDailyRate > 0 ? Math.floor(-amountDuePaise / newDailyRate) : 0;
       newPeriodEnd = new Date(newPeriodEnd.getTime() + extraDays * DAY);
@@ -192,11 +198,7 @@ export class SubscriptionsService {
     return { creditPaise, newCostPaise, amountDuePaise, newPeriodStart, newPeriodEnd };
   }
 
-  async changePlan(
-    id: string,
-    dto: { planId: string; reason?: string },
-    now: Date = new Date(),
-  ) {
+  async changePlan(id: string, dto: { planId: string; reason?: string }, now: Date = new Date()) {
     const before = await this.get(id);
     const [currentPlan] = await this.db
       .select()

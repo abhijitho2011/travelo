@@ -60,7 +60,8 @@ describe('SubscriptionLifecycleWorker — trials (item 2.4)', () => {
     expect(grace).toContain('pay.status');
 
     // The lapsed trial was told its trial ended.
-    expect(notes.some((n) => n.key === 'subscription.trial_expired' && n.relatedId === 'sub-trial'))
-      .toBe(true);
+    expect(
+      notes.some((n) => n.key === 'subscription.trial_expired' && n.relatedId === 'sub-trial'),
+    ).toBe(true);
   });
 });

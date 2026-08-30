@@ -7,7 +7,11 @@ import type { ConfigService } from '@nestjs/config';
 const MY = 'prop-mine';
 const config = (taxPercent = 5) => ({ get: () => taxPercent }) as unknown as ConfigService;
 const svc = (db: ReturnType<typeof mockDb>, tax = 5) =>
-  new SpaBillsService(db as unknown as Database, config(tax), new FolioService(db as unknown as Database));
+  new SpaBillsService(
+    db as unknown as Database,
+    config(tax),
+    new FolioService(db as unknown as Database),
+  );
 
 const apptRow = (over: Record<string, unknown> = {}) => ({
   id: 'appt-1',

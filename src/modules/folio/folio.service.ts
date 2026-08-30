@@ -232,9 +232,7 @@ export class FolioService {
     const [row] = await tx
       .select()
       .from(folioLineItems)
-      .where(
-        and(eq(folioLineItems.sourceType, sourceType), eq(folioLineItems.sourceId, sourceId)),
-      )
+      .where(and(eq(folioLineItems.sourceType, sourceType), eq(folioLineItems.sourceId, sourceId)))
       .limit(1);
     return row;
   }

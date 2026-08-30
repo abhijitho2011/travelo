@@ -61,7 +61,13 @@ describe('SubscriptionStatusGuard', () => {
   });
 
   it('allows a mutation on a route marked AllowWhenInactive', async () => {
-    const db = { select: () => ({ from: () => ({ where: () => ({ orderBy: () => ({ limit: async () => [{ status: 'SUSPENDED' }] }) }) }) }) };
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => ({ orderBy: () => ({ limit: async () => [{ status: 'SUSPENDED' }] }) }),
+        }),
+      }),
+    };
     const reflector = { getAllAndOverride: () => true };
     const g = new SubscriptionStatusGuard(db as never, reflector as never);
     expect(await g.canActivate(ctx({ method: 'POST', owner: { id: 'o1' } }))).toBe(true);

@@ -23,10 +23,7 @@ export class RecipesService {
       .select()
       .from(menuItemRecipes)
       .where(
-        and(
-          eq(menuItemRecipes.propertyId, propertyId),
-          eq(menuItemRecipes.menuItemId, menuItemId),
-        ),
+        and(eq(menuItemRecipes.propertyId, propertyId), eq(menuItemRecipes.menuItemId, menuItemId)),
       );
   }
 
