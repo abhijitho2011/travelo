@@ -253,4 +253,46 @@ void main() {
       expect(amenityIcon(null), Icons.check_circle_outline);
     });
   });
+
+  group('SubscriptionDetail + Invoice + SubscriptionOrder', () {
+    test('SubscriptionDetail parses autoRenew', () {
+      final s = SubscriptionDetail.fromJson({
+        'id': 'sub-1',
+        'planName': 'Growth',
+        'status': 'ACTIVE',
+        'autoRenew': true,
+        'features': <String>[],
+      });
+      expect(s.autoRenew, isTrue);
+      expect(SubscriptionDetail.fromJson({'id': 'x'}).autoRenew, isFalse);
+    });
+
+    test('Invoice parses documentUrl and exposes hasDocument', () {
+      final withDoc = Invoice.fromJson({
+        'id': 'inv-1',
+        'invoiceNumber': 'INV-1',
+        'total': 250000,
+        'documentUrl': 'https://signed.example/inv-1.pdf',
+      });
+      expect(withDoc.hasDocument, isTrue);
+      expect(withDoc.documentUrl, contains('inv-1.pdf'));
+      expect(Invoice.fromJson({'id': 'inv-2'}).hasDocument, isFalse);
+    });
+
+    test('SubscriptionOrder parses gateway fields', () {
+      final o = SubscriptionOrder.fromJson({
+        'paymentId': 'pay-1',
+        'gateway': 'CASHFREE',
+        'orderId': 'order-1',
+        'amount': 250000,
+        'currency': 'INR',
+        'paymentSessionId': 'sess_abc',
+        'appId': 'app_1',
+      });
+      expect(o.gateway, 'CASHFREE');
+      expect(o.paymentSessionId, 'sess_abc');
+      expect(o.keyId, isNull);
+    });
+  });
+
 }

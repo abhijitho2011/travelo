@@ -337,6 +337,7 @@ class SubscriptionDetail {
   final int propertyLimit;
   final int propertiesUsed;
   final List<String> features;
+  final bool autoRenew;
 
   const SubscriptionDetail({
     required this.id,
@@ -354,6 +355,7 @@ class SubscriptionDetail {
     required this.propertyLimit,
     required this.propertiesUsed,
     required this.features,
+    this.autoRenew = false,
   });
 
   bool get isBlocked =>
@@ -382,6 +384,7 @@ class SubscriptionDetail {
         propertyLimit: _asInt(j['propertyLimit']),
         propertiesUsed: _asInt(j['propertiesUsed']),
         features: ((j['features'] ?? []) as List).map((f) => f.toString()).toList(),
+        autoRenew: j['autoRenew'] == true,
       );
 }
 
@@ -396,6 +399,7 @@ class Invoice {
   final DateTime? issuedAt;
   final DateTime? dueDate;
   final DateTime? paidAt;
+  final String? documentUrl;
 
   const Invoice({
     required this.id,
@@ -408,6 +412,7 @@ class Invoice {
     required this.issuedAt,
     required this.dueDate,
     required this.paidAt,
+    this.documentUrl,
   });
 
   factory Invoice.fromJson(Map j) => Invoice(
@@ -421,6 +426,46 @@ class Invoice {
         issuedAt: _asDate(j['issuedAt']),
         dueDate: _asDate(j['dueDate']),
         paidAt: _asDate(j['paidAt']),
+        documentUrl: _asStr(j['documentUrl']).isEmpty ? null : _asStr(j['documentUrl']),
+      );
+
+  bool get hasDocument => documentUrl != null;
+}
+
+/// The result of raising a gateway order to pay for the next period. Carries the
+/// fields a Razorpay/Cashfree checkout widget needs; which are present depends
+/// on the gateway.
+class SubscriptionOrder {
+  final String paymentId;
+  final String gateway;
+  final String orderId;
+  final int amount; // paise
+  final String currency;
+  final String? keyId; // Razorpay
+  final String? paymentSessionId; // Cashfree
+  final String? appId; // Cashfree
+
+  const SubscriptionOrder({
+    required this.paymentId,
+    required this.gateway,
+    required this.orderId,
+    required this.amount,
+    required this.currency,
+    this.keyId,
+    this.paymentSessionId,
+    this.appId,
+  });
+
+  factory SubscriptionOrder.fromJson(Map j) => SubscriptionOrder(
+        paymentId: _asStr(j['paymentId']),
+        gateway: _asStr(j['gateway']),
+        orderId: _asStr(j['orderId']),
+        amount: _asInt(j['amount']),
+        currency: _asStr(j['currency']).isEmpty ? 'INR' : _asStr(j['currency']),
+        keyId: _asStr(j['keyId']).isEmpty ? null : _asStr(j['keyId']),
+        paymentSessionId:
+            _asStr(j['paymentSessionId']).isEmpty ? null : _asStr(j['paymentSessionId']),
+        appId: _asStr(j['appId']).isEmpty ? null : _asStr(j['appId']),
       );
 }
 

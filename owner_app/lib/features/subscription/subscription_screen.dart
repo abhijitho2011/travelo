@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/config/app_config.dart';
@@ -15,8 +16,8 @@ import '../../core/widgets/primitives.dart';
 import '../../core/widgets/states.dart';
 import '../../core/widgets/status_badge.dart';
 
-/// Read-only view of the owner's plan, usage and invoices. Owners cannot change
-/// their own plan — that is a Tavelo action — so there is no upgrade button.
+/// The owner's plan, usage and invoices. Owners can pay for the next period
+/// (renew) and download invoice PDFs; changing PLAN remains a Tavelo action.
 class SubscriptionScreen extends ConsumerWidget {
   const SubscriptionScreen({super.key});
 
@@ -80,6 +81,10 @@ class SubscriptionScreen extends ConsumerWidget {
             gapSection,
           ],
           _PlanCard(sub: s),
+          if (s.isBlocked || s.isWarning) ...[
+            gapSection,
+            _RenewCard(sub: s),
+          ],
           gapSection,
           const SectionHeader(
             title: 'Hotels in your plan',
@@ -217,6 +222,11 @@ class _PlanCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           FactRow(label: 'Billing cycle', value: _cycleLabel(sub.billingCycle)),
+          const SizedBox(height: 10),
+          FactRow(
+            label: 'Auto-renew',
+            value: sub.autoRenew ? 'On' : 'Off',
+          ),
         ],
       ),
     );
@@ -381,15 +391,148 @@ class _InvoiceRow extends StatelessWidget {
     return DataRow2(
       title: invoice.invoiceNumber.isEmpty ? 'Invoice' : invoice.invoiceNumber,
       subtitle: when == null ? '—' : DateFormat.yMMMd().format(when),
-      trailing: Text(
-        formatPaise(invoice.total, invoice.currency),
-        style: AppTypography.numeric(
-          size: 13.5,
-          weight: FontWeight.w700,
-          color: c.foreground,
-        ),
+      // A raised invoice with a generated PDF is downloadable: the row opens the
+      // short-lived presigned link in the browser.
+      onTap: invoice.hasDocument ? () => _openInvoice(context, invoice) : null,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            formatPaise(invoice.total, invoice.currency),
+            style: AppTypography.numeric(
+              size: 13.5,
+              weight: FontWeight.w700,
+              color: c.foreground,
+            ),
+          ),
+          if (invoice.hasDocument) ...[
+            const SizedBox(width: 8),
+            Icon(Icons.download_outlined, size: 18, color: c.mutedForeground),
+          ],
+        ],
       ),
       badge: StatusBadge(tone: tone, label: label, dense: true),
+    );
+  }
+}
+
+/// Opens an invoice's presigned PDF link in the browser. The link is generated
+/// per request and expires quickly, so it is always fetched fresh from the list.
+Future<void> _openInvoice(BuildContext context, Invoice invoice) async {
+  final url = invoice.documentUrl;
+  if (url == null) return;
+  final ok = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  if (!ok && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not open the invoice PDF.')),
+    );
+  }
+}
+
+/// The renew / pay-for-next-period action. Raises a gateway order server-side,
+/// then hands the owner to the gateway's checkout to complete payment. Shown
+/// only when the plan is expiring, in grace, or already lapsed.
+class _RenewCard extends ConsumerStatefulWidget {
+  const _RenewCard({required this.sub});
+  final SubscriptionDetail sub;
+
+  @override
+  ConsumerState<_RenewCard> createState() => _RenewCardState();
+}
+
+class _RenewCardState extends ConsumerState<_RenewCard> {
+  bool _busy = false;
+
+  Future<void> _renew() async {
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final order =
+          await ref.read(ownerRepositoryProvider).createSubscriptionOrder();
+      if (!mounted) return;
+      // Cashfree hands back a hosted-checkout session; Razorpay a key+order for
+      // its widget. When a hosted session URL is available we open it; either
+      // way the parked order is settled by the gateway webhook on success.
+      final sessionUrl = _hostedCheckoutUrl(order);
+      if (sessionUrl != null) {
+        final ok = await launchUrl(
+          Uri.parse(sessionUrl),
+          mode: LaunchMode.externalApplication,
+        );
+        if (!ok && mounted) {
+          messenger.showSnackBar(
+            const SnackBar(content: Text('Could not open the payment page.')),
+          );
+        }
+      } else if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              'Payment order created (${formatPaise(order.amount, order.currency)}). '
+              'Complete it with your Tavelo representative.',
+            ),
+          ),
+        );
+      }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      final msg = e.code == 'GATEWAY_NOT_CONFIGURED'
+          ? 'Online payment is not enabled yet. Contact Tavelo to renew.'
+          : (e.message.isEmpty ? 'Could not start the payment.' : e.message);
+      messenger.showSnackBar(SnackBar(content: Text(msg)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// A directly-launchable hosted checkout URL, when one is available.
+  ///
+  /// Deliberately null for now: redeeming a Razorpay order or a Cashfree
+  /// payment_session_id needs the gateway's own widget/hosted flow, which must
+  /// be wired and verified against CONFIGURED credentials on-device before it
+  /// ships — guessing a URL here would silently break real payments. Until then
+  /// the order is raised (parked PENDING, settled by the webhook) and the owner
+  /// is shown the amount; the final in-app redemption is the remaining step.
+  static String? _hostedCheckoutUrl(SubscriptionOrder order) {
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return SoftCard(
+      padding: const EdgeInsets.all(Sp.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.sub.isBlocked ? 'Renew your subscription' : 'Renew early',
+            style: AppTypography.display(size: 17, color: c.foreground),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Pay ${formatPaise(widget.sub.periodPrice, widget.sub.currency)} for '
+            'the next period. Your rooms, reservations and staff carry over '
+            'unchanged.',
+            style: AppTypography.body(size: 13, color: c.mutedForeground),
+          ),
+          const SizedBox(height: Sp.lg),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _busy ? null : _renew,
+              icon: _busy
+                  ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2.2),
+                    )
+                  : const Icon(Icons.payment_outlined, size: 18),
+              label: Text(_busy ? 'Starting…' : 'Renew now'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

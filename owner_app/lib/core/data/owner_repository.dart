@@ -151,6 +151,16 @@ class OwnerRepository {
     return (list as List).map((e) => Invoice.fromJson(e as Map)).toList();
   }
 
+  /// Raises a gateway order to pay for the owner's next period. The server
+  /// resolves the subscription; the client only picks the gateway (optional).
+  Future<SubscriptionOrder> createSubscriptionOrder({String? gateway}) async {
+    final d = await _api.post(
+      '/subscription/orders',
+      body: {if (gateway != null) 'gateway': gateway},
+    );
+    return SubscriptionOrder.fromJson(d as Map);
+  }
+
   // ---------- Support ----------
 
   Future<List<SupportTicket>> tickets({String? status, String? q}) async {
