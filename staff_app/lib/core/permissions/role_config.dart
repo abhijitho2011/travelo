@@ -931,6 +931,7 @@ class RoleConfig {
       extraRoutes: const {
         Routes.inventoryItems,
         Routes.inventoryMovements,
+        Routes.inventorySuppliers,
         Routes.inventoryPurchaseOrders,
       },
     ),

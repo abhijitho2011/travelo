@@ -22,6 +22,7 @@ import '../../features/housekeeping/presentation/task_detail_screen.dart';
 import '../../features/inventory/presentation/inventory_screen.dart';
 import '../../features/inventory/presentation/inventory_items_screen.dart';
 import '../../features/inventory/presentation/stock_movements_screen.dart';
+import '../../features/inventory/presentation/suppliers_screen.dart';
 import '../../features/inventory/presentation/purchase_orders_screen.dart';
 import '../../features/inventory/presentation/purchase_order_detail_screen.dart';
 import '../../features/maintenance/presentation/my_work_orders_screen.dart';
@@ -347,6 +348,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: Routes.inventoryItems,
             builder: (_, _) => const InventoryItemsScreen(),
+          ),
+          GoRoute(
+            path: Routes.inventorySuppliers,
+            builder: (_, _) => const SuppliersScreen(),
           ),
           GoRoute(
             path: Routes.inventoryMovements,

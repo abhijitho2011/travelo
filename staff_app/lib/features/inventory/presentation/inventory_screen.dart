@@ -60,6 +60,14 @@ class InventoryScreen extends ConsumerWidget {
                 label: const Text('Movements'),
               ),
             ),
+            PermissionGate(
+              permission: P.supplierRead,
+              child: OutlinedButton.icon(
+                onPressed: () => context.go(Routes.inventorySuppliers),
+                icon: const Icon(Icons.local_shipping_outlined, size: 16),
+                label: const Text('Suppliers'),
+              ),
+            ),
           ],
         ),
         gapSection,

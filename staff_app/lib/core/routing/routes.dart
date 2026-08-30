@@ -112,6 +112,7 @@ class Routes {
   static const inventory = '/inventory';
   static const inventoryItems = '/inventory/items';
   static const inventoryMovements = '/inventory/movements';
+  static const inventorySuppliers = '/inventory/suppliers';
   static const inventoryPurchaseOrders = '/inventory/purchase-orders';
   static const inventoryPoPattern = '/inventory/purchase-orders/:id';
   static String inventoryPo(String id) => '/inventory/purchase-orders/$id';

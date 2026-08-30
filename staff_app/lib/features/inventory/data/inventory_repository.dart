@@ -84,6 +84,14 @@ class InventoryRepository {
     return _one(data, Supplier.fromJson, 'supplier');
   }
 
+  Future<Supplier> updateSupplier(String id, Map<String, dynamic> body) async {
+    final data = await _api.patch('/inventory/suppliers/$id', body: body);
+    return _one(data, Supplier.fromJson, 'supplier');
+  }
+
+  Future<void> deleteSupplier(String id) =>
+      _api.delete('/inventory/suppliers/$id');
+
   // ----------------------------------------------------------- purchase orders --
 
   Future<List<PurchaseOrder>> purchaseOrders({PurchaseOrderStatus? status}) async {
@@ -146,4 +154,8 @@ class InventoryRepository {
 
 final inventoryRepositoryProvider = Provider<InventoryRepository>(
   (ref) => InventoryRepository(ref.watch(apiClientProvider)),
+);
+
+final suppliersProvider = FutureProvider.autoDispose<List<Supplier>>(
+  (ref) => ref.watch(inventoryRepositoryProvider).suppliers(),
 );
