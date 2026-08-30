@@ -78,10 +78,21 @@ shared-folio + allotment blocks.
 - ✅ 5.8 Permission-gated navigation; dead `/discounts` removed
 - ✅ 5.9 Dead `web/` deleted on main; admin console lives on `frontend`
 
-## ⬜ Phase 6 — Notifications & engagement
-- 6.1 FCM push (both apps) · 6.2 Guest-facing notifications
-- 6.3 Operational notifications · 6.4 Deep links + router errorBuilder
-- 6.5 WhatsApp channel (optional)
+## ✅ Phase 6 — Notifications & engagement (DONE, deployed, migrations 0025–0026)
+- ✅ 6.1 FCM push — device_tokens table + register/revoke endpoints (owner +
+  staff), FcmPushChannel over the existing Firebase service-account app,
+  firebase_messaging wired into both apps (register on sign-in, revoke on
+  sign-out, token-refresh). On-device delivery still needs the platform FCM
+  config files + APNs key (a deploy/credential step, not code).
+- ✅ 6.2 Guest-facing — booking.confirmed + booking.checked_in to the guest's
+  SMS + email on confirm / confirmed-create / check-in (templates in 0026).
+- ✅ 6.3 Operational — notify() auto-mirrors a PUSH target off every owner/staff
+  IN_APP target (reusing the IN_APP template), so every existing in-app event
+  (approvals, payments, subscription lifecycle, support) reaches devices.
+- ✅ 6.4 Deep links — tapped-notification routing (routeForData) in both apps;
+  owner app gains a go_router errorBuilder for stale/removed targets.
+- 🔶 6.5 WhatsApp — deferred (optional). Channel stays UnavailableChannel;
+  needs a WhatsApp Business API provider + credentials.
 
 ## ⬜ Phase 7 — Security & compliance hardening
 - 7.1 Owner/staff MFA / step-up · 7.2 Sign-out-all + admin staff session revoke
