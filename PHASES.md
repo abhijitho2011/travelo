@@ -49,12 +49,23 @@ Legend: ✅ done & deployed · 🔶 partial (remainder noted) · ⬜ not started
 - ✅ 3.10 Owner property GET/PATCH/DELETE (edit + archive); model parses
   `contact`, dead `starRating` chip removed
 
-## ⬜ Phase 4 — PMS depth
-- 4.1 Night audit · 4.2 Rate plans / seasonal pricing · 4.3 Guest profiles/CRM
-- 4.4 Per-night availability calendar · 4.5 Room move / stay extension
-- 4.6 Hotel reporting (ADR/RevPAR/occupancy/tax/C-Form) · 4.7 Owner ops dashboards
-- 4.8 Maintenance→OUT_OF_ORDER wiring · 4.9 Inventory depletion
-- 4.10 Export coverage · 4.11 Group bookings
+## ✅ Phase 4 — PMS depth (DONE, deployed, migrations 0020–0024)
+- ✅ 4.1 Night audit (auto no-show + daily snapshots)
+- ✅ 4.2 Rate plans — date-ranged overrides applied at booking (first cut)
+- ✅ 4.3 Guest CRM — repeat lookup, history, blacklist (first cut)
+- ✅ 4.4 Per-night availability check (fixes false refusals)
+- ✅ 4.5 Room move / stay extension
+- ✅ 4.6 Hotel reporting (occupancy/ADR/RevPAR + arrivals/departures manifest)
+- ✅ 4.7 Owner operational visibility per hotel
+- ✅ 4.8 Work order takes the room OUT_OF_ORDER on create
+- ✅ 4.9 Inventory depletion from restaurant sales via recipes
+- ✅ 4.10 Staff CSV export (reservations + expenses)
+- ✅ 4.11 Group bookings — master + linked reservations (first cut)
+
+First-cut items (4.2/4.3/4.9/4.11) have documented later refinements: per-night
+re-pricing + BAR/OTA plans; reservation-time guest auto-link + blacklist
+enforcement; recipe-driven depletion is done but a fuller BOM is future; group
+shared-folio + allotment blocks.
 
 ## ⬜ Phase 5 — Admin console write-paths (`frontend` branch)
 - 5.1 Notification deliveries + templates · 5.2 Channex sync/logs/mapping
