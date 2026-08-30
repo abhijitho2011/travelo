@@ -7,9 +7,20 @@ import { PageHeader, StatusBadge } from "@/components/admin/primitives";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AdminUser } from "@/hooks/api/types";
-import { useAdminUsers, useSetAdminUserStatus } from "@/hooks/api/use-access";
+import {
+  useAdminUsers,
+  useSetAdminUserStatus,
+  useAdminSessions,
+  useRevokeAdminSession,
+} from "@/hooks/api/use-access";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { errorMessage } from "@/lib/api";
-import { formatDateTime, humanise } from "@/lib/format";
+import { formatDateTime, humanise, relativeTime } from "@/lib/format";
 
 export const Route = createFileRoute("/admin-users")({
   head: () => ({
@@ -29,6 +40,7 @@ function AdminUsersPage() {
 
   const query = useAdminUsers({ limit: LIMIT, offset, q: q.trim() || undefined });
   const setStatus = useSetAdminUserStatus();
+  const [sessionsFor, setSessionsFor] = useState<{ id: string; name: string } | null>(null);
   const page = query.data;
 
   const act = (id: string, status: "Active" | "Blocked") =>
@@ -125,6 +137,13 @@ function AdminUsersPage() {
                 Activate
               </Button>
             )}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setSessionsFor({ id: row.id, name: row.name })}
+            >
+              Sessions
+            </Button>
           </div>
         )}
         toolbar={
@@ -140,6 +159,67 @@ function AdminUsersPage() {
         }
         pagination={{ total: page?.total ?? 0, limit: LIMIT, offset, onOffsetChange: setOffset }}
       />
+      <AdminSessionsDialog admin={sessionsFor} onClose={() => setSessionsFor(null)} />
     </div>
+  );
+}
+
+function AdminSessionsDialog({
+  admin,
+  onClose,
+}: {
+  admin: { id: string; name: string } | null;
+  onClose: () => void;
+}) {
+  const query = useAdminSessions(admin?.id ?? "");
+  const revoke = useRevokeAdminSession();
+  const sessions = (query.data ?? []).filter((sn) => !sn.revokedAt);
+
+  return (
+    <Dialog open={!!admin} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Active sessions — {admin?.name}</DialogTitle>
+        </DialogHeader>
+        {query.isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : sessions.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No active sessions.</p>
+        ) : (
+          <div className="space-y-2">
+            {sessions.map((sn) => (
+              <div
+                key={sn.id}
+                className="flex items-center gap-3 rounded-md border border-border p-2 text-sm"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-foreground">{sn.userAgent ?? "Unknown device"}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {sn.ip ?? "—"} · started {relativeTime(sn.createdAt)}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={revoke.isPending || !admin}
+                  onClick={() =>
+                    admin &&
+                    revoke.mutate(
+                      { adminId: admin.id, sessionId: sn.id },
+                      {
+                        onSuccess: () => toast.success("Session revoked"),
+                        onError: (e) => toast.error(errorMessage(e)),
+                      },
+                    )
+                  }
+                >
+                  Revoke
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
