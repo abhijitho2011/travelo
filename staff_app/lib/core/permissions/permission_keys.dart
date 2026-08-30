@@ -66,11 +66,21 @@ class P {
   static const housekeepingRead = 'housekeeping.read';
   static const housekeepingAssign = 'housekeeping.assign';
   static const taskRead = 'task.read';
+  static const taskCreate = 'task.create';
   static const taskStart = 'task.start';
   static const taskComplete = 'task.complete';
   static const taskAssign = 'task.assign';
+  static const taskInspect = 'task.inspect';
   static const maintenanceRead = 'maintenance.read';
   static const maintenanceReport = 'maintenance.report';
+  // Maintenance work orders — the technician's lifecycle plus supervisor cancel.
+  static const workOrderRead = 'workorder.read';
+  static const workOrderAccept = 'workorder.accept';
+  static const workOrderStart = 'workorder.start';
+  static const workOrderPause = 'workorder.pause';
+  static const workOrderResume = 'workorder.resume';
+  static const workOrderComplete = 'workorder.complete';
+  static const workOrderCancel = 'workorder.cancel';
   static const inventoryRead = 'inventory.read';
   static const inventoryRequest = 'inventory.request';
 

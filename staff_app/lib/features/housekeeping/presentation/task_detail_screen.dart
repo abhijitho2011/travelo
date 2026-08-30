@@ -1,10 +1,6 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../../core/networking/api_exception.dart';
 import '../../../core/permissions/permission_gate.dart';
@@ -20,8 +16,8 @@ import '../../../core/widgets/status_badge.dart';
 import '../application/task_controller.dart';
 import '../data/task_models.dart';
 
-/// One task, with the big buttons an attendant actually needs and the evidence
-/// capture (photo + note) that goes with a completion or an issue report.
+/// One task, with the big buttons an attendant needs, a guest-request callout,
+/// and a note field used on completion or when reporting an issue.
 class TaskDetailScreen extends ConsumerStatefulWidget {
   const TaskDetailScreen({super.key, required this.taskId});
 
@@ -33,29 +29,12 @@ class TaskDetailScreen extends ConsumerStatefulWidget {
 
 class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   final _note = TextEditingController();
-  XFile? _photo;
   bool _busy = false;
 
   @override
   void dispose() {
     _note.dispose();
     super.dispose();
-  }
-
-  Future<void> _pickPhoto({required bool fromCamera}) async {
-    try {
-      final picked = await ImagePicker().pickImage(
-        source: fromCamera ? ImageSource.camera : ImageSource.gallery,
-        maxWidth: 1600,
-        imageQuality: 80,
-      );
-      if (picked != null) setState(() => _photo = picked);
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open the camera on this device')),
-      );
-    }
   }
 
   Future<void> _advance(StaffTask task) async {
@@ -65,7 +44,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           .read(myTasksProvider.notifier)
           .advance(
             task,
-            note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+            notes: _note.text.trim().isEmpty ? null : _note.text.trim(),
           );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -101,19 +80,14 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     try {
       final synced = await ref
           .read(myTasksProvider.notifier)
-          .reportIssue(
-            task,
-            description: description,
-            photoPath: _photo?.path,
-          );
+          .reportIssue(task, description: description);
       if (!mounted) return;
       _note.clear();
-      setState(() => _photo = null);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             synced
-                ? 'Issue reported to your supervisor'
+                ? 'Work order raised for maintenance'
                 : 'Saved on this device — it will be sent when you are online',
           ),
         ),
@@ -156,7 +130,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           )
         else ...[
           SoftCard(
-            accent: task.priority == TaskPriority.high ? c.critical : null,
+            accent: task.priority == HkPriority.high ? c.critical : null,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -176,7 +150,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            task.taskType ?? task.title,
+                            task.typeLabel,
                             style: AppTypography.body(
                               size: 15,
                               weight: FontWeight.w600,
@@ -192,14 +166,14 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                         StatusBadge(
                           tone: task.pendingSync
                               ? StatusTone.warning
-                              : task.stage.tone,
+                              : task.status.tone,
                           label: task.pendingSync
                               ? 'Waiting to sync'
-                              : task.stage.label,
+                              : task.status.label,
                         ),
-                        if (task.priority == TaskPriority.high)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 6),
+                        if (task.priority == HkPriority.high)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 6),
                             child: StatusBadge(
                               tone: StatusTone.critical,
                               label: 'High priority',
@@ -216,7 +190,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                 _Meta(
                   icon: Icons.stairs_outlined,
                   label: 'Floor',
-                  value: task.floor ?? Fmt.dash,
+                  value: task.floor?.isNotEmpty == true
+                      ? task.floor!
+                      : Fmt.dash,
                 ),
                 _Meta(
                   icon: Icons.schedule,
@@ -224,9 +200,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                   value: Fmt.time(task.dueAt),
                 ),
                 _Meta(
-                  icon: Icons.timelapse_outlined,
-                  label: 'Estimated',
-                  value: Fmt.duration(task.estimatedMinutes),
+                  icon: Icons.person_outline,
+                  label: 'Assigned to',
+                  value: task.assigneeName ?? 'You',
                 ),
                 if (task.guestRequest != null &&
                     task.guestRequest!.isNotEmpty) ...[
@@ -274,89 +250,40 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           gapMd,
 
           Panel(
-            title: 'Add a note or photo',
-            description: 'Attach evidence before you complete or report.',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextField(
-                  controller: _note,
-                  maxLines: 3,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    hintText: 'What did you find? What did you do?',
-                  ),
-                ),
-                gapMd,
-                if (_photo != null) ...[
-                  ClipRRect(
-                    borderRadius: R.rMd,
-                    child: kIsWeb
-                        ? Image.network(
-                            _photo!.path,
-                            height: 160,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                          )
-                        : Image.file(
-                            File(_photo!.path),
-                            height: 160,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                          ),
-                  ),
-                  const SizedBox(height: Sp.sm),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: () => setState(() => _photo = null),
-                      icon: const Icon(Icons.close, size: 16),
-                      label: const Text('Remove photo'),
-                    ),
-                  ),
-                ],
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => _pickPhoto(fromCamera: true),
-                        icon: const Icon(Icons.photo_camera_outlined, size: 17),
-                        label: const Text('Camera'),
-                      ),
-                    ),
-                    const SizedBox(width: Sp.sm),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => _pickPhoto(fromCamera: false),
-                        icon: const Icon(Icons.photo_library_outlined, size: 17),
-                        label: const Text('Gallery'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+            title: 'Add a note',
+            description: 'Recorded on completion, or as the issue you report.',
+            child: TextField(
+              controller: _note,
+              maxLines: 3,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                hintText: 'What did you find? What did you do?',
+              ),
             ),
           ),
 
           gapSection,
-          PermissionGate.all(
-            permissions: const [P.taskStart, P.taskComplete],
-            mode: GateMode.disable,
-            child: SizedBox(
-              height: 52,
-              child: FilledButton.icon(
-                onPressed: _busy || task.isDone ? null : () => _advance(task),
-                icon: Icon(
-                  task.isDone ? Icons.check_circle_outline : Icons.play_arrow,
-                  size: 20,
-                ),
-                label: Text(
-                  task.stage.actionLabel,
-                  style: AppTypography.body(size: 15, weight: FontWeight.w700),
+          if (task.status.attendantAction != null)
+            PermissionGate.all(
+              permissions: const [P.taskStart, P.taskComplete],
+              mode: GateMode.disable,
+              child: SizedBox(
+                height: 52,
+                child: FilledButton.icon(
+                  onPressed: _busy ? null : () => _advance(task),
+                  icon: Icon(
+                    task.status == HkTaskStatus.inProgress
+                        ? Icons.check_circle_outline
+                        : Icons.play_arrow,
+                    size: 20,
+                  ),
+                  label: Text(
+                    task.status.actionLabel,
+                    style: AppTypography.body(size: 15, weight: FontWeight.w700),
+                  ),
                 ),
               ),
             ),
-          ),
           gapSm,
           PermissionGate(
             permission: P.maintenanceReport,

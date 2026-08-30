@@ -18,11 +18,8 @@ import '../../../core/widgets/status_badge.dart';
 import '../application/task_controller.dart';
 import '../data/task_models.dart';
 
-/// The room attendant's entire app.
-///
-/// Deliberately spare: a greeting, a progress bar, and a stack of large tap
-/// targets. No money, no guest rates, no navigation maze — modelled on HF's
-/// `attendant.tsx`.
+/// The room attendant / cleaner's entire app: a greeting, a progress bar, and a
+/// stack of large tap targets. Fed by `/housekeeping/my-tasks`.
 class MyTasksScreen extends ConsumerWidget {
   const MyTasksScreen({super.key});
 
@@ -64,7 +61,7 @@ class MyTasksScreen extends ConsumerWidget {
                       child: ClipRRect(
                         borderRadius: R.rPill,
                         child: LinearProgressIndicator(
-                          value: done / total,
+                          value: total == 0 ? 0 : done / total,
                           minHeight: 8,
                           backgroundColor: c.muted,
                         ),
@@ -147,7 +144,7 @@ class _TaskRowState extends ConsumerState<_TaskRow> {
         SnackBar(
           content: Text(
             synced
-                ? '${widget.task.headline} · ${widget.task.stage.next?.label ?? 'updated'}'
+                ? '${widget.task.headline} · ${widget.task.status.attendantNext?.label ?? 'updated'}'
                 : 'Saved on this device — it will sync when you are back online',
           ),
         ),
@@ -166,20 +163,22 @@ class _TaskRowState extends ConsumerState<_TaskRow> {
   Widget build(BuildContext context) {
     final t = widget.task;
     final c = context.colors;
+    final canAct = t.status.attendantAction != null;
 
     return TaskCard(
       headline: t.headline,
-      type: t.taskType ?? t.title,
+      type: t.typeLabel,
       note: t.guestRequest,
       meta: [
-        if (t.floor != null) 'Floor ${t.floor}',
-        if (t.estimatedMinutes != null) Fmt.duration(t.estimatedMinutes),
+        if (t.floor != null && t.floor!.isNotEmpty) 'Floor ${t.floor}',
+        if (t.area != null && t.roomNumber == null) t.area!,
+        'Priority ${t.priority.label}',
         if (t.dueAt != null) 'due ${Fmt.time(t.dueAt)}',
         if (t.pendingSync) 'waiting to sync',
       ].join(' · '),
-      statusLabel: t.stage.label,
-      statusTone: t.pendingSync ? StatusTone.warning : t.stage.tone,
-      highPriority: t.priority == TaskPriority.high,
+      statusLabel: t.pendingSync ? 'Waiting to sync' : t.status.label,
+      statusTone: t.pendingSync ? StatusTone.warning : t.status.tone,
+      highPriority: t.priority == HkPriority.high,
       dimmed: t.isDone,
       onTap: () => context.go(Routes.task(t.id)),
       actions: Row(
@@ -190,14 +189,14 @@ class _TaskRowState extends ConsumerState<_TaskRow> {
               mode: GateMode.disable,
               deniedTooltip: 'Only the assigned attendant can update this task',
               child: FilledButton(
-                onPressed: _busy || t.isDone ? null : _advance,
+                onPressed: _busy || !canAct ? null : _advance,
                 child: _busy
                     ? const SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : Text(t.stage.actionLabel),
+                    : Text(t.status.actionLabel),
               ),
             ),
           ),

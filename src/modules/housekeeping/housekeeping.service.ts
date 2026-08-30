@@ -297,6 +297,36 @@ export class HousekeepingService {
     return { groups: grouped, counts, totalRooms: roomRows.length, areaTasks };
   }
 
+  /**
+   * The staff a supervisor may assign a task to: ACTIVE housekeeping-floor staff
+   * at the property (room attendants and cleaning staff). Feeds the board's
+   * assignee picker. Scoped to the caller's property, deleted rows excluded.
+   */
+  async assignableStaff(propertyId: string) {
+    const rows = await this.db
+      .select({
+        id: hotelStaff.id,
+        firstName: hotelStaff.firstName,
+        lastName: hotelStaff.lastName,
+        role: hotelStaff.role,
+      })
+      .from(hotelStaff)
+      .where(
+        and(
+          eq(hotelStaff.propertyId, propertyId),
+          isNull(hotelStaff.deletedAt),
+          eq(hotelStaff.status, 'ACTIVE'),
+          inArray(hotelStaff.role, ['ROOM_ATTENDANT', 'CLEANING_STAFF']),
+        ),
+      )
+      .orderBy(asc(hotelStaff.firstName));
+    return rows.map((r) => ({
+      id: r.id,
+      name: `${r.firstName} ${r.lastName}`.trim(),
+      role: r.role,
+    }));
+  }
+
   // ---------- Mutations ----------
 
   async create(propertyId: string, dto: CreateTaskDto, actor: TaskActor) {

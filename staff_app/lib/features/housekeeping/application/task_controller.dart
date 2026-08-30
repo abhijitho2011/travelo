@@ -2,17 +2,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/networking/api_exception.dart';
 import '../../../core/offline/offline_providers.dart';
+import '../../maintenance/data/work_order_models.dart';
+import '../../maintenance/data/work_orders_repository.dart';
 import '../data/task_models.dart';
 import '../data/task_repository.dart';
 
-/// The attendant's task list, with optimistic stage changes.
+/// The attendant's task list, with optimistic status changes.
 ///
-/// When the write fails because the device is offline, the change is written
-/// to the durable sync queue and the card is marked "waiting to sync" — it is
-/// never silently dropped, and it is never shown as saved when it is not.
+/// When the write fails because the device is offline, the change is written to
+/// the durable sync queue and the card is marked "waiting to sync" — it is
+/// never silently dropped, and never shown as saved when it is not.
 class MyTasksController extends AsyncNotifier<List<StaffTask>> {
   @override
-  Future<List<StaffTask>> build() => ref.watch(taskRepositoryProvider).myTasks();
+  Future<List<StaffTask>> build() =>
+      ref.watch(taskRepositoryProvider).myTasks();
 
   Future<void> refresh() async {
     state = await AsyncValue.guard(
@@ -27,54 +30,58 @@ class MyTasksController extends AsyncNotifier<List<StaffTask>> {
     return null;
   }
 
-  /// Moves the task to its next stage. Returns true when the server accepted
-  /// it, false when it was queued locally instead.
-  Future<bool> advance(StaffTask task, {String? note}) async {
-    final next = task.stage.next;
-    if (next == null) return true;
+  /// Moves the task to its next attendant stage (start, then complete). Returns
+  /// true when the server accepted it, false when it was queued locally.
+  Future<bool> advance(StaffTask task, {String? notes}) async {
+    final next = task.status.attendantNext;
+    final action = task.status.attendantAction;
+    if (next == null || action == null) return true;
 
-    _patch(task.id, (t) => t.copyWith(stage: next));
+    _patch(task.id, (t) => t.copyWith(status: next, pendingSync: false));
 
     try {
-      await ref.read(taskRepositoryProvider).setStage(task.id, next, note: note);
+      await ref.read(taskRepositoryProvider).act(task.id, action, notes: notes);
       _patch(task.id, (t) => t.copyWith(pendingSync: false));
+      // A completed task leaves the attendant feed; a started one stays.
+      if (next.isTerminal || next == HkTaskStatus.completed) await refresh();
       return true;
     } on ApiException catch (e) {
       if (!e.isNetwork && !e.isMissingEndpoint) {
-        // A real rejection — put the task back where it was.
-        _patch(task.id, (t) => t.copyWith(stage: task.stage));
+        _patch(task.id, (t) => t.copyWith(status: task.status));
         rethrow;
       }
       await ref.read(enqueueMutationProvider)(
         entityId: task.id,
-        operationType: task.stage.operationType ?? 'task.update',
-        payload: {'stage': next.name.toUpperCase(), if (note != null) 'note': note},
+        operationType: 'housekeeping.task.$action',
+        payload: {if (notes != null) 'notes': notes},
       );
       _patch(task.id, (t) => t.copyWith(pendingSync: true));
       return false;
     }
   }
 
-  /// Reports a problem found in the room. Same offline behaviour.
+  /// Reports a problem found in the room as a maintenance work order. Same
+  /// offline behaviour as a status change.
   Future<bool> reportIssue(
     StaffTask task, {
     required String description,
-    String? photoPath,
   }) async {
+    final input = NewWorkOrder(
+      title: task.roomNumber?.isNotEmpty == true
+          ? 'Issue in room ${task.roomNumber}'
+          : 'Issue: ${task.area ?? task.typeLabel}',
+      description: description,
+      roomId: task.roomId,
+    );
     try {
-      await ref
-          .read(taskRepositoryProvider)
-          .reportIssue(task.id, description: description, photoPath: photoPath);
+      await ref.read(workOrdersRepositoryProvider).create(input);
       return true;
     } on ApiException catch (e) {
       if (!e.isNetwork && !e.isMissingEndpoint) rethrow;
       await ref.read(enqueueMutationProvider)(
         entityId: task.id,
-        operationType: 'task.issue',
-        payload: {
-          'description': description,
-          if (photoPath != null) 'photoPath': photoPath,
-        },
+        operationType: 'workorder.create',
+        payload: input.toJson(),
       );
       return false;
     }

@@ -2,150 +2,181 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/widgets/status_badge.dart';
 
-enum TaskStage {
-  assigned,
-  accepted,
-  started,
+/// The housekeeping task lifecycle, mirroring the server's `canTransition` map
+/// in `src/modules/housekeeping/task-transitions.ts`:
+///
+///   PENDING → IN_PROGRESS → COMPLETED → INSPECTED   (pass)
+///                              COMPLETED → REJECTED  (fail)
+///
+/// An attendant only ever drives the first two edges (start, complete); the
+/// supervisor inspects. Unknown wire values resolve to [pending] so a newer
+/// backend never crashes the list.
+enum HkTaskStatus {
+  pending,
+  inProgress,
   completed,
-  blocked;
+  inspected,
+  rejected;
 
-  static TaskStage fromWire(String? v) => switch (v?.toUpperCase()) {
-    'ASSIGNED' || 'PENDING' => TaskStage.assigned,
-    'ACCEPTED' => TaskStage.accepted,
-    'STARTED' || 'IN_PROGRESS' => TaskStage.started,
-    'COMPLETED' || 'DONE' => TaskStage.completed,
-    'BLOCKED' => TaskStage.blocked,
-    _ => TaskStage.assigned,
+  static HkTaskStatus fromWire(String? v) => switch (v?.toUpperCase()) {
+    'PENDING' => HkTaskStatus.pending,
+    'IN_PROGRESS' => HkTaskStatus.inProgress,
+    'COMPLETED' => HkTaskStatus.completed,
+    'INSPECTED' => HkTaskStatus.inspected,
+    'REJECTED' => HkTaskStatus.rejected,
+    _ => HkTaskStatus.pending,
   };
 
   String get label => switch (this) {
-    TaskStage.assigned => 'Assigned',
-    TaskStage.accepted => 'Accepted',
-    TaskStage.started => 'In progress',
-    TaskStage.completed => 'Completed',
-    TaskStage.blocked => 'Blocked',
+    HkTaskStatus.pending => 'To do',
+    HkTaskStatus.inProgress => 'In progress',
+    HkTaskStatus.completed => 'Awaiting inspection',
+    HkTaskStatus.inspected => 'Inspected',
+    HkTaskStatus.rejected => 'Rejected',
   };
 
   StatusTone get tone => switch (this) {
-    TaskStage.assigned => StatusTone.dirty,
-    TaskStage.accepted => StatusTone.occupied,
-    TaskStage.started => StatusTone.cleaning,
-    TaskStage.completed => StatusTone.healthy,
-    TaskStage.blocked => StatusTone.critical,
+    HkTaskStatus.pending => StatusTone.dirty,
+    HkTaskStatus.inProgress => StatusTone.cleaning,
+    HkTaskStatus.completed => StatusTone.inspected,
+    HkTaskStatus.inspected => StatusTone.healthy,
+    HkTaskStatus.rejected => StatusTone.critical,
   };
 
-  /// The next stage, or null when the task is finished.
-  TaskStage? get next => switch (this) {
-    TaskStage.assigned => TaskStage.accepted,
-    TaskStage.accepted => TaskStage.started,
-    TaskStage.started => TaskStage.completed,
-    TaskStage.completed => null,
-    TaskStage.blocked => TaskStage.started,
+  /// The status the attendant's primary button moves the task to, or null when
+  /// the attendant has nothing left to do (waiting on the supervisor, or done).
+  HkTaskStatus? get attendantNext => switch (this) {
+    HkTaskStatus.pending => HkTaskStatus.inProgress,
+    HkTaskStatus.inProgress => HkTaskStatus.completed,
+    _ => null,
   };
 
-  /// The label on the big primary button.
+  /// The `/housekeeping/tasks/:id/<action>` verb for [attendantNext].
+  String? get attendantAction => switch (this) {
+    HkTaskStatus.pending => 'start',
+    HkTaskStatus.inProgress => 'complete',
+    _ => null,
+  };
+
   String get actionLabel => switch (this) {
-    TaskStage.assigned => 'Accept task',
-    TaskStage.accepted => 'Start',
-    TaskStage.started => 'Mark complete',
-    TaskStage.completed => 'Completed',
-    TaskStage.blocked => 'Resume',
+    HkTaskStatus.pending => 'Start',
+    HkTaskStatus.inProgress => 'Mark complete',
+    HkTaskStatus.completed => 'Awaiting inspection',
+    HkTaskStatus.inspected => 'Inspected',
+    HkTaskStatus.rejected => 'Rejected',
   };
 
-  /// The operation type recorded on the offline queue.
-  String? get operationType => switch (this) {
-    TaskStage.assigned => 'task.accept',
-    TaskStage.accepted => 'task.start',
-    TaskStage.started => 'task.complete',
-    TaskStage.completed => null,
-    TaskStage.blocked => 'task.start',
-  };
+  bool get isTerminal =>
+      this == HkTaskStatus.inspected || this == HkTaskStatus.rejected;
 }
 
-enum TaskPriority {
+enum HkPriority {
   low,
   normal,
   high;
 
-  static TaskPriority fromWire(String? v) => switch (v?.toUpperCase()) {
-    'HIGH' || 'URGENT' => TaskPriority.high,
-    'LOW' => TaskPriority.low,
-    _ => TaskPriority.normal,
+  static HkPriority fromWire(String? v) => switch (v?.toUpperCase()) {
+    'HIGH' => HkPriority.high,
+    'LOW' => HkPriority.low,
+    _ => HkPriority.normal,
   };
 
   String get label => switch (this) {
-    TaskPriority.low => 'Low',
-    TaskPriority.normal => 'Normal',
-    TaskPriority.high => 'High',
+    HkPriority.low => 'Low',
+    HkPriority.normal => 'Normal',
+    HkPriority.high => 'High',
   };
 }
+
+/// Turns a `CHECKOUT_CLEAN` / `AREA_CLEAN` wire type into a human label.
+String hkTaskTypeLabel(String? wire) => switch (wire?.toUpperCase()) {
+  'CHECKOUT_CLEAN' => 'Checkout clean',
+  'STAYOVER' => 'Stayover service',
+  'DEEP_CLEAN' => 'Deep clean',
+  'AREA_CLEAN' => 'Area clean',
+  'CUSTOM' => 'Task',
+  _ => 'Task',
+};
 
 @immutable
 class StaffTask {
   const StaffTask({
     required this.id,
-    required this.title,
-    required this.stage,
+    required this.type,
+    required this.status,
     required this.priority,
+    this.roomId,
     this.roomNumber,
     this.floor,
-    this.taskType,
+    this.area,
     this.guestRequest,
-    this.note,
+    this.notes,
+    this.assignedStaffId,
+    this.assigneeName,
     this.dueAt,
-    this.estimatedMinutes,
     this.pendingSync = false,
   });
 
   final String id;
-  final String title;
-  final TaskStage stage;
-  final TaskPriority priority;
+  final String type;
+  final HkTaskStatus status;
+  final HkPriority priority;
+  final String? roomId;
   final String? roomNumber;
   final String? floor;
-  final String? taskType;
+  final String? area;
   final String? guestRequest;
-  final String? note;
+  final String? notes;
+  final String? assignedStaffId;
+  final String? assigneeName;
   final DateTime? dueAt;
-  final int? estimatedMinutes;
 
-  /// True when a stage change is queued locally and has not reached the
+  /// True when a status change is queued locally and has not reached the
   /// server. The card says so rather than pretending it is saved.
   final bool pendingSync;
 
-  bool get isDone => stage == TaskStage.completed;
+  String get typeLabel => hkTaskTypeLabel(type);
 
-  /// The big Sora numeral on the card.
+  bool get isDone => status.isTerminal;
+
+  /// The big Sora numeral on the card: a room number, else the area name.
   String get headline =>
-      roomNumber?.isNotEmpty == true ? roomNumber! : title;
+      roomNumber?.isNotEmpty == true ? roomNumber! : (area ?? typeLabel);
 
-  StaffTask copyWith({TaskStage? stage, bool? pendingSync, String? note}) =>
-      StaffTask(
-        id: id,
-        title: title,
-        stage: stage ?? this.stage,
-        priority: priority,
-        roomNumber: roomNumber,
-        floor: floor,
-        taskType: taskType,
-        guestRequest: guestRequest,
-        note: note ?? this.note,
-        dueAt: dueAt,
-        estimatedMinutes: estimatedMinutes,
-        pendingSync: pendingSync ?? this.pendingSync,
-      );
+  StaffTask copyWith({
+    HkTaskStatus? status,
+    bool? pendingSync,
+    String? notes,
+  }) => StaffTask(
+    id: id,
+    type: type,
+    status: status ?? this.status,
+    priority: priority,
+    roomId: roomId,
+    roomNumber: roomNumber,
+    floor: floor,
+    area: area,
+    guestRequest: guestRequest,
+    notes: notes ?? this.notes,
+    assignedStaffId: assignedStaffId,
+    assigneeName: assigneeName,
+    dueAt: dueAt,
+    pendingSync: pendingSync ?? this.pendingSync,
+  );
 
   factory StaffTask.fromJson(Map j) => StaffTask(
     id: (j['id'] ?? '').toString(),
-    title: (j['title'] as String?) ?? (j['taskType'] as String?) ?? 'Task',
-    stage: TaskStage.fromWire(j['stage'] as String? ?? j['status'] as String?),
-    priority: TaskPriority.fromWire(j['priority'] as String?),
-    roomNumber: j['roomNumber'] as String? ?? j['room'] as String?,
-    floor: j['floor']?.toString(),
-    taskType: j['taskType'] as String?,
+    type: (j['type'] as String?) ?? 'CUSTOM',
+    status: HkTaskStatus.fromWire(j['status'] as String?),
+    priority: HkPriority.fromWire(j['priority'] as String?),
+    roomId: j['roomId'] as String?,
+    roomNumber: j['roomNumber'] as String?,
+    floor: j['roomFloor']?.toString() ?? j['floor']?.toString(),
+    area: j['area'] as String?,
     guestRequest: j['guestRequest'] as String?,
-    note: j['note'] as String?,
+    notes: j['notes'] as String?,
+    assignedStaffId: j['assignedStaffId'] as String?,
+    assigneeName: j['assigneeName'] as String?,
     dueAt: DateTime.tryParse((j['dueAt'] ?? '').toString())?.toLocal(),
-    estimatedMinutes: (j['estimatedMinutes'] as num?)?.toInt(),
   );
 }

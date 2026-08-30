@@ -84,6 +84,13 @@ export class StaffHousekeepingController {
     return this.housekeeping.myTasks(me.propertyId, me.id);
   }
 
+  /** The assignee picker for the board. */
+  @Get('staff')
+  @RequireStaffPermissions('task.assign')
+  assignableStaff(@CurrentStaff() me: AuthenticatedStaff) {
+    return this.housekeeping.assignableStaff(me.propertyId);
+  }
+
   @Post('tasks')
   @RequireStaffPermissions('task.create')
   async create(@CurrentStaff() me: AuthenticatedStaff, @Body() dto: CreateTaskDto) {
