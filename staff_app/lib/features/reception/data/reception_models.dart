@@ -429,6 +429,11 @@ class DeskCounts {
     this.departures = 0,
     this.inHouse = 0,
     this.availableRooms = 0,
+    this.roomsDirty = 0,
+    this.roomsReady = 0,
+    this.walkInsToday = 0,
+    this.pendingPaymentPaise = 0,
+    this.pendingFolios = 0,
   });
 
   final int arrivals;
@@ -436,11 +441,34 @@ class DeskCounts {
   final int inHouse;
   final int availableRooms;
 
+  /// Housekeeping's side of the board: rooms that need cleaning, and rooms
+  /// cleaned + inspected and ready to sell.
+  final int roomsDirty;
+  final int roomsReady;
+
+  /// Walk-in business taken since midnight.
+  final int walkInsToday;
+
+  /// What today's in-house and departing folios still owe, in total.
+  final int pendingPaymentPaise;
+  final int pendingFolios;
+
   factory DeskCounts.fromJson(Map json) => DeskCounts(
     arrivals: _int(json['arrivals']),
     departures: _int(json['departures']),
     inHouse: _int(_pick(json, ['inHouse', 'in_house'])),
-    availableRooms: _int(_pick(json, ['availableRooms', 'available_rooms'])),
+    // The server's newer key wins; the original stays as the fallback so an
+    // older API keeps the tile honest instead of zeroing it.
+    availableRooms: _int(
+      _pick(json, ['roomsAvailable', 'availableRooms', 'available_rooms']),
+    ),
+    roomsDirty: _int(_pick(json, ['roomsDirty', 'rooms_dirty'])),
+    roomsReady: _int(_pick(json, ['roomsReady', 'rooms_ready'])),
+    walkInsToday: _int(_pick(json, ['walkInsToday', 'walk_ins_today'])),
+    pendingPaymentPaise: _int(
+      _pick(json, ['pendingPaymentPaise', 'pending_payment_paise']),
+    ),
+    pendingFolios: _int(_pick(json, ['pendingFolios', 'pending_folios'])),
   );
 }
 

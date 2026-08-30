@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, gt, inArray, isNull, lt, lte, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, gte, inArray, isNull, lt, lte, ne, sql } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import {
   hotelStaff,
@@ -139,18 +139,65 @@ export class DeskService {
         ),
       );
 
+    // Per-status room tallies for the board's housekeeping strip. One grouped
+    // scan; READY + INSPECTED together are "ready to sell".
+    const statusRows = await this.db
+      .select({ status: rooms.status, count: sql<number>`count(*)::int` })
+      .from(rooms)
+      .where(and(eq(rooms.propertyId, propertyId), isNull(rooms.deletedAt)))
+      .groupBy(rooms.status);
+    const byStatus = new Map<RoomStatus, number>(
+      statusRows.map((r) => [r.status, r.count] as const),
+    );
+
+    // Walk-ins taken TODAY (by creation time, not arrival date) — the desk's
+    // own tally of business it brought in since midnight.
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const [walkIns] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(reservations)
+      .where(
+        and(
+          ...base,
+          eq(reservations.source, 'WALK_IN'),
+          ne(reservations.status, 'CANCELLED'),
+          gte(reservations.createdAt, startOfDay),
+        ),
+      );
+
     const hydrate = (rows: Reservation[]) => this.reservationsService.hydrate(rows);
+
+    const hydratedDepartures = await hydrate(departures);
+    const hydratedInHouse = await hydrate(inHouse);
+
+    // Money still owed by guests who are here now or leaving today — computed
+    // from the SAME rows the board renders, so the figure and the list agree.
+    let pendingPaymentPaise = 0;
+    let pendingFolios = 0;
+    for (const r of [...hydratedDepartures, ...hydratedInHouse]) {
+      const due = r.totalPaise - r.paidPaise;
+      if (due > 0) {
+        pendingPaymentPaise += due;
+        pendingFolios += 1;
+      }
+    }
 
     return {
       date: day,
       arrivals: await hydrate(arrivals),
-      departures: await hydrate(departures),
-      inHouse: await hydrate(inHouse),
+      departures: hydratedDepartures,
+      inHouse: hydratedInHouse,
       counts: {
         arrivals: arrivals.length,
         departures: departures.length,
         inHouse: inHouse.length,
         availableRooms: availableRooms?.count ?? 0,
+        roomsAvailable: byStatus.get('AVAILABLE') ?? 0,
+        roomsDirty: byStatus.get('DIRTY') ?? 0,
+        roomsReady: (byStatus.get('READY') ?? 0) + (byStatus.get('INSPECTED') ?? 0),
+        walkInsToday: walkIns?.count ?? 0,
+        pendingPaymentPaise,
+        pendingFolios,
       },
     };
   }

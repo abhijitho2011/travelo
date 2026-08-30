@@ -40,8 +40,8 @@ CalendarData _data({
 );
 
 void main() {
-  group('CalendarData.lanes — room-type grouping', () {
-    test('each run of one type gets a heading carrying that type\'s room count', () {
+  group('CalendarData.lanes — the flat room rack', () {
+    test('one lane per room, in the order the rooms were given', () {
       final data = _data(
         rooms: [
           _room('r1', '101', 'Deluxe'),
@@ -51,25 +51,20 @@ void main() {
       );
 
       final lanes = data.lanes;
-      expect(lanes.length, 5); // 2 headings + 3 rooms
-
-      final first = lanes[0] as CalendarGroupLane;
-      expect(first.title, 'Deluxe');
-      expect(first.roomCount, 2);
-      expect((lanes[1] as CalendarRoomLane).room.number, '101');
-      expect((lanes[2] as CalendarRoomLane).room.number, '102');
-
-      final second = lanes[3] as CalendarGroupLane;
-      expect(second.title, 'Suite');
-      expect(second.roomCount, 1);
-      expect((lanes[4] as CalendarRoomLane).room.number, '201');
+      expect(lanes.length, 3);
+      expect((lanes[0] as CalendarRoomLane).room.number, '101');
+      expect((lanes[1] as CalendarRoomLane).room.number, '102');
+      final last = lanes[2] as CalendarRoomLane;
+      expect(last.room.number, '201');
+      // The type rides on the row itself — that is what the label renders.
+      expect(last.room.roomTypeName, 'Suite');
     });
 
     test('the unassigned lane comes first, and only when it holds something', () {
       final rooms = [_room('r1', '101', 'Deluxe')];
 
-      // Nothing unassigned: the chart opens straight on the first room type.
-      expect(_data(rooms: rooms).lanes.first, isA<CalendarGroupLane>());
+      // Nothing unassigned: the rack opens straight on the first room.
+      expect(_data(rooms: rooms).lanes.first, isA<CalendarRoomLane>());
 
       final held = _res(
         'a',
@@ -79,9 +74,10 @@ void main() {
       final withHeld = _data(rooms: rooms, unassigned: [held]).lanes;
       expect(withHeld.first, isA<CalendarUnassignedLane>());
       expect((withHeld.first as CalendarUnassignedLane).count, 1);
+      expect(withHeld.length, 2);
     });
 
-    test('no rooms means no lanes at all', () {
+    test('no rooms and nothing unassigned means no lanes at all', () {
       expect(_data(rooms: const []).lanes, isEmpty);
     });
   });

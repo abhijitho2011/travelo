@@ -5,6 +5,9 @@ import { Test } from '@nestjs/testing';
 import { DRIZZLE } from '../../database/database.module';
 import { StaffAuthController } from './staff-auth.controller';
 import { StaffTeamController } from './staff-team.controller';
+import { KeyCardsController } from '../key-cards/key-cards.controller';
+import { KeyCardsService } from '../key-cards/key-cards.service';
+import { AuditService } from '../audit/audit.service';
 import { StaffAuthService } from './staff-auth.service';
 import { StaffTeamService } from './staff-team.service';
 import { StaffMfaService } from './staff-mfa.service';
@@ -21,12 +24,14 @@ import { StaffPermissionsGuard } from './staff-permissions.guard';
 describe('staff surface route mounting', () => {
   async function mountedPaths(): Promise<{ method: string; path: string }[]> {
     const moduleRef = await Test.createTestingModule({
-      controllers: [StaffAuthController, StaffTeamController],
+      controllers: [StaffAuthController, StaffTeamController, KeyCardsController],
       providers: [
         StaffJwtGuard,
         StaffPermissionsGuard,
         { provide: StaffAuthService, useValue: {} },
         { provide: StaffTeamService, useValue: {} },
+        { provide: KeyCardsService, useValue: {} },
+        { provide: AuditService, useValue: {} },
         { provide: StaffMfaService, useValue: {} },
         { provide: JwtService, useValue: {} },
         { provide: ConfigService, useValue: { get: () => undefined, getOrThrow: () => 'x' } },
@@ -81,6 +86,17 @@ describe('staff surface route mounting', () => {
     expect(has('POST', '/api/v1/staff/team/:id/approve')).toBe(true);
     expect(has('POST', '/api/v1/staff/team/:id/status')).toBe(true);
     expect(has('DELETE', '/api/v1/staff/team/:id')).toBe(true);
+  });
+
+  it('exposes the reception key-card URLs', async () => {
+    const routes = await mountedPaths();
+    const has = (method: string, path: string) =>
+      routes.some((r) => r.method === method && r.path === path);
+
+    expect(has('GET', '/api/v1/staff/key-cards')).toBe(true);
+    expect(has('POST', '/api/v1/staff/key-cards')).toBe(true);
+    expect(has('POST', '/api/v1/staff/key-cards/:id/deactivate')).toBe(true);
+    expect(has('POST', '/api/v1/staff/key-cards/:id/replace')).toBe(true);
   });
 
   it('never double-prefixes a staff route under /api/v1/admin', async () => {

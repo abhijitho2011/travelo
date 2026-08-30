@@ -20,6 +20,7 @@ import { PropertiesModule } from './modules/properties/properties.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { RoomsModule } from './modules/rooms/rooms.module';
 import { ReservationsModule } from './modules/reservations/reservations.module';
+import { KeyCardsModule } from './modules/key-cards/key-cards.module';
 import { FolioModule } from './modules/folio/folio.module';
 import { ManagementModule } from './modules/management/management.module';
 import { GuestsModule } from './modules/guests/guests.module';
@@ -124,6 +125,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     StaffModule,
     RoomsModule,
     ReservationsModule,
+    KeyCardsModule,
     FolioModule,
     ManagementModule,
     GuestsModule,

@@ -54,6 +54,9 @@ const GENERAL_MANAGER: readonly string[] = [
   'reservation.cancel',
   'checkin.perform',
   'checkout.perform',
+  // Management can work the desk end to end, key cards included. Not in
+  // AGM_WITHHELD, so the AGM issues cards too.
+  'keycard.issue',
   'guest.read',
   'guest.create',
   'guest.update',

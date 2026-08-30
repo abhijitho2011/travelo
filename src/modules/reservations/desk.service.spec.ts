@@ -80,7 +80,19 @@ describe('DeskService.today', () => {
 
   it('answers the whole reception board in one call, scoped to the property', async () => {
     const db = mockDb({
-      select: { reservations: [[], [], []], rooms: [[{ count: 9 }]] },
+      select: {
+        reservations: [[], [], [], [{ count: 2 }]],
+        rooms: [
+          [{ count: 9 }],
+          [
+            { status: 'AVAILABLE', count: 4 },
+            { status: 'DIRTY', count: 3 },
+            { status: 'READY', count: 2 },
+            { status: 'INSPECTED', count: 1 },
+            { status: 'OCCUPIED', count: 6 },
+          ],
+        ],
+      },
     });
     const board = await svc(db).today(MY_PROPERTY, NOW);
 
@@ -90,10 +102,60 @@ describe('DeskService.today', () => {
       departures: 0,
       inHouse: 0,
       availableRooms: 9,
+      roomsAvailable: 4,
+      roomsDirty: 3,
+      // READY + INSPECTED are both sellable-clean: 2 + 1.
+      roomsReady: 3,
+      walkInsToday: 2,
+      pendingPaymentPaise: 0,
+      pendingFolios: 0,
     });
     for (const where of db.wheresFor('reservations')) {
       expect(sqlText(where)).toContain(MY_PROPERTY);
     }
+  });
+
+  it('counts only walk-ins created today and not cancelled', async () => {
+    const db = mockDb({
+      select: { reservations: [[], [], [], [{ count: 0 }]], rooms: [[{ count: 0 }], []] },
+    });
+    await svc(db).today(MY_PROPERTY, NOW);
+
+    const walkInWhere = sqlText(db.wheresFor('reservations')[3]);
+    expect(walkInWhere).toContain('WALK_IN');
+    expect(walkInWhere).toContain('CANCELLED');
+    expect(walkInWhere).toContain('created_at');
+  });
+
+  /**
+   * The pending-payment figures come from the SAME rows the board renders —
+   * departures and in-house — so the tile and the list can never disagree.
+   * Fully-settled (and over-paid) folios contribute nothing.
+   */
+  it('sums outstanding balances over departures and in-house rows only', async () => {
+    const dep = {
+      id: 'r-dep',
+      roomTypeId: 'rt-1',
+      roomId: null,
+      checkIn: '2026-03-14',
+      checkOut: '2026-03-15',
+      totalPaise: 500_00,
+      paidPaise: 200_00,
+    };
+    const stayerOwing = { ...dep, id: 'r-in-1', checkOut: '2026-03-17', paidPaise: 0 };
+    const stayerPaid = { ...dep, id: 'r-in-2', checkOut: '2026-03-17', paidPaise: 700_00 };
+    const db = mockDb({
+      select: {
+        reservations: [[], [dep], [stayerOwing, stayerPaid], [{ count: 0 }]],
+        rooms: [[{ count: 0 }], []],
+        room_types: [[{ id: 'rt-1', name: 'Deluxe' }], [{ id: 'rt-1', name: 'Deluxe' }]],
+      },
+    });
+    const board = await svc(db).today(MY_PROPERTY, NOW);
+
+    // 300 due on the departure + 500 due in-house; the over-paid folio adds 0.
+    expect(board.counts.pendingPaymentPaise).toBe(800_00);
+    expect(board.counts.pendingFolios).toBe(2);
   });
 
   /**

@@ -258,3 +258,45 @@ export const bookingGroups = pgTable(
 );
 
 export type BookingGroup = typeof bookingGroups.$inferSelect;
+
+/**
+ * Physical key cards issued against a stay.
+ *
+ * STORED status is only the lifecycle reception controls — ACTIVE,
+ * DEACTIVATED, LOST. "EXPIRED" is DERIVED at read time from an ACTIVE row
+ * whose `expires_at` has passed; writing it would demand a clock-driven
+ * background job for a fact the query can state for free.
+ */
+export const keyCardStatusValues = ['ACTIVE', 'DEACTIVATED', 'LOST'] as const;
+export type KeyCardStatus = (typeof keyCardStatusValues)[number];
+
+export const keyCards = pgTable(
+  'key_cards',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    propertyId: uuid('property_id').notNull(),
+    reservationId: uuid('reservation_id')
+      .notNull()
+      .references(() => reservations.id, { onDelete: 'cascade' }),
+    /** `KC-XXXX`. Unique PER PROPERTY: two hotels may both hold KC-0001. */
+    cardNumber: varchar('card_number', { length: 16 }).notNull(),
+    status: varchar('status', { length: 16 }).notNull().default('ACTIVE').$type<KeyCardStatus>(),
+    /** Who handed it over; nullable so a departed colleague never blocks it. */
+    issuedBy: uuid('issued_by'),
+    issuedAt: timestamp('issued_at', { withTimezone: true }).notNull().defaultNow(),
+    /** Check-out day at 11:00 — the card outlives the guest by nothing. */
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    deactivatedAt: timestamp('deactivated_at', { withTimezone: true }),
+  },
+  (t) => ({
+    propertyNumberUnique: uniqueIndex('key_cards_property_number_unique').on(
+      t.propertyId,
+      t.cardNumber,
+    ),
+    propertyStatusIdx: index('key_cards_property_status_idx').on(t.propertyId, t.status),
+  }),
+);
+
+export type KeyCard = typeof keyCards.$inferSelect;

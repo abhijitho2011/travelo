@@ -16,19 +16,12 @@ final calendarWindowStartProvider = StateProvider<DateTime>((ref) {
   return DateTime(now.year, now.month, now.day);
 });
 
-/// One row of the chart. Rooms are grouped under their room type, so the desk
-/// reads "Deluxe · 6 rooms" and then the rooms themselves — the same shape the
-/// left label column and the grid both render from, which is what keeps the two
-/// halves aligned however the grouping falls out.
+/// One row of the room rack. The same list drives the frozen label column and
+/// the scrolling grid, which is what keeps the two halves aligned. The rack is
+/// FLAT — each room row carries its type inline ("101 · Deluxe") rather than
+/// sitting under a group heading, matching the reference design.
 sealed class CalendarLane {
   const CalendarLane();
-}
-
-/// A room-type heading above the run of rooms that belong to it.
-class CalendarGroupLane extends CalendarLane {
-  const CalendarGroupLane({required this.title, required this.roomCount});
-  final String title;
-  final int roomCount;
 }
 
 class CalendarRoomLane extends CalendarLane {
@@ -63,24 +56,12 @@ class CalendarData {
   DateTime get windowEnd => windowStart.add(Duration(days: windowDays));
 
   /// The rows to render, in order: the unassigned lane (when it has anything),
-  /// then each room type's heading followed by its rooms. [rooms] is already
-  /// sorted by type then number, so a run of the same type is contiguous.
-  List<CalendarLane> get lanes {
-    final out = <CalendarLane>[];
-    if (unassigned.isNotEmpty) out.add(CalendarUnassignedLane(unassigned.length));
-
-    String? current;
-    for (var i = 0; i < rooms.length; i++) {
-      final room = rooms[i];
-      if (room.roomTypeName != current) {
-        current = room.roomTypeName;
-        final count = rooms.where((r) => r.roomTypeName == current).length;
-        out.add(CalendarGroupLane(title: current, roomCount: count));
-      }
-      out.add(CalendarRoomLane(room));
-    }
-    return out;
-  }
+  /// then every room. [rooms] is already sorted by type then number, so rooms
+  /// of one type stay together even without a heading between them.
+  List<CalendarLane> get lanes => [
+    if (unassigned.isNotEmpty) CalendarUnassignedLane(unassigned.length),
+    for (final room in rooms) CalendarRoomLane(room),
+  ];
 }
 
 /// Natural-ish room-number order: 101 before 20, 20 before 3 only when both

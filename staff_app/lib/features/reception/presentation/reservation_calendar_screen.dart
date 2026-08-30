@@ -11,24 +11,31 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../rooms/data/room_models.dart';
-import '../application/reservation_calendar_controllers.dart';
 import '../application/reception_controllers.dart';
+import '../application/reservation_calendar_controllers.dart';
 import '../data/reception_models.dart';
 import '../data/reception_repository.dart' show ReservationErrors;
 
-const double _cellW = 48;
-const double _rowH = 46;
-const double _groupH = 30;
+const double _cellW = 52;
+const double _rowH = 48;
 const double _labelW = 128;
-const double _dateHeadH = 44;
+const double _dateHeadH = 46;
 
-/// The width of the grab handle on a bar's right edge, used to extend a stay.
-const double _handleW = 14;
+/// The grab area on a pill's right end, used to drag the check-out later.
+const double _handleW = 16;
 
 DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 int _daysBetween(DateTime a, DateTime b) => _dateOnly(b).difference(_dateOnly(a)).inDays;
 
-/// The statuses a bar may be dragged from. A stay that is over, called off or
+const _monthsShort = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+String _dayMonth(DateTime d) => '${d.day} ${_monthsShort[d.month - 1]}';
+String _dayMonthYear(DateTime d) => '${_dayMonth(d)} ${d.year}';
+
+/// The statuses a pill may be dragged from. A stay that is over, called off or
 /// never arrived is history — moving or extending it would be nonsense, and the
 /// server would refuse it anyway.
 bool _isLive(ReservationStatus s) =>
@@ -44,15 +51,16 @@ class _ExtendIntent {
   final Reservation reservation;
 }
 
-/// The front-desk reservation calendar — a tape chart of rooms (rows) against dates
-/// (columns), with each reservation drawn as a bar across the nights it holds.
+/// The front-desk reservation calendar — a room rack. Rooms are rows, dates are
+/// columns, and every booking is a pill spanning the nights it holds, with the
+/// guest's name and a night count.
 ///
 /// What it can do:
-///  * tap a bar to open the reservation, tap an empty cell to start one there
+///  * tap a pill to open the reservation; tap an empty cell to start one there
 ///    (the form opens prefilled with that room and date);
-///  * long-press a bar and drop it on another room to move/assign it;
-///  * long-press the handle on a bar's right edge and drop it on a later date
-///    to extend the stay.
+///  * long-press a pill and drop it on another room to move/assign it;
+///  * long-press the grip on a pill's right end and drop it on a later date to
+///    extend the stay.
 ///
 /// Every mutation asks first and reports what the server said — a drag is easy
 /// to start by accident, and moving a guest is not a silent operation.
@@ -127,7 +135,7 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
     return ok == true;
   }
 
-  /// Dropping a bar on another room. A guest already in the building is MOVED
+  /// Dropping a pill on another room. A guest already in the building is MOVED
   /// (the server re-quotes on a type change); anyone earlier in the stay is
   /// simply assigned the room.
   Future<void> _onDropMove(Reservation r, Room room) async {
@@ -162,7 +170,7 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
     }
   }
 
-  /// Dropping the right-edge handle on a date. Check-out is EXCLUSIVE, so
+  /// Dropping the right-edge grip on a date. Check-out is EXCLUSIVE, so
   /// dropping on the 14th means "the 14th is the last night" → check-out 15th.
   Future<void> _onDropExtend(Reservation r, DateTime lastNight) async {
     if (_busy) return;
@@ -179,7 +187,7 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
     final ok = await _confirm(
       'Extend stay?',
       '${r.guestName} will stay $extraNights more '
-      '${extraNights == 1 ? 'night' : 'nights'}, to ${_monthDay(newCheckOut)}.',
+      '${extraNights == 1 ? 'night' : 'nights'}, to ${_dayMonth(newCheckOut)}.',
     );
     if (!ok || !mounted) return;
 
@@ -188,7 +196,7 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
     try {
       await ref.read(reservationActionsProvider).extendStay(r.id, newCheckOut);
       messenger.showSnackBar(
-        SnackBar(content: Text('${r.guestName} extended to ${_monthDay(newCheckOut)}')),
+        SnackBar(content: Text('${r.guestName} extended to ${_dayMonth(newCheckOut)}')),
       );
     } on ApiException catch (e) {
       messenger.showSnackBar(
@@ -213,14 +221,14 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _toolbar(context),
-            const _StatusLegend(),
+            _header(context),
+            _legend(context),
             if (_busy) const LinearProgressIndicator(minHeight: 2),
             Expanded(
               child: async.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, _) => _errorState(context, e),
-                data: (data) => _chart(context, data),
+                data: (data) => _rack(context, data),
               ),
             ),
           ],
@@ -229,153 +237,288 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
     );
   }
 
-  Widget _toolbar(BuildContext context) {
+  Widget _header(BuildContext context) {
     final c = context.colors;
     final start = ref.watch(calendarWindowStartProvider);
     final end = start.add(const Duration(days: kCalendarWindowDays - 1));
-    return Container(
-      padding: const EdgeInsets.fromLTRB(Sp.lg, Sp.md, Sp.md, Sp.sm),
-      decoration: BoxDecoration(color: c.background),
-      child: Row(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Sp.lg, Sp.md, Sp.lg, Sp.sm),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        runSpacing: Sp.sm,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Reservation calendar',
-                  style: AppTypography.display(size: 18, color: c.foreground),
-                ),
-                Text(
-                  '${_monthDay(start)} – ${_monthDay(end)}',
-                  style: AppTypography.body(size: 12.5, color: c.mutedForeground),
-                ),
-              ],
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Reservation calendar',
+                style: AppTypography.display(size: 19, color: c.foreground),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _canEdit
+                    ? 'Drag a booking to move rooms · drag its grip to extend the stay'
+                    : 'Every stay, room by room and night by night',
+                style: AppTypography.body(size: 12, color: c.mutedForeground),
+              ),
+            ],
           ),
-          IconButton(
-            tooltip: 'Previous',
-            color: c.foreground,
-            onPressed: _busy ? null : () => _shift(-kCalendarWindowDays),
-            icon: const Icon(Icons.chevron_left, size: 22),
-          ),
-          OutlinedButton(onPressed: _busy ? null : _today, child: const Text('Today')),
-          IconButton(
-            tooltip: 'Next',
-            color: c.foreground,
-            onPressed: _busy ? null : () => _shift(kCalendarWindowDays),
-            icon: const Icon(Icons.chevron_right, size: 22),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // The window, as one pill: ‹ 25 Aug – 7 Sep 2026 ›
+              Container(
+                height: 34,
+                decoration: BoxDecoration(
+                  color: c.card,
+                  borderRadius: R.rPill,
+                  border: Border.all(color: c.border),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _chevron(c, Icons.chevron_left, () => _shift(-kCalendarWindowDays)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: Text(
+                        '${_dayMonth(start)} – ${_dayMonthYear(end)}',
+                        style: AppTypography.body(
+                          size: 12.5,
+                          weight: FontWeight.w600,
+                          color: c.foreground,
+                        ),
+                      ),
+                    ),
+                    _chevron(c, Icons.chevron_right, () => _shift(kCalendarWindowDays)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: Sp.sm),
+              SizedBox(
+                height: 34,
+                child: OutlinedButton(
+                  onPressed: _busy ? null : _today,
+                  child: const Text('Today'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _chart(BuildContext context, CalendarData data) {
+  Widget _chevron(AppColors c, IconData icon, VoidCallback onTap) => InkWell(
+    onTap: _busy ? null : onTap,
+    borderRadius: R.rPill,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Icon(icon, size: 18, color: c.mutedForeground),
+    ),
+  );
+
+  /// Every status the pills can wear, dot + label, with the extend hint.
+  Widget _legend(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(Sp.lg, 0, Sp.lg, Sp.sm),
+      padding: const EdgeInsets.symmetric(horizontal: Sp.md, vertical: 8),
+      decoration: BoxDecoration(
+        color: c.card,
+        borderRadius: R.rMd,
+        border: Border.all(color: c.border),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (final s in ReservationStatus.values) ...[
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: s.tone.color(c),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                s.label,
+                style: AppTypography.body(
+                  size: 11.5,
+                  weight: FontWeight.w500,
+                  color: c.foreground.withValues(alpha: 0.75),
+                ),
+              ),
+              const SizedBox(width: Sp.lg),
+            ],
+            Icon(Icons.info_outline, size: 13, color: c.mutedForeground),
+            const SizedBox(width: 5),
+            Text(
+              _canEdit
+                  ? 'Long-press to drag · the grip extends the stay'
+                  : 'Tap a booking for its details',
+              style: AppTypography.body(size: 11.5, color: c.mutedForeground),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The rack itself: one rounded card holding the header, date row and lanes.
+  Widget _rack(BuildContext context, CalendarData data) {
     final c = context.colors;
     final days = data.windowDays;
     final gridW = days * _cellW;
     final lanes = data.lanes;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Date header: fixed corner + horizontally scrolling day columns.
-        SizedBox(
-          height: _dateHeadH,
-          child: Row(
-            children: [
-              _corner(c),
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: _datesCtrl,
-                  scrollDirection: Axis.horizontal,
-                  child: SizedBox(
-                    width: gridW,
-                    child: Row(
-                      children: [
-                        for (int i = 0; i < days; i++)
-                          _dayHead(c, data.windowStart.add(Duration(days: i))),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: SingleChildScrollView(
+    return Container(
+      margin: const EdgeInsets.fromLTRB(Sp.lg, 0, Sp.lg, Sp.lg),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: c.card,
+        borderRadius: R.rLg,
+        border: Border.all(color: c.border),
+        boxShadow: c.elevation1,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(Sp.lg, Sp.md, Sp.lg, Sp.md),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // Fixed left column. Rendered from the SAME lane list as the
-                // grid, so labels and rows can never drift apart.
-                Column(
-                  children: [for (final lane in lanes) _laneLabel(c, lane)],
+                Text(
+                  'Room rack',
+                  style: AppTypography.display(size: 15, color: c.foreground),
                 ),
+                const SizedBox(width: Sp.sm),
+                Text(
+                  '${data.rooms.length} '
+                  '${data.rooms.length == 1 ? 'room' : 'rooms'} · $days nights',
+                  style: AppTypography.body(size: 11.5, color: c.mutedForeground),
+                ),
+              ],
+            ),
+          ),
+          // Date header: fixed corner + horizontally scrolling day columns.
+          SizedBox(
+            height: _dateHeadH,
+            child: Row(
+              children: [
+                _corner(c),
                 Expanded(
                   child: SingleChildScrollView(
-                    controller: _gridCtrl,
+                    controller: _datesCtrl,
                     scrollDirection: Axis.horizontal,
-                    child: Column(
-                      children: [
-                        for (final lane in lanes) _laneRow(c, lane, data, gridW),
-                      ],
+                    child: SizedBox(
+                      width: gridW,
+                      child: Row(
+                        children: [
+                          for (int i = 0; i < days; i++)
+                            _dayHead(c, data.windowStart.add(Duration(days: i))),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ],
             ),
           ),
-        ),
-      ],
+          Expanded(
+            child: SingleChildScrollView(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Fixed left column. Rendered from the SAME lane list as the
+                  // grid, so labels and rows can never drift apart.
+                  Column(
+                    children: [for (final lane in lanes) _laneLabel(c, lane)],
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      controller: _gridCtrl,
+                      scrollDirection: Axis.horizontal,
+                      child: Column(
+                        children: [
+                          for (final lane in lanes) _laneRow(c, lane, data, gridW),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _laneLabel(AppColors c, CalendarLane lane) => switch (lane) {
-    CalendarGroupLane(:final title, :final roomCount) => Container(
+    CalendarUnassignedLane(:final count) => Container(
       width: _labelW,
-      height: _groupH,
+      height: _rowH,
+      padding: const EdgeInsets.symmetric(horizontal: Sp.md),
+      decoration: BoxDecoration(
+        color: c.surface,
+        border: Border(right: BorderSide(color: c.border), bottom: BorderSide(color: c.border)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Unassigned',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.body(size: 12.5, weight: FontWeight.w600, color: c.foreground),
+          ),
+          Text(
+            '$count awaiting a room',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.body(size: 10, color: c.mutedForeground),
+          ),
+        ],
+      ),
+    ),
+    // "101  Deluxe" — number bold, type muted beside it, as the rack reads.
+    CalendarRoomLane(:final room) => Container(
+      width: _labelW,
+      height: _rowH,
       padding: const EdgeInsets.symmetric(horizontal: Sp.md),
       alignment: Alignment.centerLeft,
       decoration: BoxDecoration(
-        color: c.muted,
-        border: Border(
-          right: BorderSide(color: c.border),
-          bottom: BorderSide(color: c.border),
-        ),
+        color: c.surface,
+        border: Border(right: BorderSide(color: c.border), bottom: BorderSide(color: c.border)),
       ),
-      child: Text(
-        '${title.toUpperCase()} · $roomCount',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: AppTypography.labelXs(c.mutedForeground),
+      child: Row(
+        children: [
+          Text(
+            room.number,
+            style: AppTypography.body(size: 13.5, weight: FontWeight.w700, color: c.foreground),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              room.roomTypeName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.body(size: 10.5, color: c.mutedForeground),
+            ),
+          ),
+        ],
       ),
-    ),
-    CalendarUnassignedLane(:final count) => _rowLabel(
-      c,
-      title: 'Unassigned',
-      subtitle: '$count awaiting a room',
-    ),
-    CalendarRoomLane(:final room) => _rowLabel(
-      c,
-      title: 'Room ${room.number}',
-      subtitle: room.status.label,
     ),
   };
 
   Widget _laneRow(AppColors c, CalendarLane lane, CalendarData data, double gridW) =>
       switch (lane) {
-        // The heading's grid half is a plain band — it carries no dates.
-        CalendarGroupLane() => Container(
-          width: gridW,
-          height: _groupH,
-          decoration: BoxDecoration(
-            color: c.muted,
-            border: Border(bottom: BorderSide(color: c.border)),
-          ),
-        ),
         CalendarUnassignedLane() => _TapeRow(
           width: gridW,
           windowStart: data.windowStart,
@@ -418,7 +561,7 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
     ),
     alignment: Alignment.centerLeft,
     padding: const EdgeInsets.only(left: Sp.md),
-    child: Text('Rooms', style: AppTypography.labelXs(c.mutedForeground)),
+    child: Text('ROOM', style: AppTypography.labelXs(c.mutedForeground)),
   );
 
   Widget _dayHead(AppColors c, DateTime day) {
@@ -428,20 +571,25 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
       width: _cellW,
       height: _dateHeadH,
       decoration: BoxDecoration(
-        color: isToday ? c.accent : (weekend ? c.surface : c.background),
+        color: isToday ? c.accent : (weekend ? c.surface : c.card),
         border: Border(right: BorderSide(color: c.border), bottom: BorderSide(color: c.border)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            _weekday(day),
-            style: AppTypography.body(size: 10, color: isToday ? c.primary : c.mutedForeground),
+            _weekday(day).toUpperCase(),
+            style: AppTypography.body(
+              size: 9,
+              weight: FontWeight.w600,
+              color: isToday ? c.primary : c.mutedForeground,
+            ).copyWith(letterSpacing: 0.5),
           ),
+          const SizedBox(height: 1),
           Text(
             '${day.day}',
             style: AppTypography.body(
-              size: 13,
+              size: 13.5,
               weight: FontWeight.w600,
               color: isToday ? c.primary : c.foreground,
             ),
@@ -450,34 +598,6 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
       ),
     );
   }
-
-  Widget _rowLabel(AppColors c, {required String title, required String subtitle}) => Container(
-    width: _labelW,
-    height: _rowH,
-    padding: const EdgeInsets.symmetric(horizontal: Sp.md),
-    decoration: BoxDecoration(
-      color: c.surface,
-      border: Border(right: BorderSide(color: c.border), bottom: BorderSide(color: c.border)),
-    ),
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: AppTypography.body(size: 13, weight: FontWeight.w600, color: c.foreground),
-        ),
-        Text(
-          subtitle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: AppTypography.body(size: 10.5, color: c.mutedForeground),
-        ),
-      ],
-    ),
-  );
 
   Widget _errorState(BuildContext context, Object e) {
     final c = context.colors;
@@ -512,58 +632,10 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
 
   static String _weekday(DateTime d) =>
       const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][d.weekday - 1];
-  static String _monthDay(DateTime d) =>
-      '${d.day} ${const ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.month - 1]}';
-}
-
-/// What the bar colours mean. Four states carry the chart — the terminal ones
-/// (checked out / cancelled / no show) explain themselves in the bar's own
-/// tooltip and would only crowd the strip.
-class _StatusLegend extends StatelessWidget {
-  const _StatusLegend();
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    const shown = [
-      ReservationStatus.pending,
-      ReservationStatus.confirmed,
-      ReservationStatus.checkedIn,
-      ReservationStatus.checkedOut,
-    ];
-    return Container(
-      padding: const EdgeInsets.fromLTRB(Sp.lg, 0, Sp.lg, Sp.sm),
-      decoration: BoxDecoration(
-        color: c.background,
-        border: Border(bottom: BorderSide(color: c.border)),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            for (final s in shown) ...[
-              Container(
-                width: 9,
-                height: 9,
-                decoration: BoxDecoration(
-                  color: s.tone.color(c).withValues(alpha: 0.22),
-                  border: Border.all(color: s.tone.color(c)),
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
-              const SizedBox(width: 5),
-              Text(s.label, style: AppTypography.body(size: 11, color: c.mutedForeground)),
-              const SizedBox(width: Sp.md),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 /// One lane's grid: empty date cells (tap to start a booking, or drop an
-/// extend-handle on to lengthen a stay) with the reservation bars over them.
+/// extend-grip on to lengthen a stay) with the reservation pills over them.
 class _TapeRow extends StatelessWidget {
   const _TapeRow({
     required this.width,
@@ -604,15 +676,16 @@ class _TapeRow extends StatelessWidget {
                 _cell(context, c, windowStart.add(Duration(days: i))),
             ],
           ),
-          // Reservation bars.
-          for (final bar in _bars(context)) bar,
+          // Reservation pills.
+          for (final pill in _pills(context)) pill,
         ],
       ),
     );
   }
 
   Widget _cell(BuildContext context, AppColors c, DateTime date) {
-    // Typed target: only an extend-handle lands here. A whole-bar move carries
+    final weekend = date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
+    // Typed target: only an extend-grip lands here. A whole-pill move carries
     // a Reservation and is caught by the row's own DragTarget instead.
     return DragTarget<_ExtendIntent>(
       onWillAcceptWithDetails: (_) => canEdit,
@@ -626,9 +699,11 @@ class _TapeRow extends StatelessWidget {
           decoration: BoxDecoration(
             color: candidate.isNotEmpty
                 ? c.primary.withValues(alpha: 0.14)
-                : (highlight ? c.accent.withValues(alpha: 0.5) : null),
+                : (highlight
+                      ? c.accent.withValues(alpha: 0.5)
+                      : (weekend ? c.surface.withValues(alpha: 0.55) : null)),
             border: Border(
-              right: BorderSide(color: c.border.withValues(alpha: 0.6)),
+              right: BorderSide(color: c.border.withValues(alpha: 0.55)),
               bottom: BorderSide(color: c.border),
             ),
           ),
@@ -637,8 +712,7 @@ class _TapeRow extends StatelessWidget {
     );
   }
 
-  List<Widget> _bars(BuildContext context) {
-    final c = context.colors;
+  List<Widget> _pills(BuildContext context) {
     final out = <Widget>[];
     for (final r in reservations) {
       final ci = r.checkIn;
@@ -648,21 +722,19 @@ class _TapeRow extends StatelessWidget {
       final endIdx = _daysBetween(windowStart, co).clamp(0, days); // checkout exclusive
       if (endIdx <= startIdx) continue;
 
-      final color = r.status.tone.color(c);
       final draggable = canEdit && _isLive(r.status);
-      // True when the real check-out falls inside the window, so the handle sits
+      // True when the real check-out falls inside the window, so the grip sits
       // on the stay's actual end rather than on the window's edge.
       final endsInWindow = _daysBetween(windowStart, co) <= days;
 
       out.add(
         Positioned(
-          left: startIdx * _cellW + 1.5,
-          top: 5,
-          width: (endIdx - startIdx) * _cellW - 3,
-          height: _rowH - 10,
-          child: _Bar(
+          left: startIdx * _cellW + 2,
+          top: 7,
+          width: (endIdx - startIdx) * _cellW - 4,
+          height: _rowH - 14,
+          child: _Pill(
             reservation: r,
-            color: color,
             draggable: draggable,
             showHandle: draggable && endsInWindow,
             onOpen: () => onOpen(r),
@@ -674,19 +746,19 @@ class _TapeRow extends StatelessWidget {
   }
 }
 
-/// A single reservation bar: tap to open, long-press to move, and (when the
-/// stay ends inside the window) a right-edge handle to drag the check-out out.
-class _Bar extends StatelessWidget {
-  const _Bar({
+/// A booking pill: guest name + night count, styled by status. Confirmed reads
+/// as a clean outlined pill on the card surface; every other status wears its
+/// tone as a tint with a leading dot. Tap opens; long-press drags; the grip on
+/// the right end (live stays only) drags the check-out later.
+class _Pill extends StatelessWidget {
+  const _Pill({
     required this.reservation,
-    required this.color,
     required this.draggable,
     required this.showHandle,
     required this.onOpen,
   });
 
   final Reservation reservation;
-  final Color color;
   final bool draggable;
   final bool showHandle;
   final VoidCallback onOpen;
@@ -694,21 +766,68 @@ class _Bar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final tone = reservation.status.tone.color(c);
+    final confirmed = reservation.status == ReservationStatus.confirmed;
+
+    final bg = confirmed ? c.card : tone.withValues(alpha: 0.13);
+    final borderColor = confirmed
+        ? c.foreground.withValues(alpha: 0.55)
+        : tone.withValues(alpha: 0.5);
+    final nights = reservation.nights;
+
     final body = GestureDetector(
       onTap: onOpen,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6),
+        padding: EdgeInsets.only(left: 10, right: showHandle ? _handleW + 4 : 8),
         alignment: Alignment.centerLeft,
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.16),
-          borderRadius: R.rSm,
-          border: Border.all(color: color.withValues(alpha: 0.5)),
+          color: bg,
+          borderRadius: R.rPill,
+          border: Border.all(color: borderColor),
+          boxShadow: confirmed ? c.elevation1 : null,
         ),
-        child: Text(
-          reservation.guestName,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: AppTypography.body(size: 11.5, weight: FontWeight.w600, color: color),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!confirmed) ...[
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(color: tone, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 6),
+            ],
+            Flexible(
+              child: Text(
+                reservation.guestName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.body(
+                  size: 11.5,
+                  weight: FontWeight.w600,
+                  color: c.foreground,
+                ),
+              ),
+            ),
+            if (nights > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  borderRadius: R.rPill,
+                  border: Border.all(color: c.border),
+                ),
+                child: Text(
+                  '${nights}N',
+                  style: AppTypography.body(
+                    size: 9.5,
+                    weight: FontWeight.w600,
+                    color: c.mutedForeground,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -719,7 +838,7 @@ class _Bar extends StatelessWidget {
         ? LongPressDraggable<Reservation>(
             data: reservation,
             dragAnchorStrategy: pointerDragAnchorStrategy,
-            feedback: _feedback(context, reservation.guestName, color),
+            feedback: _feedback(context, reservation.guestName),
             childWhenDragging: Opacity(opacity: 0.35, child: body),
             child: body,
           )
@@ -733,25 +852,27 @@ class _Bar extends StatelessWidget {
           Positioned.fill(child: movable),
           if (showHandle)
             Positioned(
-              right: 0,
-              top: 0,
-              bottom: 0,
+              right: 2,
+              top: 2,
+              bottom: 2,
               width: _handleW,
               child: LongPressDraggable<_ExtendIntent>(
                 data: _ExtendIntent(reservation),
                 dragAnchorStrategy: pointerDragAnchorStrategy,
-                feedback: _feedback(context, 'Extend stay', color),
+                feedback: _feedback(context, 'Extend stay'),
                 child: MouseRegion(
                   cursor: SystemMouseCursors.resizeLeftRight,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.28),
-                      borderRadius: const BorderRadius.horizontal(
-                        right: Radius.circular(R.sm),
-                      ),
+                      color: tone.withValues(alpha: 0.22),
+                      borderRadius: R.rPill,
                     ),
                     alignment: Alignment.center,
-                    child: Icon(Icons.drag_indicator, size: 11, color: c.surface),
+                    child: Icon(
+                      Icons.drag_indicator,
+                      size: 10,
+                      color: c.foreground.withValues(alpha: 0.5),
+                    ),
                   ),
                 ),
               ),
@@ -761,21 +882,22 @@ class _Bar extends StatelessWidget {
     );
   }
 
-  Widget _feedback(BuildContext context, String label, Color color) {
+  Widget _feedback(BuildContext context, String label) {
     final c = context.colors;
+    final tone = reservation.status.tone.color(c);
     return Material(
       color: Colors.transparent,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
           color: c.card,
-          borderRadius: R.rSm,
-          border: Border.all(color: color),
+          borderRadius: R.rPill,
+          border: Border.all(color: tone),
           boxShadow: c.elevation2,
         ),
         child: Text(
           label,
-          style: AppTypography.body(size: 12, weight: FontWeight.w600, color: color),
+          style: AppTypography.body(size: 12, weight: FontWeight.w600, color: c.foreground),
         ),
       ),
     );
