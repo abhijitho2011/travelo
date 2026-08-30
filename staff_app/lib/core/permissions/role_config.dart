@@ -895,14 +895,29 @@ class RoleConfig {
       requires: [P.kotRead],
       more: const [_inventoryMore, _myTasksMore],
     ),
-    StaffRole.cleaner: _simple(
-      StaffRole.cleaner,
-      Routes.restaurantCleaning,
-      'Cleaning Tasks',
-      'Cleaning',
-      Icons.cleaning_services_outlined,
-      requires: [P.taskRead],
-      more: const [_myTasksMore],
+    // A cleaner does cleaning tasks, which is exactly what the built My Tasks
+    // list models (start/complete, offline-capable). Same permission shape as
+    // the room attendant and cleaning staff (task.read/start/complete), so the
+    // same screen serves it honestly — no separate outlet-cleaning backend.
+    StaffRole.cleaner: RoleConfig(
+      role: StaffRole.cleaner,
+      homeRoute: Routes.myTasks,
+      homeModuleLabel: 'My Tasks',
+      built: true,
+      bottomNav: const [
+        NavItem(
+          label: 'My tasks',
+          icon: Icons.cleaning_services_outlined,
+          route: Routes.myTasks,
+          requires: [P.taskRead],
+        ),
+        NavItem(
+          label: 'Profile',
+          icon: Icons.person_outline,
+          route: Routes.profile,
+        ),
+      ],
+      moreMenu: _commonMoreNoProfile,
     ),
     StaffRole.inventoryStoreManager: _simple(
       StaffRole.inventoryStoreManager,
