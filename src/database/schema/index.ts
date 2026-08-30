@@ -9,3 +9,4 @@ export * from './rooms';
 export * from './reservations';
 export * from './housekeeping';
 export * from './restaurant';
+export * from './ops';
