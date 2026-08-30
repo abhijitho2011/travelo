@@ -591,3 +591,35 @@ describe('ReservationsService — per-night availability (4.4)', () => {
     expect(db.inserts.find((i) => i.table === 'reservations')).toBeTruthy();
   });
 });
+
+describe('ReservationsService — seasonal rate override (4.2)', () => {
+  it('quotes a booking at the date-ranged override instead of the base rate', async () => {
+    const db = mockDb({
+      select: {
+        room_types: [[typeRow], []],
+        // An override of 600000 covers the 14th (the arrival date).
+        rate_overrides: [[{ ratePaise: 600_000 }]],
+        reservations: [[{ count: 0 }]],
+      },
+      insert: { reservations: [resRow()] },
+    });
+    await svc(db).create(MY_PROPERTY, newBooking(), STAFF_ID);
+    const values = db.inserts.find((i) => i.table === 'reservations')!.values!;
+    expect(values.ratePaise).toBe(600_000); // override, not the 450000 base rate
+    expect(values.totalPaise).toBe(1_800_000); // 3 nights x 600000
+  });
+
+  it('falls back to the base rate when no override covers the date', async () => {
+    const db = mockDb({
+      select: {
+        room_types: [[typeRow], []],
+        rate_overrides: [[]], // none
+        reservations: [[{ count: 0 }]],
+      },
+      insert: { reservations: [resRow()] },
+    });
+    await svc(db).create(MY_PROPERTY, newBooking(), STAFF_ID);
+    const values = db.inserts.find((i) => i.table === 'reservations')!.values!;
+    expect(values.ratePaise).toBe(450_000);
+  });
+});

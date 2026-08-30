@@ -4,6 +4,7 @@ import {
   uuid,
   varchar,
   timestamp,
+  date,
   integer,
   boolean,
   text,
@@ -232,3 +233,35 @@ export const propertyAmenities = pgTable(
 export type Amenity = typeof amenities.$inferSelect;
 export type RoomType = typeof roomTypes.$inferSelect;
 export type Room = typeof rooms.$inferSelect;
+
+/**
+ * A date-ranged rate override for a room type (Phase 4). Over [start_date,
+ * end_date] the type is quoted at `rate_paise` instead of its base rate. The
+ * first cut of rate plans — seasonal/peak pricing without a full BAR/plan model.
+ */
+export const rateOverrides = pgTable(
+  'rate_overrides',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    propertyId: uuid('property_id')
+      .notNull()
+      .references(() => properties.id, { onDelete: 'cascade' }),
+    roomTypeId: uuid('room_type_id')
+      .notNull()
+      .references(() => roomTypes.id, { onDelete: 'cascade' }),
+    label: varchar('label', { length: 120 }),
+    startDate: date('start_date').notNull(),
+    endDate: date('end_date').notNull(),
+    ratePaise: integer('rate_paise').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (t) => ({
+    typeRangeIdx: index('rate_overrides_type_range_idx').on(t.roomTypeId, t.startDate, t.endDate),
+  }),
+);
+
+export type RateOverride = typeof rateOverrides.$inferSelect;

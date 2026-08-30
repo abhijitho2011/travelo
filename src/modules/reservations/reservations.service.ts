@@ -1,9 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, gt, inArray, isNull, lt, ne, or, sql, SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, ne, or, sql, SQL } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import { FolioService } from '../folio/folio.service';
 import {
   OCCUPYING_STATUSES,
+  rateOverrides,
   reservationEvents,
   reservations,
   rooms,
@@ -231,6 +232,36 @@ export class ReservationsService {
     return row;
   }
 
+  /**
+   * The per-night rate to quote for a booking arriving on `date`: a date-ranged
+   * rate override for the room type if one covers the date, else the type's base
+   * rate. When several overrides overlap, the highest wins (peak beats a
+   * standing discount). First cut of rate plans — one rate for the stay, from
+   * the arrival date.
+   */
+  private async resolveRate(
+    propertyId: string,
+    roomTypeId: string,
+    date: string,
+    fallback: number,
+  ): Promise<number> {
+    const [ov] = await this.db
+      .select({ ratePaise: rateOverrides.ratePaise })
+      .from(rateOverrides)
+      .where(
+        and(
+          eq(rateOverrides.propertyId, propertyId),
+          eq(rateOverrides.roomTypeId, roomTypeId),
+          lte(rateOverrides.startDate, date),
+          gte(rateOverrides.endDate, date),
+          isNull(rateOverrides.deletedAt),
+        ),
+      )
+      .orderBy(desc(rateOverrides.ratePaise))
+      .limit(1);
+    return ov?.ratePaise ?? fallback;
+  }
+
   private async requireRoom(propertyId: string, id: string) {
     const [row] = await this.db
       .select()
@@ -381,7 +412,8 @@ export class ReservationsService {
 
     // The rate is SNAPSHOTTED here, not read at check-out: a base-rate change
     // next week must not rewrite what this guest was quoted today.
-    const ratePaise = dto.ratePaise ?? type.baseRate;
+    const ratePaise =
+      dto.ratePaise ?? (await this.resolveRate(propertyId, type.id, dto.checkIn, type.baseRate));
     const status: ReservationStatus = dto.status ?? 'PENDING';
 
     for (let attempt = 0; attempt < NUMBER_ATTEMPTS; attempt += 1) {

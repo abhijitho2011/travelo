@@ -23,6 +23,7 @@ import { FolioModule } from './modules/folio/folio.module';
 import { ManagementModule } from './modules/management/management.module';
 import { GuestsModule } from './modules/guests/guests.module';
 import { StaffExportModule } from './modules/staff-export/staff-export.module';
+import { RatesModule } from './modules/rates/rates.module';
 import { HousekeepingModule } from './modules/housekeeping/housekeeping.module';
 import { RestaurantModule } from './modules/restaurant/restaurant.module';
 import { SpaModule } from './modules/spa/spa.module';
@@ -109,6 +110,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     ManagementModule,
     GuestsModule,
     StaffExportModule,
+    RatesModule,
     HousekeepingModule,
     RestaurantModule,
     SpaModule,
