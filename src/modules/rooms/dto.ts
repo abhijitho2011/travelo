@@ -20,6 +20,7 @@ import {
   bedTypeValues,
   roomStatusValues,
   roomTypeStatusValues,
+  unitKindValues,
 } from '../../database/schema';
 
 /** Hard ceiling on one bulk create — a floor, not a whole chain. */
@@ -72,6 +73,15 @@ export class RoomTypeInputDto {
 
   @IsOptional() @IsString() @Length(0, 2000) description?: string;
 
+  /** ROOM (default) or VILLA — what one bookable unit of this type is. */
+  @IsOptional() @IsIn(unitKindValues) unitKind?: (typeof unitKindValues)[number];
+
+  /** Rooms inside ONE unit — 1 for a room, 1+ for a multi-room villa. */
+  @IsOptional() @IsInt() @Min(1) @Max(20) unitRoomCount?: number;
+
+  /** Each unit has its own private pool (the shared pool stays a PROPERTY amenity). */
+  @IsOptional() @IsBoolean() privatePool?: boolean;
+
   @IsIn(bedTypeValues) bedType!: (typeof bedTypeValues)[number];
 
   @IsInt() @Min(1) @Max(20) bedCount!: number;
@@ -108,6 +118,12 @@ export class UpdateRoomTypeDto {
   @IsOptional() @IsString() @Length(1, 128) name?: string;
 
   @IsOptional() @IsString() @Length(0, 2000) description?: string;
+
+  @IsOptional() @IsIn(unitKindValues) unitKind?: (typeof unitKindValues)[number];
+
+  @IsOptional() @IsInt() @Min(1) @Max(20) unitRoomCount?: number;
+
+  @IsOptional() @IsBoolean() privatePool?: boolean;
 
   @IsOptional() @IsIn(bedTypeValues) bedType?: (typeof bedTypeValues)[number];
 

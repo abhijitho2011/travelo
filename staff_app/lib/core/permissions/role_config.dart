@@ -265,6 +265,10 @@ class RoleConfig {
   // Secondary destinations reused across several roles' More menus. Each one
   // is gated on the permission its owning role actually holds, so a role that
   // loses the permission loses the entry without any edit here.
+  /// Kept ONLY for roles without a Front desk entry (accounts, sales, travel
+  /// desk, events) — for them this is the sole path to bookings. Roles that
+  /// have Front desk reach the same screen through its "Bookings" button, so
+  /// they no longer carry a duplicate nav item.
   static const _bookingsMore = NavItem(
     label: 'Bookings',
     icon: Icons.event_note_outlined,
@@ -374,12 +378,6 @@ class RoleConfig {
         ),
       ],
       moreMenu: const [
-        NavItem(
-          label: 'Bookings',
-          icon: Icons.event_note_outlined,
-          route: Routes.reservations,
-          requires: [P.reservationRead],
-        ),
         _roomsMore,
         NavItem(
           label: 'Housekeeping',
@@ -469,12 +467,6 @@ class RoleConfig {
         ),
       ],
       moreMenu: const [
-        NavItem(
-          label: 'Bookings',
-          icon: Icons.event_note_outlined,
-          route: Routes.reservations,
-          requires: [P.reservationRead],
-        ),
         _roomsMore,
         NavItem(
           label: 'Housekeeping',
@@ -566,12 +558,6 @@ class RoleConfig {
           label: 'Front desk',
           icon: Icons.room_service_outlined,
           route: Routes.reception,
-          requires: [P.reservationRead],
-        ),
-        NavItem(
-          label: 'Bookings',
-          icon: Icons.event_note_outlined,
-          route: Routes.reservations,
           requires: [P.reservationRead],
         ),
         NavItem(

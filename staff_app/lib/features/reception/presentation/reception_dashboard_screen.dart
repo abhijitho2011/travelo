@@ -245,7 +245,7 @@ class _ReceptionDashboardScreenState
               child: FilledButton.icon(
                 onPressed: () => context.go(Routes.reservations),
                 icon: const Icon(Icons.event_note_outlined, size: 16),
-                label: const Text('All bookings'),
+                label: const Text('Bookings'),
               ),
             ),
           ],

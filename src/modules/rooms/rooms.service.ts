@@ -100,7 +100,9 @@ export class RoomsService {
 
   static toDto(
     r: Room,
-    type: { id: string; name: string; bedType: string; airConditioned: boolean } | undefined,
+    type:
+      | { id: string; name: string; bedType: string; airConditioned: boolean; unitKind: string; unitRoomCount: number; privatePool: boolean }
+      | undefined,
     amenityList: AmenityRef[],
   ) {
     return {
@@ -110,6 +112,9 @@ export class RoomsService {
       roomTypeName: type?.name ?? null,
       bedType: type?.bedType ?? null,
       airConditioned: type?.airConditioned ?? null,
+      unitKind: type?.unitKind ?? null,
+      unitRoomCount: type?.unitRoomCount ?? null,
+      privatePool: type?.privatePool ?? null,
       number: r.number,
       floor: r.floor,
       status: r.status,
@@ -134,6 +139,9 @@ export class RoomsService {
         name: roomTypes.name,
         bedType: roomTypes.bedType,
         airConditioned: roomTypes.airConditioned,
+        unitKind: roomTypes.unitKind,
+        unitRoomCount: roomTypes.unitRoomCount,
+        privatePool: roomTypes.privatePool,
       })
       .from(roomTypes)
       .where(inArray(roomTypes.id, typeIds));

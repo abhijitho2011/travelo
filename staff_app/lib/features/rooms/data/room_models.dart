@@ -221,6 +221,22 @@ enum RoomTypeStatus {
 
 // ------------------------------------------------------------- room types --
 
+/// What one bookable unit of a type physically is: a single hotel room, or a
+/// standalone villa (which may contain several rooms and a private pool). The
+/// guest books the whole unit either way.
+enum UnitKind {
+  room('ROOM', 'Room'),
+  villa('VILLA', 'Villa');
+
+  const UnitKind(this.wire, this.label);
+
+  final String wire;
+  final String label;
+
+  static UnitKind fromWire(String? value) =>
+      _wire(value) == UnitKind.villa.wire ? UnitKind.villa : UnitKind.room;
+}
+
 /// A row from `GET /room-types` — one sellable category of room.
 @immutable
 class RoomType {
@@ -235,6 +251,9 @@ class RoomType {
     required this.airConditioned,
     required this.baseRate,
     required this.status,
+    this.unitKind = UnitKind.room,
+    this.unitRoomCount = 1,
+    this.privatePool = false,
     this.propertyId,
     this.description,
     this.currency = 'INR',
@@ -259,6 +278,16 @@ class RoomType {
   /// room of the type inherits it, and rates are quoted on it.
   final bool airConditioned;
 
+  /// ROOM or VILLA — what one bookable unit of this type is.
+  final UnitKind unitKind;
+
+  /// Rooms inside ONE unit (1 for a room; 1+ for a multi-room villa). Not the
+  /// number of units the hotel has — that is [roomCount].
+  final int unitRoomCount;
+
+  /// Every unit of this type has its own private pool.
+  final bool privatePool;
+
   /// Paise. Never rupees — the wire is the wire.
   final int baseRate;
   final String currency;
@@ -274,6 +303,17 @@ class RoomType {
 
   bool get isArchived => status == RoomTypeStatus.archived;
 
+  bool get isVilla => unitKind == UnitKind.villa;
+
+  /// "Villa · 3 rooms · Private pool" — empty for a plain room type.
+  String get unitLabel => isVilla
+      ? [
+          'Villa',
+          if (unitRoomCount > 1) '$unitRoomCount rooms',
+          if (privatePool) 'Private pool',
+        ].join(' · ')
+      : (privatePool ? 'Private pool' : '');
+
   Set<String> get amenityIds =>
       amenities.map((a) => a.id).toSet();
 
@@ -288,8 +328,9 @@ class RoomType {
 
   String get baseRateLabel => formatPaise(baseRate);
 
-  String get roomCountLabel =>
-      '$roomCount ${roomCount == 1 ? 'room' : 'rooms'}';
+  String get roomCountLabel => isVilla
+      ? '$roomCount ${roomCount == 1 ? 'villa' : 'villas'}'
+      : '$roomCount ${roomCount == 1 ? 'room' : 'rooms'}';
 
   factory RoomType.fromJson(Map json) => RoomType(
     id: (json['id'] ?? '').toString(),
@@ -304,6 +345,9 @@ class RoomType {
     airConditioned: _bool(
       _pick(json, ['airConditioned', 'air_conditioned']),
     ),
+    unitKind: UnitKind.fromWire(_str(_pick(json, ['unitKind', 'unit_kind']))),
+    unitRoomCount: _int(_pick(json, ['unitRoomCount', 'unit_room_count']), 1),
+    privatePool: _bool(_pick(json, ['privatePool', 'private_pool'])),
     baseRate: _int(_pick(json, ['baseRate', 'base_rate'])),
     currency: _str(json['currency']) ?? 'INR',
     sizeSqft: _intOrNull(_pick(json, ['sizeSqft', 'size_sqft'])),
@@ -325,6 +369,9 @@ class RoomType {
     'maxAdults': maxAdults,
     'maxChildren': maxChildren,
     'airConditioned': airConditioned,
+    'unitKind': unitKind.wire,
+    'unitRoomCount': unitRoomCount,
+    'privatePool': privatePool,
     'baseRate': baseRate,
     'currency': currency,
     if (sizeSqft != null) 'sizeSqft': sizeSqft,
@@ -605,6 +652,9 @@ class NewRoomType {
     required this.maxChildren,
     required this.airConditioned,
     required this.baseRate,
+    this.unitKind = UnitKind.room,
+    this.unitRoomCount = 1,
+    this.privatePool = false,
     this.description,
     this.currency,
     this.sizeSqft,
@@ -613,6 +663,9 @@ class NewRoomType {
 
   final String name;
   final String? description;
+  final UnitKind unitKind;
+  final int unitRoomCount;
+  final bool privatePool;
   final BedType bedType;
   final int bedCount;
   final int maxOccupancy;
@@ -630,6 +683,9 @@ class NewRoomType {
     'name': name,
     if (description != null && description!.isNotEmpty)
       'description': description,
+    'unitKind': unitKind.wire,
+    'unitRoomCount': unitRoomCount,
+    'privatePool': privatePool,
     'bedType': bedType.wire,
     'bedCount': bedCount,
     'maxOccupancy': maxOccupancy,

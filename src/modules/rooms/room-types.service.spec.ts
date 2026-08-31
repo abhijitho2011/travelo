@@ -19,6 +19,9 @@ const typeRow = (over: Record<string, unknown> = {}) => ({
   propertyId: MY_PROPERTY,
   name: 'Deluxe',
   description: null,
+  unitKind: 'ROOM',
+  unitRoomCount: 1,
+  privatePool: false,
   bedType: 'KING',
   bedCount: 1,
   maxOccupancy: 2,
@@ -142,6 +145,65 @@ describe('RoomTypesService — air conditioning is a column, not an amenity', ()
     const dto = RoomTypesService.toDto(typeRow({ airConditioned: true }) as never, []);
     expect(dto.airConditioned).toBe(true);
     expect(dto.amenities).toEqual([]);
+  });
+});
+
+describe('RoomTypesService — villa unit kinds', () => {
+  it('defaults to a 1-room ROOM unit when the client sends nothing', async () => {
+    const db = mockDb({ insert: { room_types: [typeRow()] } });
+    await svc(db).create(MY_PROPERTY, { ...input });
+    expect(db.inserts.find((i) => i.table === 'room_types')?.values).toMatchObject({
+      unitKind: 'ROOM',
+      unitRoomCount: 1,
+      privatePool: false,
+    });
+  });
+
+  it('persists a multi-room private-pool villa as sent', async () => {
+    const db = mockDb({
+      insert: { room_types: [typeRow({ unitKind: 'VILLA', unitRoomCount: 3, privatePool: true })] },
+    });
+    await svc(db).create(MY_PROPERTY, {
+      ...input,
+      unitKind: 'VILLA' as const,
+      unitRoomCount: 3,
+      privatePool: true,
+    });
+    expect(db.inserts.find((i) => i.table === 'room_types')?.values).toMatchObject({
+      unitKind: 'VILLA',
+      unitRoomCount: 3,
+      privatePool: true,
+    });
+  });
+
+  it('forces unitRoomCount back to 1 when a ROOM kind is created with a stray count', async () => {
+    const db = mockDb({ insert: { room_types: [typeRow()] } });
+    await svc(db).create(MY_PROPERTY, { ...input, unitKind: 'ROOM' as const, unitRoomCount: 4 });
+    expect(db.inserts.find((i) => i.table === 'room_types')?.values).toMatchObject({
+      unitRoomCount: 1,
+    });
+  });
+
+  it('resets the room count when a villa is converted back to a plain room', async () => {
+    const db = mockDb({
+      select: { room_types: [[typeRow({ unitKind: 'VILLA', unitRoomCount: 3 })]], room_type_amenities: [[]] },
+      update: { room_types: [typeRow()] },
+    });
+    await svc(db).update(MY_PROPERTY, TYPE_ID, { unitKind: 'ROOM' });
+    expect(db.updates.find((u) => u.table === 'room_types')?.values).toMatchObject({
+      unitKind: 'ROOM',
+      unitRoomCount: 1,
+    });
+  });
+
+  it('reports unit fields on the DTO', () => {
+    const dto = RoomTypesService.toDto(
+      typeRow({ unitKind: 'VILLA', unitRoomCount: 2, privatePool: true }) as never,
+      [],
+    );
+    expect(dto.unitKind).toBe('VILLA');
+    expect(dto.unitRoomCount).toBe(2);
+    expect(dto.privatePool).toBe(true);
   });
 });
 

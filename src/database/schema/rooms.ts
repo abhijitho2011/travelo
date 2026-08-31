@@ -73,6 +73,16 @@ export const amenities = pgTable(
 export const bedTypeValues = ['SINGLE', 'TWIN', 'DOUBLE', 'QUEEN', 'KING', 'BUNK'] as const;
 export type BedType = (typeof bedTypeValues)[number];
 
+/**
+ * What one bookable unit of this type physically is. A ROOM is a single
+ * hotel room; a VILLA is a standalone unit that may contain several rooms and
+ * private facilities. The guest always books the WHOLE unit either way — a
+ * `rooms` row is one villa, exactly as it is one room — so reservations,
+ * housekeeping and occupancy need no special-casing.
+ */
+export const unitKindValues = ['ROOM', 'VILLA'] as const;
+export type UnitKind = (typeof unitKindValues)[number];
+
 export const roomTypeStatusValues = ['ACTIVE', 'ARCHIVED'] as const;
 export type RoomTypeStatus = (typeof roomTypeStatusValues)[number];
 
@@ -87,6 +97,20 @@ export const roomTypes = pgTable(
       .references(() => properties.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 128 }).notNull(),
     description: text('description'),
+    unitKind: varchar('unit_kind', { length: 16 }).notNull().default('ROOM').$type<UnitKind>(),
+    /**
+     * Rooms inside ONE unit of this type — 1 for a normal room, 1+ for a
+     * villa ("2-room private-pool villa"). NOT the number of units the hotel
+     * has; that is `rooms` rows.
+     */
+    unitRoomCount: integer('unit_room_count').notNull().default(1),
+    /**
+     * A PRIVATE pool belonging to each unit. Same argument as
+     * `airConditioned` below: the shared hotel pool is a PROPERTY amenity,
+     * and making "private pool" a ROOM amenity would let the two contradict.
+     * A boolean on the type states exactly what every unit of the type has.
+     */
+    privatePool: boolean('private_pool').notNull().default(false),
     bedType: varchar('bed_type', { length: 16 }).notNull().default('DOUBLE').$type<BedType>(),
     bedCount: integer('bed_count').notNull().default(1),
     maxOccupancy: integer('max_occupancy').notNull().default(2),

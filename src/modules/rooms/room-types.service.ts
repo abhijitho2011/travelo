@@ -45,6 +45,9 @@ export class RoomTypesService {
       propertyId: t.propertyId,
       name: t.name,
       description: t.description,
+      unitKind: t.unitKind,
+      unitRoomCount: t.unitRoomCount,
+      privatePool: t.privatePool,
       bedType: t.bedType,
       bedCount: t.bedCount,
       maxOccupancy: t.maxOccupancy,
@@ -146,6 +149,10 @@ export class RoomTypesService {
             propertyId,
             name: dto.name,
             description: dto.description ?? null,
+            unitKind: dto.unitKind ?? 'ROOM',
+            // A plain room is always a 1-room unit, whatever the client sent.
+            unitRoomCount: (dto.unitKind ?? 'ROOM') === 'ROOM' ? 1 : (dto.unitRoomCount ?? 1),
+            privatePool: dto.privatePool ?? false,
             bedType: dto.bedType,
             bedCount: dto.bedCount,
             maxOccupancy: dto.maxOccupancy,
@@ -178,6 +185,9 @@ export class RoomTypesService {
     const patch: Partial<typeof roomTypes.$inferInsert> = { updatedAt: new Date() };
     if (dto.name !== undefined) patch.name = dto.name;
     if (dto.description !== undefined) patch.description = dto.description;
+    if (dto.unitKind !== undefined) patch.unitKind = dto.unitKind;
+    if (dto.unitRoomCount !== undefined) patch.unitRoomCount = dto.unitRoomCount;
+    if (dto.privatePool !== undefined) patch.privatePool = dto.privatePool;
     if (dto.bedType !== undefined) patch.bedType = dto.bedType;
     if (dto.bedCount !== undefined) patch.bedCount = dto.bedCount;
     if (dto.maxOccupancy !== undefined) patch.maxOccupancy = dto.maxOccupancy;
@@ -188,6 +198,17 @@ export class RoomTypesService {
     if (dto.currency !== undefined) patch.currency = dto.currency;
     if (dto.sizeSqft !== undefined) patch.sizeSqft = dto.sizeSqft;
     if (dto.status !== undefined) patch.status = dto.status;
+
+    // A ROOM-kind type is always a 1-room unit — converting a villa back to a
+    // plain room must not leave a stale multi-room count behind. Only touch the
+    // count when the caller touched either field, so the nothing-to-update
+    // guard below still works.
+    if (
+      (dto.unitKind !== undefined || dto.unitRoomCount !== undefined) &&
+      (dto.unitKind ?? before.unitKind) === 'ROOM'
+    ) {
+      patch.unitRoomCount = 1;
+    }
 
     const replacingAmenities = dto.amenityIds !== undefined;
     if (Object.keys(patch).length === 1 && !replacingAmenities) {

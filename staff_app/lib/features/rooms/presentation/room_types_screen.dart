@@ -259,6 +259,22 @@ class _RoomTypeCardState extends ConsumerState<RoomTypeCard> {
             spacing: 6,
             runSpacing: 6,
             children: [
+              // A villa unit reads first — it changes what a "room" of this
+              // type even is.
+              if (type.isVilla)
+                FeatureChip(
+                  icon: Icons.villa_outlined,
+                  label: type.unitRoomCount > 1
+                      ? 'Villa · ${type.unitRoomCount} rooms'
+                      : 'Villa',
+                  tone: c.stInspected,
+                ),
+              if (type.privatePool)
+                FeatureChip(
+                  icon: Icons.pool_outlined,
+                  label: 'Private pool',
+                  tone: c.stInspected,
+                ),
               FeatureChip(icon: Icons.king_bed_outlined, label: type.bedLabel),
               FeatureChip(
                 icon: Icons.people_outline,

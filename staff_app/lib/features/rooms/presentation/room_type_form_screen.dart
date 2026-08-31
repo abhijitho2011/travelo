@@ -94,6 +94,9 @@ class _RoomTypeFormState extends ConsumerState<RoomTypeForm> {
   late bool _airConditioned;
   late RoomTypeStatus _status;
   late Set<String> _amenityIds;
+  late UnitKind _unitKind;
+  late TextEditingController _unitRoomCount;
+  late bool _privatePool;
 
   bool _busy = false;
   String? _submitError;
@@ -116,6 +119,9 @@ class _RoomTypeFormState extends ConsumerState<RoomTypeForm> {
     _airConditioned = e?.airConditioned ?? false;
     _status = e?.status ?? RoomTypeStatus.active;
     _amenityIds = e?.amenityIds ?? <String>{};
+    _unitKind = e?.unitKind ?? UnitKind.room;
+    _unitRoomCount = TextEditingController(text: '${e?.unitRoomCount ?? 1}');
+    _privatePool = e?.privatePool ?? false;
   }
 
   @override
@@ -129,6 +135,7 @@ class _RoomTypeFormState extends ConsumerState<RoomTypeForm> {
       _maxChildren,
       _baseRate,
       _sizeSqft,
+      _unitRoomCount,
     ]) {
       controller.dispose();
     }
@@ -154,6 +161,17 @@ class _RoomTypeFormState extends ConsumerState<RoomTypeForm> {
 
     putText('name', _name.text.trim(), e.name);
     putText('description', _description.text.trim(), e.description);
+    if (_unitKind != e.unitKind) body['unitKind'] = _unitKind.wire;
+    // The room count only means anything on a villa; the server resets it to
+    // 1 for plain rooms, so only send it while VILLA is selected.
+    if (_unitKind == UnitKind.villa) {
+      putInt(
+        'unitRoomCount',
+        _numberIn(_unitRoomCount, e.unitRoomCount),
+        e.unitRoomCount,
+      );
+    }
+    if (_privatePool != e.privatePool) body['privatePool'] = _privatePool;
     if (_bedType != e.bedType) body['bedType'] = _bedType.wire;
     putInt('bedCount', _numberIn(_bedCount, e.bedCount), e.bedCount);
     putInt(
@@ -202,6 +220,11 @@ class _RoomTypeFormState extends ConsumerState<RoomTypeForm> {
               NewRoomType(
                 name: _name.text.trim(),
                 description: _description.text.trim(),
+                unitKind: _unitKind,
+                unitRoomCount: _unitKind == UnitKind.villa
+                    ? _numberIn(_unitRoomCount, 1)
+                    : 1,
+                privatePool: _privatePool,
                 bedType: _bedType,
                 bedCount: _numberIn(_bedCount, 1),
                 maxOccupancy: occupancy,
@@ -302,6 +325,68 @@ class _RoomTypeFormState extends ConsumerState<RoomTypeForm> {
                             'anything that sets it apart.',
                         alignLabelWithHint: true,
                       ),
+                    ),
+                  ],
+                ),
+              ),
+              gapMd,
+
+              SoftCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const LabelXs('Unit'),
+                    const SizedBox(height: Sp.md),
+                    SegmentedButton<UnitKind>(
+                      segments: const [
+                        ButtonSegment(
+                          value: UnitKind.room,
+                          label: Text('Room'),
+                          icon: Icon(Icons.meeting_room_outlined, size: 18),
+                        ),
+                        ButtonSegment(
+                          value: UnitKind.villa,
+                          label: Text('Villa'),
+                          icon: Icon(Icons.villa_outlined, size: 18),
+                        ),
+                      ],
+                      selected: {_unitKind},
+                      onSelectionChanged: (selection) =>
+                          setState(() => _unitKind = selection.first),
+                    ),
+                    if (_unitKind == UnitKind.villa) ...[
+                      gapMd,
+                      _CountField(
+                        controller: _unitRoomCount,
+                        label: 'Rooms in each villa',
+                        minimum: 1,
+                        icon: Icons.door_front_door_outlined,
+                      ),
+                      const FieldNote(
+                        text:
+                            'How many rooms one villa contains — a guest '
+                            'always books the whole villa. The number of '
+                            'villas the property has is set by adding rooms '
+                            'of this type.',
+                      ),
+                    ],
+                    const SizedBox(height: Sp.sm),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      value: _privatePool,
+                      onChanged: (value) => setState(() => _privatePool = value),
+                      secondary: Icon(
+                        Icons.pool_outlined,
+                        size: 20,
+                        color: _privatePool ? c.stInspected : c.mutedForeground,
+                      ),
+                      title: const Text('Private pool'),
+                    ),
+                    const FieldNote(
+                      text:
+                          'A pool belonging to each unit of this type. The '
+                          'hotel’s shared pool stays a property amenity and '
+                          'is not set here.',
                     ),
                   ],
                 ),
