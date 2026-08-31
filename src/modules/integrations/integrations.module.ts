@@ -10,9 +10,16 @@ import { RequirePermissions } from '../../common/decorators/permissions.decorato
 import { loadEnv } from '../../config/env';
 import { AuditModule } from '../audit/audit.module';
 import { ReservationsModule } from '../reservations/reservations.module';
+import { JwtModule } from '@nestjs/jwt';
+import { SharedAuthModule } from '../shared-auth/shared-auth.module';
 import { ChannexClient } from './channex.client';
 import { ChannexSyncService } from './channex-sync.service';
 import { ChannexController, ChannexWebhookController } from './channex.controller';
+import { StaffChannelsService } from './staff-channels.service';
+import {
+  StaffChannelsController,
+  StaffRoomTypeChannelsController,
+} from './staff-channels.controller';
 
 @Injectable()
 export class IntegrationsService {
@@ -101,9 +108,22 @@ export const CHANNEX_CLIENT_PROVIDER = {
 };
 
 @Module({
-  imports: [AuditModule, ReservationsModule],
-  providers: [IntegrationsService, ChannexSyncService, CHANNEX_CLIENT_PROVIDER],
-  controllers: [IntegrationsController, ChannexController, ChannexWebhookController],
-  exports: [IntegrationsService, ChannexSyncService],
+  // JwtModule + SharedAuthModule are what the STAFF guards on the channels
+  // controllers below resolve against, exactly as KeyCardsModule wires them.
+  imports: [AuditModule, ReservationsModule, JwtModule.register({}), SharedAuthModule],
+  providers: [
+    IntegrationsService,
+    ChannexSyncService,
+    StaffChannelsService,
+    CHANNEX_CLIENT_PROVIDER,
+  ],
+  controllers: [
+    IntegrationsController,
+    ChannexController,
+    ChannexWebhookController,
+    StaffChannelsController,
+    StaffRoomTypeChannelsController,
+  ],
+  exports: [IntegrationsService, ChannexSyncService, StaffChannelsService],
 })
 export class IntegrationsModule {}

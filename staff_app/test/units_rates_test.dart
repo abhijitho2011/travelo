@@ -22,9 +22,31 @@ RoomTypeFee _fee({
 
 void main() {
   group('RoomTypeDraft occupancy', () {
-    test('maximum occupancy is the guest counts added up, never a fourth field', () {
-      final draft = RoomTypeDraft(maxAdults: 3, maxChildren: 2, maxInfants: 1);
-      expect(draft.maxOccupancy, 6);
+    test(
+      'maximum occupancy is its own number, not the guest counts added up',
+      () {
+        // A room may allow 3 adults OR 2 adults and 2 children and still only
+        // sleep 5 — so the maximum is set, and the counts only cap it.
+        final draft = RoomTypeDraft(
+          maxOccupancy: 5,
+          maxAdults: 3,
+          maxChildren: 2,
+          maxInfants: 1,
+        );
+        expect(draft.maxOccupancy, 5);
+        expect(draft.occupancyCeiling, 6);
+      },
+    );
+
+    test('the ceiling is what the allowances add up to', () {
+      expect(
+        RoomTypeDraft(
+          maxAdults: 2,
+          maxChildren: 1,
+          maxInfants: 1,
+        ).occupancyCeiling,
+        4,
+      );
     });
 
     test('a whole-unit shape reports itself as one, a room does not', () {
@@ -33,7 +55,9 @@ void main() {
         isTrue,
       );
       expect(
-        RoomTypeDraft(accommodationType: AccommodationType.apartment).isWholeUnit,
+        RoomTypeDraft(
+          accommodationType: AccommodationType.apartment,
+        ).isWholeUnit,
         isTrue,
       );
       expect(
@@ -91,11 +115,14 @@ void main() {
       expect((payload['beds'] as List).length, 2);
     });
 
-    test('extra-bed detail is omitted entirely when no extra bed is offered', () {
-      final payload = RoomTypeDraft(extraBedAvailable: false).toPayload();
-      expect(payload.containsKey('extraBedPricePaise'), isFalse);
-      expect(payload['extraBedAvailable'], false);
-    });
+    test(
+      'extra-bed detail is omitted entirely when no extra bed is offered',
+      () {
+        final payload = RoomTypeDraft(extraBedAvailable: false).toPayload();
+        expect(payload.containsKey('extraBedPricePaise'), isFalse);
+        expect(payload['extraBedAvailable'], false);
+      },
+    );
 
     test('an edit round-trips through the draft without drifting', () {
       final type = RoomType(
@@ -135,27 +162,30 @@ void main() {
       expect(preview.guestTotalPaise, 506250);
     });
 
-    test('per-guest and per-night multiply, and the lines sum to the total', () {
-      final preview = PricePreview.compute(
-        basePaise: 100000,
-        fees: [
-          _fee(
-            name: 'City tax',
-            value: 5000,
-            calculation: FeeCalculation.fixed,
-            basis: FeeBasis.perGuest,
-          ),
-        ],
-        nights: 3,
-        guests: 2,
-      );
-      // ₹50 (5,000 paise) × 2 guests × 3 nights = ₹300.
-      expect(preview.lines.single.amountPaise, 30000);
-      expect(
-        preview.lines.fold<int>(0, (sum, l) => sum + l.amountPaise),
-        preview.taxTotalPaise,
-      );
-    });
+    test(
+      'per-guest and per-night multiply, and the lines sum to the total',
+      () {
+        final preview = PricePreview.compute(
+          basePaise: 100000,
+          fees: [
+            _fee(
+              name: 'City tax',
+              value: 5000,
+              calculation: FeeCalculation.fixed,
+              basis: FeeBasis.perGuest,
+            ),
+          ],
+          nights: 3,
+          guests: 2,
+        );
+        // ₹50 (5,000 paise) × 2 guests × 3 nights = ₹300.
+        expect(preview.lines.single.amountPaise, 30000);
+        expect(
+          preview.lines.fold<int>(0, (sum, l) => sum + l.amountPaise),
+          preview.taxTotalPaise,
+        );
+      },
+    );
 
     test('a per-stay fee is charged once however long the stay', () {
       final preview = PricePreview.compute(
@@ -173,18 +203,21 @@ void main() {
       expect(preview.taxTotalPaise, 25000);
     });
 
-    test('inclusive pricing charges the rate — the fees explain what is inside', () {
-      final fees = [_fee(name: 'GST', value: 1250)];
-      final exclusive = PricePreview.compute(basePaise: 450000, fees: fees);
-      final inclusive = PricePreview.compute(
-        basePaise: 450000,
-        fees: fees,
-        pricesIncludeTax: true,
-      );
+    test(
+      'inclusive pricing charges the rate — the fees explain what is inside',
+      () {
+        final fees = [_fee(name: 'GST', value: 1250)];
+        final exclusive = PricePreview.compute(basePaise: 450000, fees: fees);
+        final inclusive = PricePreview.compute(
+          basePaise: 450000,
+          fees: fees,
+          pricesIncludeTax: true,
+        );
 
-      expect(exclusive.guestTotalPaise, greaterThan(exclusive.basePaise));
-      expect(inclusive.guestTotalPaise, inclusive.basePaise);
-    });
+        expect(exclusive.guestTotalPaise, greaterThan(exclusive.basePaise));
+        expect(inclusive.guestTotalPaise, inclusive.basePaise);
+      },
+    );
 
     test('no fees means the guest pays exactly the rate', () {
       final preview = PricePreview.compute(basePaise: 450000, fees: const []);
@@ -234,8 +267,11 @@ void main() {
       expect(_fee(name: 'GST', value: 1250).valueLabel, '12.5%');
       expect(_fee(name: 'GST', value: 1800).valueLabel, '18%');
       expect(
-        _fee(name: 'Fee', value: 25000, calculation: FeeCalculation.fixed)
-            .valueLabel,
+        _fee(
+          name: 'Fee',
+          value: 25000,
+          calculation: FeeCalculation.fixed,
+        ).valueLabel,
         '₹250',
       );
     });

@@ -73,7 +73,9 @@ class _UnitsScreenState extends ConsumerState<UnitsScreen> {
     final sort = ref.watch(_sortProvider);
 
     final rows = all
-        .where((t) => accommodation == null || t.accommodationType == accommodation)
+        .where(
+          (t) => accommodation == null || t.accommodationType == accommodation,
+        )
         .toList();
 
     int startingRate(RoomType t) {
@@ -86,10 +88,12 @@ class _UnitsScreenState extends ConsumerState<UnitsScreen> {
     }
 
     rows.sort(switch (sort) {
-      UnitSort.nameAsc => (a, b) =>
-          a.name.toLowerCase().compareTo(b.name.toLowerCase()),
-      UnitSort.nameDesc => (a, b) =>
-          b.name.toLowerCase().compareTo(a.name.toLowerCase()),
+      UnitSort.nameAsc => (a, b) => a.name.toLowerCase().compareTo(
+        b.name.toLowerCase(),
+      ),
+      UnitSort.nameDesc => (a, b) => b.name.toLowerCase().compareTo(
+        a.name.toLowerCase(),
+      ),
       UnitSort.rateAsc => (a, b) => startingRate(a).compareTo(startingRate(b)),
       UnitSort.rateDesc => (a, b) => startingRate(b).compareTo(startingRate(a)),
       UnitSort.unitsDesc => (a, b) => b.units.compareTo(a.units),
@@ -103,7 +107,8 @@ class _UnitsScreenState extends ConsumerState<UnitsScreen> {
     final types = ref.watch(roomTypesProvider);
     // Plans drive the "from" price and the plan count. A failure here must not
     // blank the catalogue, so it degrades to an empty list.
-    final plans = ref.watch(allRatePlansProvider).valueOrNull ?? const <RatePlan>[];
+    final plans =
+        ref.watch(allRatePlansProvider).valueOrNull ?? const <RatePlan>[];
     final wide = MediaQuery.sizeOf(context).width >= _tableBreakpoint;
 
     return PageBody(
@@ -182,15 +187,16 @@ class _UnitsScreenState extends ConsumerState<UnitsScreen> {
                     tooltip: 'Clear search',
                     onPressed: () {
                       _search.clear();
-                      ref.read(roomTypeFilterProvider.notifier).state =
-                          filter.copyWith(query: '');
+                      ref.read(roomTypeFilterProvider.notifier).state = filter
+                          .copyWith(query: '');
                     },
                   ),
           ),
           onChanged: (_) => setState(() {}),
           onSubmitted: (value) =>
-              ref.read(roomTypeFilterProvider.notifier).state =
-                  filter.copyWith(query: value.trim()),
+              ref.read(roomTypeFilterProvider.notifier).state = filter.copyWith(
+                query: value.trim(),
+              ),
         ),
         gapSm,
         Wrap(
@@ -199,11 +205,17 @@ class _UnitsScreenState extends ConsumerState<UnitsScreen> {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             Segmented<RoomTypeStatus?>(
-              options: const [null, RoomTypeStatus.active, RoomTypeStatus.archived],
+              options: const [
+                null,
+                RoomTypeStatus.active,
+                RoomTypeStatus.archived,
+              ],
               labelOf: (status) => status?.label ?? 'All',
               value: filter.status,
               onChanged: (status) =>
-                  ref.read(roomTypeFilterProvider.notifier).state = status == null
+                  ref
+                      .read(roomTypeFilterProvider.notifier)
+                      .state = status == null
                   ? filter.copyWith(clearStatus: true)
                   : filter.copyWith(status: status),
             ),
@@ -222,8 +234,8 @@ class _UnitsScreenState extends ConsumerState<UnitsScreen> {
               hint: 'Sort',
               options: UnitSort.values,
               labelOf: (s) => s.label,
-              onChanged: (s) =>
-                  ref.read(_sortProvider.notifier).state = s ?? UnitSort.nameAsc,
+              onChanged: (s) => ref.read(_sortProvider.notifier).state =
+                  s ?? UnitSort.nameAsc,
             ),
           ],
         ),
@@ -262,7 +274,8 @@ class _UnitsScreenState extends ConsumerState<UnitsScreen> {
 
   Widget _emptyFilter(BuildContext context) => const EmptyState(
     title: 'Nothing matches those filters',
-    hint: 'Try a different search, or set the type and status filters back to All.',
+    hint:
+        'Try a different search, or set the type and status filters back to All.',
     icon: Icons.filter_alt_off_outlined,
   );
 }
@@ -348,7 +361,8 @@ class _UnitsTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    const width = _rowMinName +
+    const width =
+        _rowMinName +
         _colAccommodation +
         _colUnits +
         _colOccupancy +
@@ -372,8 +386,7 @@ class _UnitsTable extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _header(c),
-              for (final type in rows)
-                _UnitsTableRow(type: type, plans: plans),
+              for (final type in rows) _UnitsTableRow(type: type, plans: plans),
             ],
           ),
         ),
@@ -428,7 +441,9 @@ class _UnitsTableRow extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: Sp.lg, vertical: Sp.md),
         decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: c.border.withValues(alpha: 0.7))),
+          border: Border(
+            top: BorderSide(color: c.border.withValues(alpha: 0.7)),
+          ),
         ),
         child: Row(
           children: [
@@ -479,13 +494,20 @@ class _UnitsTableRow extends ConsumerWidget {
               '${type.units} total',
               sub: type.units == 0 ? 'no units yet' : null,
             ),
-            _cell(c, _colOccupancy, type.occupancyMix, sub: 'base ${type.baseOccupancy}'),
+            _cell(
+              c,
+              _colOccupancy,
+              type.occupancyMix,
+              sub: 'base ${type.baseOccupancy}',
+            ),
             _cell(c, _colRate, 'From ${rupees(from)}', sub: 'per night'),
             _cell(
               c,
               _colPlans,
               mine.isEmpty ? '—' : '${mine.length}',
-              sub: mine.isEmpty ? 'none yet' : (mine.length == 1 ? 'plan' : 'plans'),
+              sub: mine.isEmpty
+                  ? 'none yet'
+                  : (mine.length == 1 ? 'plan' : 'plans'),
             ),
             SizedBox(
               width: _colStatus,
@@ -493,7 +515,9 @@ class _UnitsTableRow extends ConsumerWidget {
                 alignment: Alignment.centerLeft,
                 child: StatusBadge(
                   label: type.status.label,
-                  tone: type.isArchived ? StatusTone.neutral : StatusTone.available,
+                  tone: type.isArchived
+                      ? StatusTone.neutral
+                      : StatusTone.available,
                 ),
               ),
             ),
@@ -507,27 +531,28 @@ class _UnitsTableRow extends ConsumerWidget {
     );
   }
 
-  Widget _cell(AppColors c, double width, String value, {String? sub}) => SizedBox(
-    width: width,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: AppTypography.body(size: 12.5, color: c.foreground),
+  Widget _cell(AppColors c, double width, String value, {String? sub}) =>
+      SizedBox(
+        width: width,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.body(size: 12.5, color: c.foreground),
+            ),
+            if (sub != null)
+              Text(
+                sub,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.body(size: 10.5, color: c.mutedForeground),
+              ),
+          ],
         ),
-        if (sub != null)
-          Text(
-            sub,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTypography.body(size: 10.5, color: c.mutedForeground),
-          ),
-      ],
-    ),
-  );
+      );
 }
 
 /// The primary photo, or a neutral placeholder when the type has none — never
@@ -549,7 +574,11 @@ class _Thumbnail extends StatelessWidget {
         borderRadius: R.rSm,
         border: Border.all(color: c.border),
       ),
-      child: Icon(Icons.bed_outlined, size: size * 0.45, color: c.mutedForeground),
+      child: Icon(
+        Icons.bed_outlined,
+        size: size * 0.45,
+        color: c.mutedForeground,
+      ),
     );
     if (url == null || url!.isEmpty) return placeholder;
     return ClipRRect(
@@ -615,9 +644,9 @@ class _RowActions extends ConsumerWidget {
             ? RoomTypeStatus.active
             : RoomTypeStatus.archived;
         try {
-          await ref
-              .read(roomTypeActionsProvider)
-              .update(type.id, {'status': next.wire});
+          await ref.read(roomTypeActionsProvider).update(type.id, {
+            'status': next.wire,
+          });
           messenger.showSnackBar(
             SnackBar(
               content: Text(
@@ -686,7 +715,9 @@ class _UnitCard extends ConsumerWidget {
               ),
               StatusBadge(
                 label: type.status.label,
-                tone: type.isArchived ? StatusTone.neutral : StatusTone.available,
+                tone: type.isArchived
+                    ? StatusTone.neutral
+                    : StatusTone.available,
               ),
               _RowActions(type: type),
             ],
@@ -726,10 +757,7 @@ class _UnitCard extends ConsumerWidget {
       children: [
         Icon(icon, size: 13, color: c.mutedForeground),
         const SizedBox(width: 5),
-        Text(
-          label,
-          style: AppTypography.body(size: 11.5, color: c.foreground),
-        ),
+        Text(label, style: AppTypography.body(size: 11.5, color: c.foreground)),
       ],
     ),
   );

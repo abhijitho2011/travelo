@@ -53,8 +53,8 @@ class UnitsRepository {
   Future<void> setPrimaryPhoto(String roomTypeId, String photoId) =>
       _api.post('/room-types/$roomTypeId/photos/$photoId/primary');
 
-  Future<void> reorderPhotos(String roomTypeId, List<String> orderedIds) =>
-      _api.patch('/room-types/$roomTypeId/photos/order', body: {'ids': orderedIds});
+  Future<void> reorderPhotos(String roomTypeId, List<String> orderedIds) => _api
+      .patch('/room-types/$roomTypeId/photos/order', body: {'ids': orderedIds});
 
   Future<void> deletePhoto(String roomTypeId, String photoId) =>
       _api.delete('/room-types/$roomTypeId/photos/$photoId');
@@ -74,7 +74,10 @@ class UnitsRepository {
     return RatePlan.fromJson(data as Map);
   }
 
-  Future<RatePlan> updateRatePlan(String id, Map<String, dynamic> changes) async {
+  Future<RatePlan> updateRatePlan(
+    String id,
+    Map<String, dynamic> changes,
+  ) async {
     final data = await _api.patch('/rate-plans/$id', body: changes);
     return RatePlan.fromJson(data as Map);
   }
@@ -104,12 +107,16 @@ class UnitsRepository {
     return RoomTypeFee.fromJson(data as Map);
   }
 
-  Future<RoomTypeFee> updateFee(String feeId, Map<String, dynamic> changes) async {
+  Future<RoomTypeFee> updateFee(
+    String feeId,
+    Map<String, dynamic> changes,
+  ) async {
     final data = await _api.patch('/room-types/fees/$feeId', body: changes);
     return RoomTypeFee.fromJson(data as Map);
   }
 
-  Future<void> deleteFee(String feeId) => _api.delete('/room-types/fees/$feeId');
+  Future<void> deleteFee(String feeId) =>
+      _api.delete('/room-types/fees/$feeId');
 
   // ----------------------------------------------------- dynamic pricing --
 
@@ -118,7 +125,10 @@ class UnitsRepository {
     return _listOf(data, PricingRule.fromJson);
   }
 
-  Future<PricingRule> createPricingRule(String roomTypeId, PricingRule rule) async {
+  Future<PricingRule> createPricingRule(
+    String roomTypeId,
+    PricingRule rule,
+  ) async {
     final data = await _api.post(
       '/room-types/$roomTypeId/pricing-rules',
       body: rule.toJson(),
@@ -139,6 +149,42 @@ class UnitsRepository {
 
   Future<void> deletePricingRule(String ruleId) =>
       _api.delete('/room-types/pricing-rules/$ruleId');
+
+  // ------------------------------------------------------ sales channels --
+
+  /// Every channel-manager connection the property has, whether or not this
+  /// room type is mapped to it — the section shows both states.
+  Future<List<ChannelMapping>> channelMappings(String roomTypeId) async {
+    final data = await _api.get('/room-types/$roomTypeId/channels');
+    return _listOf(data, ChannelMapping.fromJson);
+  }
+
+  Future<ChannelMapping> mapChannel(
+    String roomTypeId,
+    String connectionId, {
+    required String channelRoomTypeId,
+    String? channelRatePlanId,
+  }) async {
+    final data = await _api.put(
+      '/room-types/$roomTypeId/channels/$connectionId',
+      body: {
+        'channelRoomTypeId': channelRoomTypeId,
+        if (channelRatePlanId != null && channelRatePlanId.isNotEmpty)
+          'channelRatePlanId': channelRatePlanId,
+      },
+    );
+    return ChannelMapping.fromJson(data as Map);
+  }
+
+  Future<ChannelMapping> unmapChannel(
+    String roomTypeId,
+    String connectionId,
+  ) async {
+    final data = await _api.delete(
+      '/room-types/$roomTypeId/channels/$connectionId',
+    );
+    return ChannelMapping.fromJson(data as Map);
+  }
 }
 
 final unitsRepositoryProvider = Provider<UnitsRepository>(

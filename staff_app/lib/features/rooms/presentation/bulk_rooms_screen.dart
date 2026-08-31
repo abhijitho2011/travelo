@@ -245,7 +245,10 @@ class _BulkRoomsScreenState extends ConsumerState<BulkRoomsScreen> {
                 ),
               ),
               gapMd,
-              if (_mode == BulkRoomMode.range) ..._rangeFields() else _listField(),
+              if (_mode == BulkRoomMode.range)
+                ..._rangeFields()
+              else
+                _listField(),
             ],
           ),
         ),

@@ -274,9 +274,7 @@ class _RoomFormState extends ConsumerState<RoomForm> {
                     DropdownButtonFormField<RoomStatus>(
                       initialValue: _status,
                       isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Status',
-                      ),
+                      decoration: const InputDecoration(labelText: 'Status'),
                       items: [
                         for (final status in RoomStatus.values)
                           DropdownMenuItem(

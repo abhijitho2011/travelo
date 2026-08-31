@@ -38,14 +38,23 @@ final pricingRulesProvider = FutureProvider.autoDispose
           ref.watch(unitsRepositoryProvider).pricingRules(roomTypeId),
     );
 
+/// The sales channels this room type can be mapped to. autoDispose because a
+/// connection's health is only interesting while the workspace is open.
+final channelMappingsProvider = FutureProvider.autoDispose
+    .family<List<ChannelMapping>, String>(
+      (ref, roomTypeId) =>
+          ref.watch(unitsRepositoryProvider).channelMappings(roomTypeId),
+    );
+
 /// The physical units belonging to one room type, straight from the rooms
 /// board's own endpoint — the workspace never keeps a second copy of the
 /// inventory, so its table and the board cannot drift apart.
-final unitsOfTypeProvider = FutureProvider.autoDispose.family<List<Room>, String>(
-  (ref, roomTypeId) => ref
-      .watch(roomsRepositoryProvider)
-      .rooms(RoomFilter(roomTypeId: roomTypeId, limit: 200)),
-);
+final unitsOfTypeProvider = FutureProvider.autoDispose
+    .family<List<Room>, String>(
+      (ref, roomTypeId) => ref
+          .watch(roomsRepositoryProvider)
+          .rooms(RoomFilter(roomTypeId: roomTypeId, limit: 200)),
+    );
 
 /// The inventory summary card. Derived from the same rooms the table shows —
 /// counted here rather than fetched, because a second source could disagree
@@ -195,6 +204,28 @@ class UnitsActions {
   Future<void> deletePricingRule(String roomTypeId, String ruleId) async {
     await _repo.deletePricingRule(ruleId);
     _ref.invalidate(pricingRulesProvider(roomTypeId));
+  }
+
+  // -- sales channels --
+
+  Future<void> mapChannel(
+    String roomTypeId,
+    String connectionId, {
+    required String channelRoomTypeId,
+    String? channelRatePlanId,
+  }) async {
+    await _repo.mapChannel(
+      roomTypeId,
+      connectionId,
+      channelRoomTypeId: channelRoomTypeId,
+      channelRatePlanId: channelRatePlanId,
+    );
+    _ref.invalidate(channelMappingsProvider(roomTypeId));
+  }
+
+  Future<void> unmapChannel(String roomTypeId, String connectionId) async {
+    await _repo.unmapChannel(roomTypeId, connectionId);
+    _ref.invalidate(channelMappingsProvider(roomTypeId));
   }
 }
 

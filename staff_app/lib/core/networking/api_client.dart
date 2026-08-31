@@ -44,6 +44,11 @@ class ApiClient {
   Future<dynamic> post(String path, {Object? body}) =>
       _send('POST', path, body: body);
 
+  /// Used where the server models the write as "set this to exactly that" —
+  /// the channel mapping for one room type — rather than a partial edit.
+  Future<dynamic> put(String path, {Object? body}) =>
+      _send('PUT', path, body: body);
+
   Future<dynamic> patch(String path, {Object? body}) =>
       _send('PATCH', path, body: body);
 

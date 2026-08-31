@@ -38,6 +38,40 @@ export function readChannexConfig(config: unknown): ChannexConnectionConfig {
   };
 }
 
+/**
+ * Merges ONE room type's channel mapping into an existing raw config value and
+ * returns the whole jsonb to store back.
+ *
+ * Read-modify-write, and deliberately over the RAW object rather than over the
+ * parsed one: a connection row may carry keys this file knows nothing about
+ * (another provider's, a newer build's), and replacing the column with only the
+ * Channex-shaped subset would silently drop them. `undefined` for either id
+ * removes that room type's key instead of writing an empty string.
+ */
+export function writeChannexRoomTypeMapping(
+  config: unknown,
+  taveloRoomTypeId: string,
+  mapping: { channelRoomTypeId?: string; channelRatePlanId?: string },
+): Record<string, unknown> {
+  const raw = {
+    ...((config && typeof config === 'object' ? config : {}) as Record<string, unknown>),
+  };
+  const current = readChannexConfig(config);
+
+  const roomTypeMap = { ...current.roomTypeMap };
+  const ratePlanMap = { ...current.ratePlanMap };
+
+  if (mapping.channelRoomTypeId) roomTypeMap[taveloRoomTypeId] = mapping.channelRoomTypeId;
+  else delete roomTypeMap[taveloRoomTypeId];
+
+  if (mapping.channelRatePlanId) ratePlanMap[taveloRoomTypeId] = mapping.channelRatePlanId;
+  else delete ratePlanMap[taveloRoomTypeId];
+
+  raw.roomTypeMap = roomTypeMap;
+  raw.ratePlanMap = ratePlanMap;
+  return raw;
+}
+
 /** Channex room type id -> Tavelo room type id. Built by inverting the map. */
 export function invertRoomTypeMap(cfg: ChannexConnectionConfig): Record<string, string> {
   const out: Record<string, string> = {};

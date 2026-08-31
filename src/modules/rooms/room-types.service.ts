@@ -81,6 +81,14 @@ export function assertOccupancy(v: OccupancyShape): void {
       `Maximum occupancy (${v.maxOccupancy}) cannot be below the maximum adults (${v.maxAdults})`,
     );
   }
+  // ...and it cannot sleep more people than the guest allowances add up to,
+  // or availability would sell a headcount no bed exists for.
+  const ceiling = v.maxAdults + v.maxChildren + v.maxInfants;
+  if (v.maxOccupancy > ceiling) {
+    throw RoomErrors.occupancyInvalid(
+      `Maximum occupancy (${v.maxOccupancy}) exceeds the adults, children and infants allowed (${ceiling})`,
+    );
+  }
   for (const [label, n] of [
     ['Base rate', v.baseRate],
     ['Extra bed price', v.extraBedPricePaise ?? 0],

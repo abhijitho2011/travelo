@@ -166,7 +166,11 @@ class _RowMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) => PopupMenuButton<String>(
     tooltip: 'Actions',
-    icon: Icon(Icons.more_vert, size: 18, color: context.colors.mutedForeground),
+    icon: Icon(
+      Icons.more_vert,
+      size: 18,
+      color: context.colors.mutedForeground,
+    ),
     itemBuilder: (_) => items,
     onSelected: onSelected,
   );
@@ -307,7 +311,10 @@ class _SheetScaffold extends StatelessWidget {
                     Expanded(
                       child: Text(
                         error!,
-                        style: AppTypography.body(size: 12.5, color: c.critical),
+                        style: AppTypography.body(
+                          size: 12.5,
+                          color: c.critical,
+                        ),
                       ),
                     ),
                   ],
@@ -485,7 +492,10 @@ class _SheetSwitch extends StatelessWidget {
                 ),
                 Text(
                   hint,
-                  style: AppTypography.body(size: 11.5, color: c.mutedForeground),
+                  style: AppTypography.body(
+                    size: 11.5,
+                    color: c.mutedForeground,
+                  ),
                 ),
               ],
             ),
@@ -644,29 +654,35 @@ class RatePlansSection extends ConsumerWidget {
         await ref
             .read(unitsActionsProvider)
             .deleteRatePlan(roomTypeId, plan.id);
-        messenger.showSnackBar(
-          SnackBar(content: Text('${plan.name} deleted')),
-        );
+        messenger.showSnackBar(SnackBar(content: Text('${plan.name} deleted')));
       } catch (error) {
         messenger.showSnackBar(SnackBar(content: Text(_friendlyError(error))));
       }
       return;
     }
 
-    final next = plan.isActive ? RatePlanStatus.inactive : RatePlanStatus.active;
+    final next = plan.isActive
+        ? RatePlanStatus.inactive
+        : RatePlanStatus.active;
     try {
       await ref
           .read(unitsActionsProvider)
           .setRatePlanStatus(roomTypeId, plan.id, next);
       messenger.showSnackBar(
-        SnackBar(content: Text('${plan.name} is now ${next.label.toLowerCase()}')),
+        SnackBar(
+          content: Text('${plan.name} is now ${next.label.toLowerCase()}'),
+        ),
       );
     } catch (error) {
       messenger.showSnackBar(SnackBar(content: Text(_friendlyError(error))));
     }
   }
 
-  Future<void> _edit(BuildContext context, WidgetRef ref, RatePlan? plan) async {
+  Future<void> _edit(
+    BuildContext context,
+    WidgetRef ref,
+    RatePlan? plan,
+  ) async {
     final messenger = ScaffoldMessenger.of(context);
     final saved = await _openSheet<String>(
       context,
@@ -888,7 +904,9 @@ class _RatePlanSheetState extends ConsumerState<_RatePlanSheet> {
 
     final basePaise = _price.text.trim().isEmpty ? 0 : _hundredths(_price.text);
     if (basePaise == null) {
-      setState(() => _error = 'Enter the base price as a plain amount, e.g. 2500.');
+      setState(
+        () => _error = 'Enter the base price as a plain amount, e.g. 2500.',
+      );
       return;
     }
 
@@ -966,9 +984,7 @@ class _RatePlanSheetState extends ConsumerState<_RatePlanSheet> {
         );
       }
       if (!mounted) return;
-      navigator.pop(
-        existing == null ? '$name added' : '$name saved',
-      );
+      navigator.pop(existing == null ? '$name added' : '$name saved');
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -1015,7 +1031,8 @@ class TaxesFeesSection extends ConsumerWidget {
             child: Segmented<bool>(
               options: const [false, true],
               value: pricesIncludeTax,
-              labelOf: (v) => v ? 'Prices include taxes' : 'Prices exclude taxes',
+              labelOf: (v) =>
+                  v ? 'Prices include taxes' : 'Prices exclude taxes',
               onChanged: onPricesIncludeTaxChanged,
             ),
           ),
@@ -1290,8 +1307,9 @@ class _CollapsibleState extends State<_Collapsible> {
         duration: const Duration(milliseconds: 180),
         firstChild: const SizedBox(width: double.infinity),
         secondChild: Builder(builder: widget.builder),
-        crossFadeState:
-            _open ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+        crossFadeState: _open
+            ? CrossFadeState.showSecond
+            : CrossFadeState.showFirst,
         sizeCurve: Curves.easeOut,
       ),
     );
@@ -1581,9 +1599,11 @@ class DynamicPricingSection extends ConsumerWidget {
   ) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await ref
-          .read(unitsActionsProvider)
-          .updatePricingRule(roomTypeId, rule.id, {'enabled': value});
+      await ref.read(unitsActionsProvider).updatePricingRule(
+        roomTypeId,
+        rule.id,
+        {'enabled': value},
+      );
       messenger.showSnackBar(
         SnackBar(content: Text(value ? 'Rule enabled' : 'Rule disabled')),
       );
@@ -1611,7 +1631,9 @@ class DynamicPricingSection extends ConsumerWidget {
     );
     if (!ok) return;
     try {
-      await ref.read(unitsActionsProvider).deletePricingRule(roomTypeId, rule.id);
+      await ref
+          .read(unitsActionsProvider)
+          .deletePricingRule(roomTypeId, rule.id);
       messenger.showSnackBar(const SnackBar(content: Text('Rule deleted')));
     } catch (error) {
       messenger.showSnackBar(SnackBar(content: Text(_friendlyError(error))));
@@ -1702,8 +1724,16 @@ class _PricingRuleSheetState extends ConsumerState<_PricingRuleSheet> {
         ),
         if (_trigger.usesDates)
           _SheetPair(
-            left: _dateField('Start date', _start, (d) => setState(() => _start = d)),
-            right: _dateField('End date', _end, (d) => setState(() => _end = d)),
+            left: _dateField(
+              'Start date',
+              _start,
+              (d) => setState(() => _start = d),
+            ),
+            right: _dateField(
+              'End date',
+              _end,
+              (d) => setState(() => _end = d),
+            ),
           )
         else ...[
           _SheetDropdown<Comparator>(
@@ -1759,7 +1789,11 @@ class _PricingRuleSheetState extends ConsumerState<_PricingRuleSheet> {
     );
   }
 
-  Widget _dateField(String label, DateTime? value, ValueChanged<DateTime> onPick) {
+  Widget _dateField(
+    String label,
+    DateTime? value,
+    ValueChanged<DateTime> onPick,
+  ) {
     final c = context.colors;
     return Padding(
       padding: const EdgeInsets.only(bottom: Sp.md),
@@ -1800,7 +1834,9 @@ class _PricingRuleSheetState extends ConsumerState<_PricingRuleSheet> {
         return;
       }
       if (_end!.isBefore(_start!)) {
-        setState(() => _error = 'The end date must be on or after the start date.');
+        setState(
+          () => _error = 'The end date must be on or after the start date.',
+        );
         return;
       }
     } else {
@@ -1872,100 +1908,263 @@ class _PricingRuleSheetState extends ConsumerState<_PricingRuleSheet> {
 
 /// §16 — where this room type is sold.
 ///
-/// Deliberately inert. Channel connections are held by the platform, and the
-/// staff API exposes no endpoint for reading or mapping them, so the section
-/// states honestly that nothing is connected rather than showing a control that
-/// would do nothing or a status it cannot know.
+/// Connecting a channel manager is the platform administrator's job; what the
+/// hotel owns is the last mile — telling the channel WHICH of its room types
+/// this one is. So the section lists the property's real connections with their
+/// real health, and the only control it offers is that mapping.
 class SalesChannelsSection extends ConsumerWidget {
   const SalesChannelsSection({super.key, required this.roomTypeId});
 
   final String roomTypeId;
 
-  static const _channels = <(String, IconData)>[
-    ('Booking.com', Icons.hotel_outlined),
-    ('Expedia', Icons.flight_takeoff_outlined),
-    ('Airbnb', Icons.house_outlined),
-  ];
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final c = context.colors;
+    final channels = ref.watch(channelMappingsProvider(roomTypeId));
 
     return _SectionCard(
       title: 'Sales channels',
       subtitle: 'Where this room type can be booked.',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _channelRow(
-            context,
-            'Direct booking',
-            Icons.storefront_outlined,
-            const StatusBadge(
-              label: 'Connected',
-              tone: StatusTone.available,
-              dense: true,
-            ),
-            first: true,
-          ),
-          for (final (name, icon) in _channels)
-            _channelRow(
-              context,
-              name,
-              icon,
-              const StatusBadge(
-                label: 'Not connected',
-                tone: StatusTone.neutral,
-                dense: true,
-              ),
-            ),
-          const SizedBox(height: Sp.md),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      child: channels.when(
+        loading: () => const _SectionLoading(),
+        error: (error, _) => ErrorState(
+          error: error,
+          onRetry: () => ref.invalidate(channelMappingsProvider(roomTypeId)),
+        ),
+        data: (rows) {
+          if (rows.isEmpty) {
+            return const EmptyState(
+              title: 'No sales channels connected',
+              hint:
+                  'A platform administrator connects a channel manager, then '
+                  'you map this room type to it here.',
+              icon: Icons.hub_outlined,
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(Icons.info_outline, size: 14, color: c.mutedForeground),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Channel connections are configured by your platform '
-                  'administrator. Once a channel is connected, map this room '
-                  'type and its rate plans here.',
-                  style: AppTypography.body(
-                    size: 11.5,
-                    color: c.mutedForeground,
-                  ),
+              for (final (index, channel) in rows.indexed)
+                _ListRow(
+                  first: index == 0,
+                  child: _channelRow(context, ref, channel),
                 ),
-              ),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 
   Widget _channelRow(
     BuildContext context,
-    String name,
-    IconData icon,
-    Widget badge, {
-    bool first = false,
-  }) {
+    WidgetRef ref,
+    ChannelMapping channel,
+  ) {
     final c = context.colors;
-    return _ListRow(
-      first: first,
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: c.mutedForeground),
-          const SizedBox(width: Sp.sm),
-          Expanded(
-            child: Text(
-              name,
-              style: AppTypography.body(size: 13, color: c.foreground),
-            ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Icon(Icons.hub_outlined, size: 16, color: c.mutedForeground),
+        ),
+        const SizedBox(width: Sp.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: Sp.sm,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    channel.providerLabel,
+                    style: AppTypography.body(
+                      size: 13.5,
+                      weight: FontWeight.w600,
+                      color: c.foreground,
+                    ),
+                  ),
+                  StatusBadge(
+                    label: channel.statusLabel,
+                    tone: channel.statusTone,
+                    dense: true,
+                  ),
+                  StatusBadge(
+                    label: channel.mapped ? 'Mapped' : 'Not mapped',
+                    tone: channel.mapped ? StatusTone.info : StatusTone.neutral,
+                    dense: true,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                channel.mapped
+                    ? 'Room type ${channel.channelRoomTypeId}'
+                          '${channel.channelRatePlanId == null ? '' : ' · rate plan ${channel.channelRatePlanId}'}'
+                    : 'This room type is not sold on this channel yet.',
+                style: AppTypography.body(size: 11.5, color: c.mutedForeground),
+              ),
+            ],
           ),
-          badge,
-        ],
-      ),
+        ),
+        PermissionGate(
+          permission: P.roomTypeUpdate,
+          child: channel.mapped
+              ? _RowMenu(
+                  items: const [
+                    PopupMenuItem(value: 'edit', child: Text('Edit mapping')),
+                    PopupMenuItem(
+                      value: 'remove',
+                      child: Text('Remove mapping'),
+                    ),
+                  ],
+                  onSelected: (action) => _run(context, ref, channel, action),
+                )
+              : TextButton(
+                  onPressed: () => _map(context, ref, channel),
+                  child: const Text('Map'),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _run(
+    BuildContext context,
+    WidgetRef ref,
+    ChannelMapping channel,
+    String action,
+  ) async {
+    if (action == 'edit') {
+      await _map(context, ref, channel);
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await _confirm(
+      context,
+      title: 'Remove ${channel.providerLabel} mapping?',
+      body:
+          'This room type will stop being synced to ${channel.providerLabel}. '
+          'Nothing already booked is affected.',
+      confirmLabel: 'Remove',
+    );
+    if (!ok) return;
+    try {
+      await ref
+          .read(unitsActionsProvider)
+          .unmapChannel(roomTypeId, channel.connectionId);
+      messenger.showSnackBar(
+        SnackBar(content: Text('${channel.providerLabel} mapping removed')),
+      );
+    } catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+    }
+  }
+
+  Future<void> _map(
+    BuildContext context,
+    WidgetRef ref,
+    ChannelMapping channel,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final saved = await _openSheet<String>(
+      context,
+      (_) => _ChannelMappingSheet(roomTypeId: roomTypeId, channel: channel),
+    );
+    if (saved == null) return;
+    messenger.showSnackBar(SnackBar(content: Text(saved)));
+  }
+}
+
+/// The mapping editor. Both ids are the CHANNEL's, copied out of the channel
+/// manager — so the sheet says so rather than leaving a receptionist guessing
+/// which system the value belongs to.
+class _ChannelMappingSheet extends ConsumerStatefulWidget {
+  const _ChannelMappingSheet({required this.roomTypeId, required this.channel});
+
+  final String roomTypeId;
+  final ChannelMapping channel;
+
+  @override
+  ConsumerState<_ChannelMappingSheet> createState() =>
+      _ChannelMappingSheetState();
+}
+
+class _ChannelMappingSheetState extends ConsumerState<_ChannelMappingSheet> {
+  late final TextEditingController _roomTypeId = TextEditingController(
+    text: widget.channel.channelRoomTypeId ?? '',
+  );
+  late final TextEditingController _ratePlanId = TextEditingController(
+    text: widget.channel.channelRatePlanId ?? '',
+  );
+
+  String? _error;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _roomTypeId.dispose();
+    _ratePlanId.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final channelRoomTypeId = _roomTypeId.text.trim();
+    if (channelRoomTypeId.isEmpty) {
+      setState(() => _error = 'Enter the room type id from the channel.');
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(unitsActionsProvider)
+          .mapChannel(
+            widget.roomTypeId,
+            widget.channel.connectionId,
+            channelRoomTypeId: channelRoomTypeId,
+            channelRatePlanId: _ratePlanId.text.trim(),
+          );
+      if (!mounted) return;
+      Navigator.of(context).pop('Mapped to ${widget.channel.providerLabel}');
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = _friendlyError(error);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SheetScaffold(
+      title: '${widget.channel.providerLabel} mapping',
+      error: _error,
+      saving: _saving,
+      onSave: _save,
+      saveLabel: 'Save mapping',
+      fields: [
+        _SheetField(
+          label: 'Channel room type id',
+          controller: _roomTypeId,
+          autofocus: true,
+          helper:
+              'The id this room type has in ${widget.channel.providerLabel}. '
+              'Copy it from the channel manager.',
+        ),
+        _SheetField(
+          label: 'Channel rate plan id (optional)',
+          controller: _ratePlanId,
+          helper: 'Leave blank to sync availability only, without prices.',
+        ),
+      ],
     );
   }
 }

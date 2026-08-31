@@ -1,3 +1,4 @@
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -34,38 +35,79 @@ class RoomTypePhotosSection extends ConsumerStatefulWidget {
 
 class _RoomTypePhotosSectionState extends ConsumerState<RoomTypePhotosSection> {
   bool _busy = false;
+  bool _dragging = false;
   PhotoCategory _category = PhotoCategory.room;
 
   Future<void> _pick() async {
-    final id = widget.roomTypeId;
-    if (id == null || _busy) return;
+    if (_busy) return;
     final messenger = ScaffoldMessenger.of(context);
-
     final List<XFile> picked;
     try {
       picked = await ImagePicker().pickMultiImage();
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Could not open photos: $e')));
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not open photos: $e')),
+      );
       return;
     }
-    if (picked.isEmpty || !mounted) return;
+    await _upload(picked);
+  }
+
+  /// Files dropped onto the area. Filtered to images here rather than sent and
+  /// refused: dropping a folder of mixed files is normal, and a rejection per
+  /// stray file would bury the ones that did upload.
+  Future<void> _onDrop(DropDoneDetails details) async {
+    if (_busy) return;
+    const extensions = {'.jpg', '.jpeg', '.png', '.webp'};
+    final images = details.files.where((f) {
+      final name = f.name.toLowerCase();
+      return extensions.any(name.endsWith);
+    }).toList();
+
+    if (images.isEmpty) {
+      if (details.files.isNotEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Drop JPEG, PNG or WebP images — nothing else uploads.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+    final skipped = details.files.length - images.length;
+    await _upload(images, skipped: skipped);
+  }
+
+  /// The one upload path both the picker and the drop target run through, so a
+  /// dropped file and a browsed file are treated identically.
+  Future<void> _upload(List<XFile> files, {int skipped = 0}) async {
+    final id = widget.roomTypeId;
+    if (id == null || files.isEmpty || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
 
     setState(() => _busy = true);
     var uploaded = 0;
     try {
-      for (final file in picked) {
+      for (final file in files) {
         final bytes = await file.readAsBytes();
-        await ref.read(unitsActionsProvider).uploadPhoto(
-          id,
-          bytes: bytes,
-          filename: file.name,
-          category: _category,
-        );
+        await ref
+            .read(unitsActionsProvider)
+            .uploadPhoto(
+              id,
+              bytes: bytes,
+              filename: file.name,
+              category: _category,
+            );
         uploaded += 1;
       }
       messenger.showSnackBar(
         SnackBar(
-          content: Text('$uploaded ${uploaded == 1 ? 'photo' : 'photos'} added'),
+          content: Text(
+            '$uploaded ${uploaded == 1 ? 'photo' : 'photos'} added'
+            '${skipped > 0 ? ' · $skipped non-image ${skipped == 1 ? 'file' : 'files'} skipped' : ''}',
+          ),
         ),
       );
     } on ApiException catch (e) {
@@ -88,7 +130,8 @@ class _RoomTypePhotosSectionState extends ConsumerState<RoomTypePhotosSection> {
   static String _friendly(ApiException e) => switch (e.code) {
     'UNSUPPORTED_MEDIA_TYPE' => 'That file is not a JPEG, PNG or WebP image.',
     'FILE_TOO_LARGE' => 'That image is too large — 5 MB is the limit.',
-    'PHOTO_LIMIT_REACHED' => 'This room type already has the maximum 20 photos.',
+    'PHOTO_LIMIT_REACHED' =>
+      'This room type already has the maximum 20 photos.',
     _ => e.message,
   };
 
@@ -101,7 +144,10 @@ class _RoomTypePhotosSectionState extends ConsumerState<RoomTypePhotosSection> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Photos', style: AppTypography.display(size: 15, color: c.foreground)),
+          Text(
+            'Photos',
+            style: AppTypography.display(size: 15, color: c.foreground),
+          ),
           const SizedBox(height: 2),
           Text(
             'The first photo becomes the primary image used across Tavelo.',
@@ -163,45 +209,74 @@ class _RoomTypePhotosSectionState extends ConsumerState<RoomTypePhotosSection> {
       const SizedBox(height: Sp.md),
       PermissionGate(
         permission: P.roomTypeUpdate,
-        child: InkWell(
-          onTap: _busy ? null : _pick,
-          borderRadius: R.rMd,
-          child: Container(
-            height: 132,
-            decoration: BoxDecoration(
-              color: c.surface,
-              borderRadius: R.rMd,
-              border: Border.all(color: c.border),
-            ),
-            child: Center(
-              child: _busy
-                  ? const CircularProgressIndicator(strokeWidth: 2)
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.add_photo_alternate_outlined,
-                          size: 28,
-                          color: c.mutedForeground,
-                        ),
-                        const SizedBox(height: Sp.sm),
-                        Text(
-                          'Browse files',
-                          style: AppTypography.body(
-                            size: 13,
-                            weight: FontWeight.w600,
-                            color: c.primary,
+        // The drop target wraps the whole area, so a file can be released
+        // anywhere on it; the same area is still tappable to browse, because a
+        // phone has nothing to drag from.
+        child: DropTarget(
+          onDragEntered: (_) => setState(() => _dragging = true),
+          onDragExited: (_) => setState(() => _dragging = false),
+          onDragDone: (details) async {
+            setState(() => _dragging = false);
+            await _onDrop(details);
+          },
+          child: InkWell(
+            onTap: _busy ? null : _pick,
+            borderRadius: R.rMd,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
+              height: 132,
+              decoration: BoxDecoration(
+                color: _dragging ? c.accent : c.surface,
+                borderRadius: R.rMd,
+                border: Border.all(
+                  color: _dragging ? c.primary : c.border,
+                  width: _dragging ? 1.5 : 1,
+                ),
+              ),
+              child: Center(
+                child: _busy
+                    ? const CircularProgressIndicator(strokeWidth: 2)
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _dragging
+                                ? Icons.file_download_outlined
+                                : Icons.add_photo_alternate_outlined,
+                            size: 28,
+                            color: _dragging ? c.primary : c.mutedForeground,
                           ),
-                        ),
-                        Text(
-                          'JPEG, PNG or WebP · up to 5 MB each · select several',
-                          style: AppTypography.body(
-                            size: 11,
-                            color: c.mutedForeground,
+                          const SizedBox(height: Sp.sm),
+                          Text(
+                            _dragging
+                                ? 'Drop to upload'
+                                : 'Drag & drop photos here',
+                            style: AppTypography.body(
+                              size: 13,
+                              weight: FontWeight.w600,
+                              color: _dragging ? c.primary : c.foreground,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                          if (!_dragging) ...[
+                            Text(
+                              'or browse files',
+                              style: AppTypography.body(
+                                size: 12,
+                                weight: FontWeight.w600,
+                                color: c.primary,
+                              ),
+                            ),
+                            Text(
+                              'JPEG, PNG or WebP · up to 5 MB each',
+                              style: AppTypography.body(
+                                size: 11,
+                                color: c.mutedForeground,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+              ),
             ),
           ),
         ),
@@ -321,10 +396,17 @@ class _PhotoTile extends ConsumerWidget {
                 top: 0,
                 child: PopupMenuButton<String>(
                   tooltip: 'Photo actions',
-                  icon: const Icon(Icons.more_vert, size: 17, color: Colors.white),
+                  icon: const Icon(
+                    Icons.more_vert,
+                    size: 17,
+                    color: Colors.white,
+                  ),
                   onSelected: (a) => _run(context, ref, a),
                   itemBuilder: (_) => [
-                    const PopupMenuItem(value: 'preview', child: Text('Preview')),
+                    const PopupMenuItem(
+                      value: 'preview',
+                      child: Text('Preview'),
+                    ),
                     if (!photo.isPrimary)
                       const PopupMenuItem(
                         value: 'primary',
@@ -402,7 +484,9 @@ class _PhotoTile extends ConsumerWidget {
           );
           if (ok != true) return;
           await actions.deletePhoto(roomTypeId, photo.id);
-          messenger.showSnackBar(const SnackBar(content: Text('Photo deleted')));
+          messenger.showSnackBar(
+            const SnackBar(content: Text('Photo deleted')),
+          );
       }
     } on ApiException catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(e.message)));
@@ -440,7 +524,10 @@ class AmenitiesSection extends StatelessWidget {
                   children: [
                     Text(
                       'Amenities & facilities',
-                      style: AppTypography.display(size: 15, color: c.foreground),
+                      style: AppTypography.display(
+                        size: 15,
+                        color: c.foreground,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(

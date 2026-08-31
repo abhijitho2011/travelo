@@ -322,17 +322,29 @@ class RatePlan {
     cancellationPolicy: CancellationPolicy.fromWire(
       _pick(json, ['cancellationPolicy', 'cancellation_policy']),
     ),
-    cancellationNote: _str(_pick(json, ['cancellationNote', 'cancellation_note'])),
+    cancellationNote: _str(
+      _pick(json, ['cancellationNote', 'cancellation_note']),
+    ),
     paymentPolicy: PaymentPolicy.fromWire(
       _pick(json, ['paymentPolicy', 'payment_policy']),
     ),
     minStay: _intOrNull(_pick(json, ['minStay', 'min_stay'])),
     maxStay: _intOrNull(_pick(json, ['maxStay', 'max_stay'])),
-    minAdvanceDays: _intOrNull(_pick(json, ['minAdvanceDays', 'min_advance_days'])),
-    maxAdvanceDays: _intOrNull(_pick(json, ['maxAdvanceDays', 'max_advance_days'])),
-    extraAdultPaise: _int(_pick(json, ['extraAdultPaise', 'extra_adult_paise'])),
-    extraChildPaise: _int(_pick(json, ['extraChildPaise', 'extra_child_paise'])),
-    extraInfantPaise: _int(_pick(json, ['extraInfantPaise', 'extra_infant_paise'])),
+    minAdvanceDays: _intOrNull(
+      _pick(json, ['minAdvanceDays', 'min_advance_days']),
+    ),
+    maxAdvanceDays: _intOrNull(
+      _pick(json, ['maxAdvanceDays', 'max_advance_days']),
+    ),
+    extraAdultPaise: _int(
+      _pick(json, ['extraAdultPaise', 'extra_adult_paise']),
+    ),
+    extraChildPaise: _int(
+      _pick(json, ['extraChildPaise', 'extra_child_paise']),
+    ),
+    extraInfantPaise: _int(
+      _pick(json, ['extraInfantPaise', 'extra_infant_paise']),
+    ),
     status: RatePlanStatus.fromWire(json['status']),
     sortOrder: _int(_pick(json, ['sortOrder', 'sort_order'])),
   );
@@ -451,8 +463,9 @@ enum FeePeriod {
   final String wire;
   final String label;
 
-  static FeePeriod fromWire(Object? v) =>
-      _norm(v) == FeePeriod.perStay.wire ? FeePeriod.perStay : FeePeriod.perNight;
+  static FeePeriod fromWire(Object? v) => _norm(v) == FeePeriod.perStay.wire
+      ? FeePeriod.perStay
+      : FeePeriod.perNight;
 }
 
 /// A tax, service charge or fee added on top of (or extracted from) the rate.
@@ -486,8 +499,9 @@ class RoomTypeFee {
 
   /// "12.5%" or "₹250". Basis points render with only the decimals they
   /// actually carry — 1250 is 12.5%, not 12.50%.
-  String get valueLabel =>
-      calculation == FeeCalculation.percent ? '${percentLabel(value)}%' : rupees(value);
+  String get valueLabel => calculation == FeeCalculation.percent
+      ? '${percentLabel(value)}%'
+      : rupees(value);
 
   String get ruleLabel => '${basis.label} · ${period.label}';
 
@@ -630,9 +644,7 @@ class PricingRule {
   /// The condition half, read as a sentence.
   String get conditionLabel {
     if (trigger.usesDates) {
-      String d(DateTime? v) => v == null
-          ? '—'
-          : '${v.day}/${v.month}';
+      String d(DateTime? v) => v == null ? '—' : '${v.day}/${v.month}';
       return '${trigger.clause} ${d(startDate)} – ${d(endDate)}';
     }
     return '${trigger.clause} ${comparator.label} ${threshold ?? 0}'
@@ -655,9 +667,7 @@ class PricingRule {
       _pick(json, ['adjustmentKind', 'adjustment_kind']),
     ),
     adjustmentValue: _int(_pick(json, ['adjustmentValue', 'adjustment_value'])),
-    enabled: json['enabled'] == null
-        ? true
-        : _bool(json['enabled']),
+    enabled: json['enabled'] == null ? true : _bool(json['enabled']),
     priority: _int(json['priority']),
   );
 
@@ -697,4 +707,132 @@ class UnitInventory {
   final int occupied;
   final int blocked;
   final int outOfService;
+}
+
+// ---------------------------------------------------------- sales channels --
+
+/// One channel-manager connection the platform holds for this property.
+///
+/// `status` stays a plain string rather than an enum: it is the integration
+/// health the server writes (`HEALTHY`, `WARNING`, `ERROR`, and whatever an
+/// operator sets by hand), and the app only ever needs to know "is this usable"
+/// — which the server already answers in [connected] — plus the raw word to
+/// show when it is not. An enum here would have to guess at values it does not
+/// own and would go stale the moment a new one appears.
+@immutable
+class ChannelConnection {
+  const ChannelConnection({
+    required this.id,
+    required this.provider,
+    required this.status,
+    required this.connected,
+    this.errorCount = 0,
+    this.detail,
+    this.channelPropertyId,
+  });
+
+  final String id;
+  final String provider;
+  final String status;
+  final bool connected;
+  final int errorCount;
+  final String? detail;
+
+  /// The property's id on the provider's side, when the admin has set one.
+  final String? channelPropertyId;
+
+  /// "channex" -> "Channex". The provider column is a slug, not display copy.
+  String get providerLabel => provider.isEmpty
+      ? 'Channel'
+      : provider[0].toUpperCase() + provider.substring(1);
+
+  /// What the badge says: connected, or the reason it is not.
+  String get statusLabel => connected
+      ? 'Connected'
+      : (status.isEmpty ? 'Not connected' : _title(status));
+
+  StatusTone get statusTone {
+    if (connected) return StatusTone.available;
+    return status.toUpperCase() == 'ERROR'
+        ? StatusTone.critical
+        : StatusTone.neutral;
+  }
+
+  static ChannelConnection fromJson(Map json) => ChannelConnection(
+    id: (json['id'] ?? '').toString(),
+    provider: _str(json['provider']) ?? '',
+    status: _str(json['status']) ?? '',
+    connected: _bool(json['connected']),
+    errorCount: _int(_pick(json, ['errorCount', 'error_count'])),
+    detail: _str(json['detail']),
+    channelPropertyId: _str(
+      _pick(json, ['channexPropertyId', 'channex_property_id']),
+    ),
+  );
+}
+
+/// One connection as seen from ONE room type: the same health, plus whether
+/// this room type has been pointed at its counterpart on the channel.
+@immutable
+class ChannelMapping {
+  const ChannelMapping({
+    required this.connectionId,
+    required this.provider,
+    required this.status,
+    required this.connected,
+    required this.mapped,
+    this.channelRoomTypeId,
+    this.channelRatePlanId,
+  });
+
+  final String connectionId;
+  final String provider;
+  final String status;
+  final bool connected;
+  final bool mapped;
+  final String? channelRoomTypeId;
+  final String? channelRatePlanId;
+
+  String get providerLabel => ChannelConnection(
+    id: connectionId,
+    provider: provider,
+    status: status,
+    connected: connected,
+  ).providerLabel;
+
+  String get statusLabel => ChannelConnection(
+    id: connectionId,
+    provider: provider,
+    status: status,
+    connected: connected,
+  ).statusLabel;
+
+  StatusTone get statusTone => ChannelConnection(
+    id: connectionId,
+    provider: provider,
+    status: status,
+    connected: connected,
+  ).statusTone;
+
+  static ChannelMapping fromJson(Map json) => ChannelMapping(
+    connectionId: (_pick(json, ['connectionId', 'connection_id']) ?? '')
+        .toString(),
+    provider: _str(json['provider']) ?? '',
+    status: _str(json['status']) ?? '',
+    connected: _bool(json['connected']),
+    mapped: _bool(json['mapped']),
+    channelRoomTypeId: _str(
+      _pick(json, ['channelRoomTypeId', 'channel_room_type_id']),
+    ),
+    channelRatePlanId: _str(
+      _pick(json, ['channelRatePlanId', 'channel_rate_plan_id']),
+    ),
+  );
+}
+
+/// `HEALTHY` / `not_connected` -> `Healthy` / `Not connected`.
+String _title(String raw) {
+  final words = raw.toLowerCase().replaceAll('_', ' ').trim();
+  if (words.isEmpty) return raw;
+  return words[0].toUpperCase() + words.substring(1);
 }

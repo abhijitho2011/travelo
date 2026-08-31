@@ -36,6 +36,7 @@ class RoomTypeDraft {
     this.sizeValue,
     this.sizeUnit = SizeUnit.sqm,
     this.baseOccupancy = 2,
+    this.maxOccupancy = 2,
     this.maxAdults = 2,
     this.maxChildren = 0,
     this.maxInfants = 0,
@@ -65,6 +66,11 @@ class RoomTypeDraft {
   SizeUnit sizeUnit;
 
   int baseOccupancy;
+
+  /// The most guests the room may ever hold. Its own number, not the sum:
+  /// a room that allows 3 adults OR 2 adults + 2 children still sleeps 4, and
+  /// deriving it would quietly overstate what the room can take.
+  int maxOccupancy;
   int maxAdults;
   int maxChildren;
   int maxInfants;
@@ -86,11 +92,9 @@ class RoomTypeDraft {
   bool dynamicPricingEnabled;
   Set<String> amenityIds;
 
-  /// The most guests the room may ever hold. Derived rather than typed: adults
-  /// plus children plus infants IS the maximum, and letting someone enter a
-  /// fourth number invites a contradiction the server would then have to
-  /// referee.
-  int get maxOccupancy => maxAdults + maxChildren + maxInfants;
+  /// The ceiling the maximum cannot exceed — you cannot sleep more people than
+  /// the guest allowances add up to.
+  int get occupancyCeiling => maxAdults + maxChildren + maxInfants;
 
   bool get isWholeUnit => accommodationType.isWholeUnit;
 
@@ -105,6 +109,7 @@ class RoomTypeDraft {
     sizeValue: type.sizeValue,
     sizeUnit: type.sizeUnit,
     baseOccupancy: type.baseOccupancy,
+    maxOccupancy: type.maxOccupancy,
     maxAdults: type.maxAdults,
     maxChildren: type.maxChildren,
     maxInfants: type.maxInfants,
@@ -176,7 +181,11 @@ class RoomTypeDraft {
 /// say so plainly while the type is still new rather than collecting data they
 /// would have nowhere to put.
 class RoomTypeWorkspaceScreen extends ConsumerStatefulWidget {
-  const RoomTypeWorkspaceScreen({super.key, this.roomTypeId, this.duplicateOfId});
+  const RoomTypeWorkspaceScreen({
+    super.key,
+    this.roomTypeId,
+    this.duplicateOfId,
+  });
 
   /// Null for a new room type.
   final String? roomTypeId;
@@ -210,6 +219,15 @@ class _RoomTypeWorkspaceScreenState
     });
   }
 
+  /// Raises the maximum when a guest allowance grows past it. Only upward —
+  /// quietly REDUCING a number the hotelier typed would be the form overruling
+  /// them; growing it just keeps the pair from being born invalid.
+  void _liftCeiling() {
+    if (_draft.maxOccupancy < _draft.maxAdults) {
+      _draft.maxOccupancy = _draft.maxAdults;
+    }
+  }
+
   // ------------------------------------------------------------- validation --
 
   /// §18. Returns null when the draft may be saved, otherwise the first thing
@@ -218,13 +236,23 @@ class _RoomTypeWorkspaceScreenState
     final d = _draft;
     if (d.name.trim().isEmpty) return 'Give this room type a name.';
     if (d.maxAdults < 1) return 'A room has to hold at least one adult.';
-    if (d.baseOccupancy < 1) return 'Base occupancy has to be at least one guest.';
+    if (d.baseOccupancy < 1) {
+      return 'Base occupancy has to be at least one guest.';
+    }
     if (d.maxChildren < 0 || d.maxInfants < 0) {
       return 'Guest counts cannot be negative.';
     }
     if (d.maxOccupancy < d.baseOccupancy) {
       return 'Maximum occupancy (${d.maxOccupancy}) cannot be lower than base '
           'occupancy (${d.baseOccupancy}).';
+    }
+    if (d.maxOccupancy < d.maxAdults) {
+      return 'Maximum occupancy (${d.maxOccupancy}) has to fit the ${d.maxAdults} '
+          'adults this room allows.';
+    }
+    if (d.maxOccupancy > d.occupancyCeiling) {
+      return 'Maximum occupancy (${d.maxOccupancy}) is more than the adults, '
+          'children and infants allowed add up to (${d.occupancyCeiling}).';
     }
     if ((d.baseRateRupees ?? 0) < 0) return 'A rate cannot be negative.';
     if (d.beds.isEmpty) return 'Add at least one bed.';
@@ -392,7 +420,10 @@ class _RoomTypeWorkspaceScreenState
               gapSection,
               _beds(context),
               gapSection,
-              UnitsSection(roomTypeId: widget.roomTypeId, draftName: _draft.name),
+              UnitsSection(
+                roomTypeId: widget.roomTypeId,
+                draftName: _draft.name,
+              ),
               gapSection,
               RoomTypePhotosSection(roomTypeId: widget.roomTypeId),
               gapSection,
@@ -590,7 +621,9 @@ class _RoomTypeWorkspaceScreenState
               label: 'Floor / location',
               child: TextFormField(
                 initialValue: d.floorLabel,
-                decoration: const InputDecoration(hintText: '2nd floor, sea wing'),
+                decoration: const InputDecoration(
+                  hintText: '2nd floor, sea wing',
+                ),
                 onChanged: (v) => _touch(() => d.floorLabel = v),
               ),
             ),
@@ -638,7 +671,9 @@ class _RoomTypeWorkspaceScreenState
             value: d.accessible,
             onChanged: (v) => _touch(() => d.accessible = v),
             title: const Text('Accessible room'),
-            subtitle: const Text('Step-free access and an accessible bathroom.'),
+            subtitle: const Text(
+              'Step-free access and an accessible bathroom.',
+            ),
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
@@ -654,7 +689,8 @@ class _RoomTypeWorkspaceScreenState
             const Divider(height: Sp.xl),
             _TwoUp(
               left: _Field(
-                label: 'Rooms in one ${d.accommodationType.label.toLowerCase()}',
+                label:
+                    'Rooms in one ${d.accommodationType.label.toLowerCase()}',
                 child: _Stepper(
                   value: d.unitRoomCount,
                   min: 1,
@@ -707,63 +743,90 @@ class _RoomTypeWorkspaceScreenState
                 label: 'Maximum adults',
                 value: d.maxAdults,
                 min: 1,
-                onChanged: (v) => _touch(() => d.maxAdults = v),
+                onChanged: (v) => _touch(() {
+                  d.maxAdults = v;
+                  _liftCeiling();
+                }),
               ),
               _Counter(
                 label: 'Maximum children',
                 value: d.maxChildren,
-                onChanged: (v) => _touch(() => d.maxChildren = v),
+                onChanged: (v) => _touch(() {
+                  d.maxChildren = v;
+                  _liftCeiling();
+                }),
               ),
               _Counter(
                 label: 'Maximum infants',
                 value: d.maxInfants,
-                onChanged: (v) => _touch(() => d.maxInfants = v),
+                onChanged: (v) => _touch(() {
+                  d.maxInfants = v;
+                  _liftCeiling();
+                }),
+              ),
+              _Counter(
+                label: 'Maximum occupancy',
+                value: d.maxOccupancy,
+                min: 1,
+                onChanged: (v) => _touch(() => d.maxOccupancy = v),
               ),
             ],
           ),
           gapMd,
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: Sp.md,
-              vertical: Sp.sm,
-            ),
-            decoration: BoxDecoration(
-              color: d.maxOccupancy < d.baseOccupancy
-                  ? c.destructive.withValues(alpha: 0.1)
-                  : c.accent,
-              borderRadius: R.rMd,
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  d.maxOccupancy < d.baseOccupancy
-                      ? Icons.error_outline
-                      : Icons.people_outline,
-                  size: 16,
-                  color: d.maxOccupancy < d.baseOccupancy
-                      ? c.destructive
-                      : c.primary,
+          Builder(
+            builder: (context) {
+              // The same three rules the validator enforces, said as the numbers
+              // change rather than only when Save is pressed.
+              final problem = d.maxOccupancy < d.baseOccupancy
+                  ? 'Lower than base occupancy (${d.baseOccupancy}).'
+                  : d.maxOccupancy < d.maxAdults
+                  ? 'Too low to fit ${d.maxAdults} adults.'
+                  : d.maxOccupancy > d.occupancyCeiling
+                  ? 'More than the ${d.occupancyCeiling} the allowances add up to.'
+                  : null;
+              final bad = problem != null;
+              return Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: Sp.md,
+                  vertical: Sp.sm,
                 ),
-                const SizedBox(width: Sp.sm),
-                Text(
-                  'Maximum occupancy: ${d.maxOccupancy} '
-                  '${d.maxOccupancy == 1 ? 'guest' : 'guests'}',
-                  style: AppTypography.body(
-                    size: 13,
-                    weight: FontWeight.w600,
-                    color: d.maxOccupancy < d.baseOccupancy
-                        ? c.destructive
-                        : c.primary,
-                  ),
+                decoration: BoxDecoration(
+                  color: bad ? c.destructive.withValues(alpha: 0.1) : c.accent,
+                  borderRadius: R.rMd,
                 ),
-              ],
-            ),
+                child: Row(
+                  children: [
+                    Icon(
+                      bad ? Icons.error_outline : Icons.people_outline,
+                      size: 16,
+                      color: bad ? c.destructive : c.primary,
+                    ),
+                    const SizedBox(width: Sp.sm),
+                    Expanded(
+                      child: Text(
+                        bad
+                            ? 'Maximum occupancy: ${d.maxOccupancy} — $problem'
+                            : 'Maximum occupancy: ${d.maxOccupancy} '
+                                  '${d.maxOccupancy == 1 ? 'guest' : 'guests'}'
+                                  '${d.maxOccupancy < d.occupancyCeiling ? ' (up to ${d.occupancyCeiling} allowed by the mix)' : ''}',
+                        style: AppTypography.body(
+                          size: 13,
+                          weight: FontWeight.w600,
+                          color: bad ? c.destructive : c.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
           const FieldNote(
             text:
                 'Base occupancy is the number of guests included in the base '
-                'rate. Maximum occupancy is the most the room may ever hold — '
-                'adults, children and infants together.',
+                'rate. Maximum occupancy is the most the room may ever hold, and '
+                'is set on its own — a room that allows 3 adults or 2 adults and '
+                '2 children may still only sleep 4.',
           ),
         ],
       ),
@@ -796,7 +859,9 @@ class _RoomTypeWorkspaceScreenState
                           DropdownMenuItem(value: b, child: Text(b.label)),
                       ],
                       onChanged: (b) => _touch(() {
-                        if (b != null) d.beds[i] = d.beds[i].copyWith(bedType: b);
+                        if (b != null) {
+                          d.beds[i] = d.beds[i].copyWith(bedType: b);
+                        }
                       }),
                     ),
                   ),
@@ -887,7 +952,8 @@ class _RoomTypeWorkspaceScreenState
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               decoration: const InputDecoration(hintText: '4500'),
-              onChanged: (v) => _touch(() => d.baseRateRupees = int.tryParse(v)),
+              onChanged: (v) =>
+                  _touch(() => d.baseRateRupees = int.tryParse(v)),
             ),
           ),
           const FieldNote(
@@ -940,7 +1006,11 @@ class _Section extends StatelessWidget {
 /// A labelled form field. The asterisk is the only place "required" is stated,
 /// so it never disagrees with the validator.
 class _Field extends StatelessWidget {
-  const _Field({required this.label, required this.child, this.required = false});
+  const _Field({
+    required this.label,
+    required this.child,
+    this.required = false,
+  });
 
   final String label;
   final Widget child;
@@ -956,10 +1026,7 @@ class _Field extends StatelessWidget {
           children: [
             Text(label, style: AppTypography.labelXs(c.mutedForeground)),
             if (required)
-              Text(
-                ' *',
-                style: AppTypography.labelXs(c.destructive),
-              ),
+              Text(' *', style: AppTypography.labelXs(c.destructive)),
           ],
         ),
         const SizedBox(height: 5),
@@ -983,7 +1050,11 @@ class _TwoUp extends StatelessWidget {
         if (constraints.maxWidth < 520) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [left, const SizedBox(height: Sp.md), right],
+            children: [
+              left,
+              const SizedBox(height: Sp.md),
+              right,
+            ],
           );
         }
         return Row(
@@ -1002,11 +1073,7 @@ class _TwoUp extends StatelessWidget {
 /// A compact − / value / + control, used wherever a count is small enough that
 /// typing a number is more work than pressing a button.
 class _Stepper extends StatelessWidget {
-  const _Stepper({
-    required this.value,
-    required this.onChanged,
-    this.min = 0,
-  });
+  const _Stepper({required this.value, required this.onChanged, this.min = 0});
 
   final int value;
   final ValueChanged<int> onChanged;

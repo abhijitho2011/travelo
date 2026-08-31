@@ -62,14 +62,14 @@ final _preciseInr = NumberFormat.currency(
   decimalDigits: 2,
 );
 
-String formatPaise(int paise) =>
-    paise % 100 == 0 ? Fmt.money(paise ~/ 100) : _preciseInr.format(paise / 100);
+String formatPaise(int paise) => paise % 100 == 0
+    ? Fmt.money(paise ~/ 100)
+    : _preciseInr.format(paise / 100);
 
 /// Rupees as typed into a form: whole where the rate is whole, so an untouched
 /// field never looks edited.
-String paiseToRupeeInput(int paise) => paise % 100 == 0
-    ? '${paise ~/ 100}'
-    : (paise / 100).toStringAsFixed(2);
+String paiseToRupeeInput(int paise) =>
+    paise % 100 == 0 ? '${paise ~/ 100}' : (paise / 100).toStringAsFixed(2);
 
 /// Rupees back to paise, rounded — a rate of 2499.995 is not a thing.
 int rupeesToPaise(String input) {
@@ -216,9 +216,8 @@ enum RoomTypeStatus {
   final String wire;
   final String label;
 
-  StatusTone get tone => this == RoomTypeStatus.active
-      ? StatusTone.healthy
-      : StatusTone.neutral;
+  StatusTone get tone =>
+      this == RoomTypeStatus.active ? StatusTone.healthy : StatusTone.neutral;
 
   static RoomTypeStatus fromWire(String? value) =>
       _wire(value) == RoomTypeStatus.archived.wire
@@ -430,8 +429,7 @@ class RoomType {
         ].join(' · ')
       : (privatePool ? 'Private pool' : '');
 
-  Set<String> get amenityIds =>
-      amenities.map((a) => a.id).toSet();
+  Set<String> get amenityIds => amenities.map((a) => a.id).toSet();
 
   String get bedLabel =>
       bedCount == 1 ? bedType.label : '$bedCount × ${bedType.label}';
@@ -458,9 +456,7 @@ class RoomType {
     maxOccupancy: _int(_pick(json, ['maxOccupancy', 'max_occupancy']), 2),
     maxAdults: _int(_pick(json, ['maxAdults', 'max_adults']), 2),
     maxChildren: _int(_pick(json, ['maxChildren', 'max_children'])),
-    airConditioned: _bool(
-      _pick(json, ['airConditioned', 'air_conditioned']),
-    ),
+    airConditioned: _bool(_pick(json, ['airConditioned', 'air_conditioned'])),
     unitKind: UnitKind.fromWire(_str(_pick(json, ['unitKind', 'unit_kind']))),
     unitRoomCount: _int(_pick(json, ['unitRoomCount', 'unit_room_count']), 1),
     privatePool: _bool(_pick(json, ['privatePool', 'private_pool'])),
@@ -475,13 +471,19 @@ class RoomType {
     code: _str(json['code']),
     floorLabel: _str(_pick(json, ['floorLabel', 'floor_label'])),
     accommodationType: AccommodationType.fromWire(
-      _pick(json, ['accommodationType', 'accommodation_type', 'unitKind', 'unit_kind']),
+      _pick(json, [
+        'accommodationType',
+        'accommodation_type',
+        'unitKind',
+        'unit_kind',
+      ]),
     ),
     smokingPolicy: SmokingPolicy.fromWire(
       _pick(json, ['smokingPolicy', 'smoking_policy']),
     ),
     accessible: _bool(json['accessible']),
-    sizeValue: _intOrNull(_pick(json, ['sizeValue', 'size_value'])) ??
+    sizeValue:
+        _intOrNull(_pick(json, ['sizeValue', 'size_value'])) ??
         _intOrNull(_pick(json, ['sizeSqft', 'size_sqft'])),
     sizeUnit: SizeUnit.fromWire(_pick(json, ['sizeUnit', 'size_unit'])),
     baseOccupancy: _int(_pick(json, ['baseOccupancy', 'base_occupancy']), 2),
@@ -512,7 +514,9 @@ class RoomType {
               .map(BedRow.fromJson)
               .toList(growable: false)
         : const <BedRow>[],
-    primaryPhotoUrl: _str(_pick(json, ['primaryPhotoUrl', 'primary_photo_url'])),
+    primaryPhotoUrl: _str(
+      _pick(json, ['primaryPhotoUrl', 'primary_photo_url']),
+    ),
     unitCount: _intOrNull(_pick(json, ['unitCount', 'unit_count'])),
   );
 
@@ -586,8 +590,7 @@ class Room {
   List<Amenity> get extraAmenities =>
       amenities.where((a) => !a.fromRoomType).toList(growable: false);
 
-  Set<String> get extraAmenityIds =>
-      extraAmenities.map((a) => a.id).toSet();
+  Set<String> get extraAmenityIds => extraAmenities.map((a) => a.id).toSet();
 
   String get floorLabel => floor == null ? 'Floor not set' : 'Floor $floor';
 
@@ -952,9 +955,10 @@ class BulkRoomRequest {
   /// work, not a second source of truth.
   List<String> get preview => switch (mode) {
     BulkRoomMode.list => numbers,
-    BulkRoomMode.range => (from == null || to == null)
-        ? const <String>[]
-        : expandRange(prefix: prefix, from: from!, to: to!, pad: pad),
+    BulkRoomMode.range =>
+      (from == null || to == null)
+          ? const <String>[]
+          : expandRange(prefix: prefix, from: from!, to: to!, pad: pad),
   };
 
   Map<String, dynamic> toJson() => {

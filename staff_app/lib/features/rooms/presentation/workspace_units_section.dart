@@ -57,10 +57,7 @@ class UnitsSection extends ConsumerWidget {
           const SizedBox(height: Sp.lg),
           _Explainer(typeName: draftName),
           const SizedBox(height: Sp.lg),
-          if (id == null)
-            _NotYet()
-          else
-            _UnitsBody(roomTypeId: id),
+          if (id == null) _NotYet() else _UnitsBody(roomTypeId: id),
         ],
       ),
     );
@@ -82,10 +79,7 @@ class _Explainer extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(Sp.md),
-      decoration: BoxDecoration(
-        color: c.accent,
-        borderRadius: R.rMd,
-      ),
+      decoration: BoxDecoration(color: c.accent, borderRadius: R.rMd),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -227,15 +221,17 @@ class _UnitsBody extends ConsumerWidget {
 
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await ref.read(roomActionsProvider).create(
-        NewRoom(
-          roomTypeId: roomTypeId,
-          number: result.number,
-          floor: result.floor,
-          status: result.status,
-          notes: result.notes,
-        ),
-      );
+      await ref
+          .read(roomActionsProvider)
+          .create(
+            NewRoom(
+              roomTypeId: roomTypeId,
+              number: result.number,
+              floor: result.floor,
+              status: result.status,
+              notes: result.notes,
+            ),
+          );
       ref.invalidate(unitsOfTypeProvider(roomTypeId));
       messenger.showSnackBar(
         SnackBar(content: Text('Unit ${result.number} added')),
@@ -294,7 +290,11 @@ class _InventorySummary extends StatelessWidget {
       (label: 'Available', value: inventory.available, tone: c.healthy),
       (label: 'Occupied', value: inventory.occupied, tone: c.stOccupied),
       (label: 'Blocked', value: inventory.blocked, tone: c.warning),
-      (label: 'Out of service', value: inventory.outOfService, tone: c.critical),
+      (
+        label: 'Out of service',
+        value: inventory.outOfService,
+        tone: c.critical,
+      ),
     ];
 
     return Wrap(
@@ -320,7 +320,10 @@ class _InventorySummary extends StatelessWidget {
                   '${tile.value}',
                   style: AppTypography.display(size: 20, color: tile.tone),
                 ),
-                Text(tile.label, style: AppTypography.labelXs(c.mutedForeground)),
+                Text(
+                  tile.label,
+                  style: AppTypography.labelXs(c.mutedForeground),
+                ),
               ],
             ),
           ),
@@ -354,11 +357,17 @@ class _UnitsTable extends ConsumerWidget {
               children: [
                 SizedBox(
                   width: 78,
-                  child: Text('Unit', style: AppTypography.labelXs(c.mutedForeground)),
+                  child: Text(
+                    'Unit',
+                    style: AppTypography.labelXs(c.mutedForeground),
+                  ),
                 ),
                 SizedBox(
                   width: 66,
-                  child: Text('Floor', style: AppTypography.labelXs(c.mutedForeground)),
+                  child: Text(
+                    'Floor',
+                    style: AppTypography.labelXs(c.mutedForeground),
+                  ),
                 ),
                 Expanded(
                   child: Text(
@@ -501,7 +510,9 @@ class _UnitRow extends ConsumerWidget {
     try {
       await ref.read(roomActionsProvider).remove(unit.id);
       ref.invalidate(unitsOfTypeProvider(roomTypeId));
-      messenger.showSnackBar(SnackBar(content: Text('Unit ${unit.number} removed')));
+      messenger.showSnackBar(
+        SnackBar(content: Text('Unit ${unit.number} removed')),
+      );
     } on ApiException catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(e.message)));
     }
@@ -533,12 +544,15 @@ class _UnitFormSheet extends StatefulWidget {
 }
 
 class _UnitFormSheetState extends State<_UnitFormSheet> {
-  late final TextEditingController _number =
-      TextEditingController(text: widget.unit?.number ?? '');
-  late final TextEditingController _floor =
-      TextEditingController(text: widget.unit?.floor?.toString() ?? '');
-  late final TextEditingController _notes =
-      TextEditingController(text: widget.unit?.notes ?? '');
+  late final TextEditingController _number = TextEditingController(
+    text: widget.unit?.number ?? '',
+  );
+  late final TextEditingController _floor = TextEditingController(
+    text: widget.unit?.floor?.toString() ?? '',
+  );
+  late final TextEditingController _notes = TextEditingController(
+    text: widget.unit?.notes ?? '',
+  );
   late RoomStatus _status = widget.unit?.status ?? RoomStatus.available;
   String? _error;
 
@@ -575,7 +589,9 @@ class _UnitFormSheetState extends State<_UnitFormSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              widget.unit == null ? 'Add unit' : 'Edit unit ${widget.unit!.number}',
+              widget.unit == null
+                  ? 'Add unit'
+                  : 'Edit unit ${widget.unit!.number}',
               style: AppTypography.display(size: 16, color: c.foreground),
             ),
             const SizedBox(height: Sp.lg),
@@ -599,13 +615,16 @@ class _UnitFormSheetState extends State<_UnitFormSheet> {
             ),
             const SizedBox(height: Sp.md),
             DropdownButtonFormField<RoomStatus>(
-              initialValue: _settable.contains(_status) ? _status : RoomStatus.available,
+              initialValue: _settable.contains(_status)
+                  ? _status
+                  : RoomStatus.available,
               decoration: const InputDecoration(labelText: 'Status'),
               items: [
                 for (final s in _settable)
                   DropdownMenuItem(value: s, child: Text(s.label)),
               ],
-              onChanged: (s) => setState(() => _status = s ?? RoomStatus.available),
+              onChanged: (s) =>
+                  setState(() => _status = s ?? RoomStatus.available),
             ),
             const SizedBox(height: Sp.md),
             TextField(
@@ -637,7 +656,9 @@ class _UnitFormSheetState extends State<_UnitFormSheet> {
                     number: number,
                     floor: int.tryParse(_floor.text.trim()),
                     status: _status,
-                    notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+                    notes: _notes.text.trim().isEmpty
+                        ? null
+                        : _notes.text.trim(),
                   ),
                 );
               },
@@ -684,9 +705,7 @@ class _AutoGenerateSheetState extends State<_AutoGenerateSheet> {
     final to = int.tryParse(_to.text.trim());
     if (from == null || to == null || to < from) return const [];
     final prefix = _prefix.text.trim();
-    return [
-      for (var n = from; n <= to && n - from < 40; n++) '$prefix$n',
-    ];
+    return [for (var n = from; n <= to && n - from < 40; n++) '$prefix$n'];
   }
 
   @override
@@ -694,7 +713,9 @@ class _AutoGenerateSheetState extends State<_AutoGenerateSheet> {
     final c = context.colors;
     final from = int.tryParse(_from.text.trim());
     final to = int.tryParse(_to.text.trim());
-    final count = (from != null && to != null && to >= from) ? to - from + 1 : 0;
+    final count = (from != null && to != null && to >= from)
+        ? to - from + 1
+        : 0;
 
     return SafeArea(
       child: Padding(
@@ -843,9 +864,7 @@ class _AutoGenerateSheetState extends State<_AutoGenerateSheet> {
                           ),
                         );
                       },
-                child: Text(
-                  count == 0 ? 'Set a range' : 'Create $count units',
-                ),
+                child: Text(count == 0 ? 'Set a range' : 'Create $count units'),
               ),
             ],
           ),

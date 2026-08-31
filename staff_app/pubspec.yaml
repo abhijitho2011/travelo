@@ -45,6 +45,9 @@ dependencies:
   firebase_messaging: ^15.2.10
   flutter_svg: ^2.3.0
 
+  # Drag-and-drop photo uploads on desktop and web
+  desktop_drop: ^0.8.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -221,11 +221,7 @@ class FieldNote extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          icon ?? Icons.info_outline,
-          size: 13,
-          color: c.mutedForeground,
-        ),
+        Icon(icon ?? Icons.info_outline, size: 13, color: c.mutedForeground),
         const SizedBox(width: 6),
         Expanded(
           child: Text(

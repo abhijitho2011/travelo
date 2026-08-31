@@ -83,10 +83,8 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                   ),
           ),
           onChanged: (_) => setState(() {}),
-          onSubmitted: (value) =>
-              ref.read(roomFilterProvider.notifier).state = filter.copyWith(
-                query: value.trim(),
-              ),
+          onSubmitted: (value) => ref.read(roomFilterProvider.notifier).state =
+              filter.copyWith(query: value.trim()),
         ),
         gapMd,
 
@@ -100,7 +98,8 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
             child: TextButton.icon(
               onPressed: () {
                 _search.clear();
-                ref.read(roomFilterProvider.notifier).state = const RoomFilter();
+                ref.read(roomFilterProvider.notifier).state =
+                    const RoomFilter();
               },
               icon: const Icon(Icons.filter_alt_off_outlined, size: 15),
               label: const Text('Clear filters'),
@@ -181,7 +180,8 @@ class _FloorPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // The sheet is the only way to act on a room, so it opens only for someone
     // who can actually do something once it is open.
-    final canAct = ref.watch(canProvider(P.roomStatusUpdate)) ||
+    final canAct =
+        ref.watch(canProvider(P.roomStatusUpdate)) ||
         ref.watch(canProvider(P.roomUpdate)) ||
         ref.watch(canProvider(P.roomDelete));
 
@@ -277,7 +277,8 @@ class _RoomTypeFilterChips extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final types = ref.watch(roomTypeOptionsProvider).value ?? const <RoomType>[];
+    final types =
+        ref.watch(roomTypeOptionsProvider).value ?? const <RoomType>[];
     if (types.isEmpty) return const SizedBox.shrink();
 
     return Padding(
@@ -472,7 +473,10 @@ class _RoomStatusSheetState extends ConsumerState<RoomStatusSheet> {
               ),
               if (room.notes != null) ...[
                 const SizedBox(height: Sp.sm),
-                FieldNote(text: room.notes!, icon: Icons.sticky_note_2_outlined),
+                FieldNote(
+                  text: room.notes!,
+                  icon: Icons.sticky_note_2_outlined,
+                ),
               ],
               const SizedBox(height: Sp.lg),
 
