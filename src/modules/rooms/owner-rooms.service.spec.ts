@@ -21,7 +21,7 @@ function svc(db: MockDb) {
     d,
     amenities,
     roomTypes,
-    new RoomsService(d, roomTypes, amenities),
+    new RoomsService(d, roomTypes, amenities, new StorageService({})),
     propertiesService,
   );
 }

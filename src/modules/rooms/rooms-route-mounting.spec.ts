@@ -18,6 +18,7 @@ import { OwnerRoomsController } from './owner-rooms.controller';
 import { AmenitiesService } from './amenities.service';
 import { RoomTypesService } from './room-types.service';
 import { RoomTypePhotosService } from './room-type-photos.service';
+import { RoomPhotosService } from './room-photos.service';
 import { RoomsService } from './rooms.service';
 import { OwnerRoomsService } from './owner-rooms.service';
 
@@ -47,6 +48,7 @@ describe('rooms surface route mounting', () => {
         { provide: AmenitiesService, useValue: {} },
         { provide: RoomTypesService, useValue: {} },
         { provide: RoomTypePhotosService, useValue: {} },
+        { provide: RoomPhotosService, useValue: {} },
         { provide: RoomsService, useValue: {} },
         { provide: OwnerRoomsService, useValue: {} },
         { provide: AuditService, useValue: { record: async () => undefined } },

@@ -143,7 +143,12 @@ describe('archiving an amenity does not break rooms already using it', () => {
       amenities,
       new StorageService({}),
     );
-    const rooms = new RoomsService(db as unknown as Database, roomTypes, amenities);
+    const rooms = new RoomsService(
+      db as unknown as Database,
+      roomTypes,
+      amenities,
+      new StorageService({}),
+    );
 
     const dto = await rooms.get('p1', 'room-1');
     expect(dto.amenities.map((a) => a.key)).toEqual(['bathtub']);

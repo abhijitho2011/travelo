@@ -24,6 +24,7 @@ import { AuditService } from '../audit/audit.service';
 import { AmenitiesService } from './amenities.service';
 import { RoomTypesService } from './room-types.service';
 import { RoomsService } from './rooms.service';
+import { RoomPhotosService } from './room-photos.service';
 import {
   MAX_PHOTO_BYTES,
   RoomTypePhotosService,
@@ -253,6 +254,7 @@ export class StaffRoomTypesController {
 export class StaffRoomsController {
   constructor(
     private readonly rooms: RoomsService,
+    private readonly photos: RoomPhotosService,
     private readonly audit: AuditService,
   ) {}
 
@@ -366,6 +368,108 @@ export class StaffRoomsController {
       entity: 'room',
       entityId: id,
       before: { number: res.number },
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return res;
+  }
+
+  // ---------- Photos of THIS room ----------
+  //
+  // A deliberate mirror of the room-type photo routes above, and gated on the
+  // same room.* permissions as the rest of this controller: whoever may edit a
+  // room may picture it. Bytes never pass back through the API — the service
+  // hands out short-lived presigned URLs.
+
+  @Get(':id/photos')
+  @RequireStaffPermissions('room.read')
+  listPhotos(@CurrentStaff() me: AuthenticatedStaff, @Param('id') id: string) {
+    return this.photos.list(me.propertyId, id);
+  }
+
+  /**
+   * Multipart: `file` plus an optional `category`. Multer's own `fileSize`
+   * limit stops the bytes at the socket, and the service re-checks mime and
+   * size before writing anything.
+   */
+  @Post(':id/photos')
+  @RequireStaffPermissions('room.update')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_PHOTO_BYTES, files: 1 } }))
+  async addPhoto(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @UploadedFile() file: UploadedRoomTypePhoto | undefined,
+    @Body() dto: UploadRoomTypePhotoDto,
+  ) {
+    const photo = await this.photos.upload(me.propertyId, id, file, dto?.category);
+    await this.audit.record({
+      action: 'staff.room.photo_added',
+      entity: 'room',
+      entityId: id,
+      after: { photoId: photo.id, category: photo.category, sizeBytes: photo.sizeBytes },
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return photo;
+  }
+
+  /** Declared BEFORE the `:photoId` routes so "order" is never read as an id. */
+  @Patch(':id/photos/order')
+  @RequireStaffPermissions('room.update')
+  async reorderPhotos(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @Body() dto: ReorderRoomTypePhotosDto,
+  ) {
+    const photos = await this.photos.reorder(me.propertyId, id, dto.ids);
+    await this.audit.record({
+      action: 'staff.room.photos_reordered',
+      entity: 'room',
+      entityId: id,
+      after: { ids: dto.ids },
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return photos;
+  }
+
+  @Post(':id/photos/:photoId/primary')
+  @RequireStaffPermissions('room.update')
+  async setPrimaryPhoto(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @Param('photoId') photoId: string,
+  ) {
+    const photo = await this.photos.setPrimary(me.propertyId, id, photoId);
+    await this.audit.record({
+      action: 'staff.room.photo_primary_set',
+      entity: 'room',
+      entityId: id,
+      after: { photoId },
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return photo;
+  }
+
+  @Delete(':id/photos/:photoId')
+  @RequireStaffPermissions('room.update')
+  async removePhoto(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @Param('photoId') photoId: string,
+  ) {
+    const res = await this.photos.remove(me.propertyId, id, photoId);
+    await this.audit.record({
+      action: 'staff.room.photo_deleted',
+      entity: 'room',
+      entityId: id,
+      before: { photoId },
       actorId: me.id,
       actorEmail: me.email,
       actorRole: me.role,

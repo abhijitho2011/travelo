@@ -112,6 +112,29 @@ export const RoomErrors = {
       HttpStatus.CONFLICT,
     ),
 
+  /**
+   * A room is either grouped under a shared type or unique with its own specs.
+   * Both at once is not a preference we can guess at.
+   */
+  roomSpecsAmbiguous: () =>
+    roomError(
+      'ROOM_SPECS_AMBIGUOUS',
+      "Send either an existing roomTypeId or this room's own specs, not both",
+      HttpStatus.BAD_REQUEST,
+    ),
+  roomSpecsMissing: () =>
+    roomError(
+      'ROOM_SPECS_MISSING',
+      'A room needs either an existing roomTypeId or its own specs',
+      HttpStatus.BAD_REQUEST,
+    ),
+  /** Editing one room must never re-specify the others sharing its type. */
+  roomSpecsShared: () =>
+    roomError(
+      'ROOM_SPECS_SHARED',
+      'This room shares its type with other rooms, so its specifications cannot be edited from the room. Edit the room type, or give this room its own specifications.',
+      HttpStatus.CONFLICT,
+    ),
   photoNotFound: () =>
     roomError('ROOM_TYPE_PHOTO_NOT_FOUND', 'Photo not found', HttpStatus.NOT_FOUND),
 

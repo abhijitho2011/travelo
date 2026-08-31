@@ -116,6 +116,10 @@ export class RoomTypesService {
 
   static conditions(propertyId: string, params: RoomTypeFilterDto): SQL[] {
     const conds: SQL[] = [eq(roomTypes.propertyId, propertyId), isNull(roomTypes.deletedAt)];
+    // A private type is one room's own specifications wearing a type's clothes.
+    // It is a real type to reservations, rates and channels, but it is not
+    // something a person picks from a list, so it never appears in one.
+    if (!params.includePrivate) conds.push(eq(roomTypes.isPrivate, false));
     if (params.status) conds.push(eq(roomTypes.status, params.status as RoomTypeStatus));
     if (params.q) conds.push(ilike(roomTypes.name, `%${params.q}%`));
     return conds;
@@ -137,6 +141,7 @@ export class RoomTypesService {
   ) {
     return {
       id: t.id,
+      isPrivate: t.isPrivate,
       propertyId: t.propertyId,
       name: t.name,
       code: t.code,
@@ -365,7 +370,12 @@ export class RoomTypesService {
     }));
   }
 
-  async create(propertyId: string, dto: RoomTypeInputDto) {
+  /**
+   * `opts.isPrivate` is deliberately NOT part of RoomTypeInputDto: a private
+   * type is minted by the rooms service on a room's behalf, and no client
+   * should be able to create one directly through the room-type endpoint.
+   */
+  async create(propertyId: string, dto: RoomTypeInputDto, opts?: { isPrivate?: boolean }) {
     // Validate the amenity ids BEFORE opening the transaction, so a bad id is a
     // clean 400 rather than a rolled-back insert.
     const attach = await this.amenityCatalogue.resolveForScope(dto.amenityIds ?? [], 'ROOM');
@@ -394,6 +404,7 @@ export class RoomTypesService {
           .insert(roomTypes)
           .values({
             propertyId,
+            isPrivate: opts?.isPrivate ?? false,
             name: dto.name,
             code: dto.code ?? null,
             description: dto.description ?? null,

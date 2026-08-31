@@ -244,6 +244,12 @@ export class RoomTypeFilterDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
 
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) offset?: number;
+
+  /**
+   * Include the per-room private types too. Off by default: the only callers
+   * that want them are diagnostics and the room screen resolving its own type.
+   */
+  @IsOptional() @IsBoolean() @Type(() => Boolean) includePrivate?: boolean;
 }
 
 // ---------- Rooms ----------
@@ -251,7 +257,26 @@ export class RoomTypeFilterDto {
 const ROOM_NUMBER = /^[A-Za-z0-9][A-Za-z0-9\-/ ]{0,31}$/;
 
 export class CreateRoomDto {
-  @IsUUID('4') roomTypeId!: string;
+  /**
+   * The type this room belongs to, when it SHARES one with other rooms.
+   *
+   * Optional because the app is room-first: most properties here have no two
+   * rooms alike, so the usual request sends `specs` instead and the room gets a
+   * private type of its own. Exactly one of the two must be present — the
+   * service rejects both and neither, since a room cannot be simultaneously
+   * grouped and unique.
+   */
+  @IsOptional() @IsUUID('4') roomTypeId?: string;
+
+  /**
+   * This room's OWN specifications — occupancy, beds, size, rate, policies.
+   * Sending these creates a room type private to this one room; nothing else
+   * can be filed under it.
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => RoomTypeInputDto)
+  specs?: RoomTypeInputDto;
 
   @IsString() @Length(1, 32) @Matches(ROOM_NUMBER) number!: string;
 
@@ -271,6 +296,16 @@ export class CreateRoomDto {
 
 export class UpdateRoomDto {
   @IsOptional() @IsUUID('4') roomTypeId?: string;
+
+  /**
+   * Edits to this room's OWN specifications. Only meaningful for a room whose
+   * type is private to it; the service refuses these against a SHARED type,
+   * because editing 201 must never silently re-specify 202.
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => UpdateRoomTypeDto)
+  specs?: UpdateRoomTypeDto;
 
   @IsOptional() @IsString() @Length(1, 32) @Matches(ROOM_NUMBER) number?: string;
 

@@ -7,12 +7,14 @@ import {
   roomAmenities,
   rooms,
   roomTypes,
+  roomPhotos,
   type Amenity,
   type Room,
   type RoomStatus,
 } from '../../database/schema';
 import { AmenitiesService } from './amenities.service';
-import { RoomTypesService } from './room-types.service';
+import { ROOM_TYPE_PHOTO_URL_TTL_SECONDS, RoomTypesService } from './room-types.service';
+import { StorageService } from '../storage/storage.service';
 import { effectiveAmenities, type AmenityRef } from './effective-amenities';
 import {
   BulkCreateRoomsDto,
@@ -47,6 +49,7 @@ export class RoomsService {
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly roomTypesService: RoomTypesService,
     private readonly amenityCatalogue: AmenitiesService,
+    private readonly storage: StorageService,
   ) {}
 
   // ---------- roomCount, derived ----------
@@ -141,30 +144,56 @@ export class RoomsService {
   private async hydrate(rows: Room[]) {
     if (rows.length === 0) return [];
     const typeIds = [...new Set(rows.map((r) => r.roomTypeId))];
-    const typeRows = await this.db
-      .select({
-        id: roomTypes.id,
-        name: roomTypes.name,
-        bedType: roomTypes.bedType,
-        airConditioned: roomTypes.airConditioned,
-        unitKind: roomTypes.unitKind,
-        unitRoomCount: roomTypes.unitRoomCount,
-        privatePool: roomTypes.privatePool,
-      })
-      .from(roomTypes)
-      .where(inArray(roomTypes.id, typeIds));
+    // The whole row, not a handful of columns: on a room-first screen the type
+    // IS the room's specification sheet, and the list renders it.
+    const typeRows = await this.db.select().from(roomTypes).where(inArray(roomTypes.id, typeIds));
     const typeById = new Map(typeRows.map((t) => [t.id, t]));
 
     const typeAmenities = await this.roomTypesService.amenitiesByType(typeIds);
     const extras = await this.extrasByRoom(rows.map((r) => r.id));
+    const covers = await this.coverPhotoUrls(rows.map((r) => r.id));
 
-    return rows.map((r) =>
-      RoomsService.toDto(
-        r,
-        typeById.get(r.roomTypeId),
-        effectiveAmenities(typeAmenities.get(r.roomTypeId) ?? [], extras.get(r.id) ?? []),
-      ),
+    return rows.map((r) => {
+      const type = typeById.get(r.roomTypeId);
+      return {
+        ...RoomsService.toDto(
+          r,
+          type,
+          effectiveAmenities(typeAmenities.get(r.roomTypeId) ?? [], extras.get(r.id) ?? []),
+        ),
+        primaryPhotoUrl: covers.get(r.id) ?? null,
+        // Whether this room's specifications are its own or shared with the
+        // other rooms of its type. The room screen needs it to decide between
+        // editing the specs inline and sending the user to the shared type.
+        specsArePrivate: type?.isPrivate ?? false,
+        specs: type ? RoomTypesService.toDto(type) : null,
+      };
+    });
+  }
+
+  /**
+   * One presigned URL per room that has a primary photo. A single query for the
+   * page — the list screen must not sign URLs room by room.
+   */
+  private async coverPhotoUrls(roomIds: string[]): Promise<Map<string, string>> {
+    if (roomIds.length === 0) return new Map();
+    const rows = await this.db
+      .select({ roomId: roomPhotos.roomId, storageKey: roomPhotos.storageKey })
+      .from(roomPhotos)
+      .where(and(inArray(roomPhotos.roomId, roomIds), eq(roomPhotos.isPrimary, true)));
+
+    const out = new Map<string, string>();
+    await Promise.all(
+      rows.map(async (r) => {
+        // A signing failure must not take the whole room list down with it; the
+        // room simply renders without a cover, exactly as one with no photo.
+        const url = await this.storage
+          .getSignedUrl(r.storageKey, ROOM_TYPE_PHOTO_URL_TTL_SECONDS)
+          .catch(() => null);
+        if (url) out.set(r.roomId, url);
+      }),
     );
+    return out;
   }
 
   async list(propertyId: string, params: RoomFilterDto = {}) {
@@ -197,10 +226,59 @@ export class RoomsService {
 
   // ---------- Writes ----------
 
+  /**
+   * Resolves the type a new room will sit under.
+   *
+   * Room-first is the normal path here: the request describes THIS room, and we
+   * mint a room type private to it. Sharing an existing type stays supported
+   * for properties that genuinely have twenty identical rooms.
+   */
+  /**
+   * Cheap pre-check so the caller fails before side effects. The unique index
+   * is still the authority — this narrows the window, it does not close it,
+   * which is why the insert below still handles 23505.
+   */
+  private async assertRoomNumberFree(propertyId: string, number: string): Promise<void> {
+    const [taken] = await this.db
+      .select({ id: rooms.id })
+      .from(rooms)
+      .where(
+        and(
+          eq(rooms.propertyId, propertyId),
+          eq(rooms.number, number),
+          sql`${rooms.deletedAt} is null`,
+        ),
+      )
+      .limit(1);
+    if (taken) throw RoomErrors.roomNumberTaken(number);
+  }
+
+  private async resolveTypeForNewRoom(propertyId: string, dto: CreateRoomDto): Promise<string> {
+    if (dto.roomTypeId && dto.specs) throw RoomErrors.roomSpecsAmbiguous();
+    if (!dto.roomTypeId && !dto.specs) throw RoomErrors.roomSpecsMissing();
+
+    if (dto.roomTypeId) {
+      await this.roomTypesService.requireRoomType(propertyId, dto.roomTypeId);
+      return dto.roomTypeId;
+    }
+
+    // A private type is named after the room it belongs to when the request
+    // does not name it, so the rows stay readable to anyone reading the table
+    // directly. It is never offered as a type to file other rooms under.
+    const specs = dto.specs!;
+    const created = await this.roomTypesService.create(
+      propertyId,
+      { ...specs, name: specs.name?.trim() || `Room ${dto.number}` },
+      { isPrivate: true },
+    );
+    return created.id;
+  }
+
   async create(propertyId: string, dto: CreateRoomDto) {
-    // Both of these 404/400 BEFORE the transaction opens, so a bad request is
-    // never a rolled-back write.
-    await this.roomTypesService.requireRoomType(propertyId, dto.roomTypeId);
+    // The number is checked BEFORE a private type is minted: finding out the
+    // room number was taken afterwards would leave an orphan type behind.
+    await this.assertRoomNumberFree(propertyId, dto.number);
+    const roomTypeId = await this.resolveTypeForNewRoom(propertyId, dto);
     const extras = await this.amenityCatalogue.resolveForScope(dto.amenityIds ?? [], 'ROOM');
 
     const { row, roomCount } = await this.db.transaction(async (tx) => {
@@ -210,7 +288,7 @@ export class RoomsService {
           .insert(rooms)
           .values({
             propertyId,
-            roomTypeId: dto.roomTypeId,
+            roomTypeId,
             number: dto.number,
             floor: dto.floor ?? null,
             status: dto.status ?? 'AVAILABLE',
@@ -336,6 +414,15 @@ export class RoomsService {
       await this.roomTypesService.requireRoomType(propertyId, dto.roomTypeId);
     }
 
+    // This room's own specifications. Applied to the room's PRIVATE type, and
+    // refused outright when the type is shared — editing 201 must never
+    // silently re-specify every other room filed under the same type.
+    if (dto.specs) {
+      const type = await this.roomTypesService.requireRoomType(propertyId, before.roomTypeId);
+      if (!type.isPrivate) throw RoomErrors.roomSpecsShared();
+      await this.roomTypesService.update(propertyId, type.id, dto.specs);
+    }
+
     const patch: Partial<typeof rooms.$inferInsert> = { updatedAt: new Date() };
     if (dto.roomTypeId !== undefined) patch.roomTypeId = dto.roomTypeId;
     if (dto.number !== undefined) patch.number = dto.number;
@@ -344,7 +431,7 @@ export class RoomsService {
     if (dto.status !== undefined) patch.status = dto.status;
 
     const replacingAmenities = dto.amenityIds !== undefined;
-    if (Object.keys(patch).length === 1 && !replacingAmenities) {
+    if (Object.keys(patch).length === 1 && !replacingAmenities && !dto.specs) {
       throw RoomErrors.nothingToUpdate();
     }
     const extras = replacingAmenities
@@ -403,9 +490,19 @@ export class RoomsService {
   /** Soft delete, with the room count recomputed in the same transaction. */
   async remove(propertyId: string, id: string) {
     const before = await this.requireRoom(propertyId, id);
+    // A private type exists only to hold this room's specifications, so it goes
+    // when the room goes. Its reservations still resolve — the row is soft
+    // deleted, exactly as the room's is.
+    const type = await this.roomTypesService.requireRoomType(propertyId, before.roomTypeId);
     const now = new Date();
     const roomCount = await this.db.transaction(async (tx) => {
       await tx.update(rooms).set({ deletedAt: now, updatedAt: now }).where(eq(rooms.id, id));
+      if (type.isPrivate) {
+        await tx
+          .update(roomTypes)
+          .set({ deletedAt: now, updatedAt: now })
+          .where(eq(roomTypes.id, type.id));
+      }
       return RoomsService.recountRooms(tx as unknown as Tx, propertyId);
     });
     return {

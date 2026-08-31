@@ -17,7 +17,7 @@ function svc(db: MockDb) {
     amenities,
     new StorageService({}),
   );
-  return new RoomsService(db as unknown as Database, roomTypes, amenities);
+  return new RoomsService(db as unknown as Database, roomTypes, amenities, new StorageService({}));
 }
 
 const roomRow = (over: Record<string, unknown> = {}) => ({
@@ -283,7 +283,12 @@ describe('properties.room_count stays derived', () => {
 
   it('recomputes on room CREATE', async () => {
     const db = mockDb({
-      select: { room_types: [[typeRow]], rooms: [[{ count: 4 }], [roomRow()]], amenities: [[]] },
+      select: {
+        room_types: [[typeRow]],
+        // [] — the number-availability probe, which must find nothing.
+        rooms: [[], [{ count: 4 }], [roomRow()]],
+        amenities: [[]],
+      },
       insert: { rooms: [roomRow()] },
       update: { properties: [] },
     });
@@ -296,7 +301,7 @@ describe('properties.room_count stays derived', () => {
 
   it('recomputes on room DELETE', async () => {
     const db = mockDb({
-      select: { rooms: [[roomRow()], [{ count: 2 }]] },
+      select: { rooms: [[roomRow()], [{ count: 2 }]], room_types: [[typeRow]] },
       update: { properties: [], rooms: [] },
     });
     const res = await svc(db).remove(MY_PROPERTY, 'room-1');
@@ -308,7 +313,7 @@ describe('properties.room_count stays derived', () => {
 
   it('soft-deletes rather than removing the row, so the number can come back', async () => {
     const db = mockDb({
-      select: { rooms: [[roomRow()], [{ count: 0 }]] },
+      select: { rooms: [[roomRow()], [{ count: 0 }]], room_types: [[typeRow]] },
       update: { properties: [], rooms: [] },
     });
     await svc(db).remove(MY_PROPERTY, 'room-1');
@@ -353,5 +358,84 @@ describe('RoomsService.setStatus — the narrow write', () => {
       status: 404,
     });
     expect(db.updates).toEqual([]);
+  });
+});
+
+/**
+ * Room-first inventory: a room describes ITSELF, and the type it needs to
+ * satisfy reservations, rates and channel mapping is minted behind it.
+ */
+describe('room-first inventory', () => {
+  const specs = { name: '', maxOccupancy: 2, maxAdults: 2, maxChildren: 0, baseRate: 450000 };
+
+  it('mints a PRIVATE type from the room’s own specifications', async () => {
+    const db = mockDb({
+      select: {
+        rooms: [[], [{ count: 1 }], [roomRow()]],
+        room_types: [[typeRow]],
+        amenities: [[]],
+      },
+      insert: { room_types: [typeRow], rooms: [roomRow()] },
+      update: { properties: [] },
+    });
+    await svc(db).create(MY_PROPERTY, { number: '301', specs } as never);
+
+    const written = db.inserts.find((i) => i.table === 'room_types');
+    expect(written?.values).toMatchObject({ isPrivate: true });
+    // Unnamed specs are filed under the room they belong to, so the row stays
+    // readable to anyone reading the table directly.
+    expect(written?.values).toMatchObject({ name: 'Room 301' });
+  });
+
+  it('refuses a room that is both grouped and unique, and one that is neither', async () => {
+    await expect(
+      svc(mockDb({})).create(MY_PROPERTY, { number: '301', roomTypeId: TYPE_ID, specs } as never),
+    ).rejects.toThrow(HttpException);
+    await expect(svc(mockDb({})).create(MY_PROPERTY, { number: '301' } as never)).rejects.toThrow(
+      HttpException,
+    );
+  });
+
+  it('checks the room number BEFORE minting a type, so a clash leaves no orphan', async () => {
+    const db = mockDb({ select: { rooms: [[roomRow()]] } });
+    await expect(svc(db).create(MY_PROPERTY, { number: '301', specs } as never)).rejects.toThrow(
+      HttpException,
+    );
+    expect(db.inserts.filter((i) => i.table === 'room_types')).toEqual([]);
+  });
+
+  it('refuses to edit specs through a room whose type is SHARED', async () => {
+    // Editing 201 must never silently re-specify every other room of its type.
+    const db = mockDb({
+      select: { rooms: [[roomRow()]], room_types: [[{ ...typeRow, isPrivate: false }]] },
+    });
+    await expect(
+      svc(db).update(MY_PROPERTY, 'room-1', { specs: { baseRate: 1 } } as never),
+    ).rejects.toThrow(HttpException);
+    expect(db.updates.filter((u) => u.table === 'room_types')).toEqual([]);
+  });
+
+  it('takes the private type with the room when the room is deleted', async () => {
+    const db = mockDb({
+      select: {
+        rooms: [[roomRow()], [{ count: 0 }]],
+        room_types: [[{ ...typeRow, isPrivate: true }]],
+      },
+      update: { properties: [], rooms: [], room_types: [] },
+    });
+    await svc(db).remove(MY_PROPERTY, 'room-1');
+    expect(db.updates.find((u) => u.table === 'room_types')?.values).toHaveProperty('deletedAt');
+  });
+
+  it('leaves a SHARED type alone when one of its rooms is deleted', async () => {
+    const db = mockDb({
+      select: {
+        rooms: [[roomRow()], [{ count: 0 }]],
+        room_types: [[{ ...typeRow, isPrivate: false }]],
+      },
+      update: { properties: [], rooms: [] },
+    });
+    await svc(db).remove(MY_PROPERTY, 'room-1');
+    expect(db.updates.filter((u) => u.table === 'room_types')).toEqual([]);
   });
 });

@@ -137,6 +137,13 @@ export const roomTypes = pgTable(
      * A boolean on the type states exactly what every unit of the type has.
      */
     privatePool: boolean('private_pool').notNull().default(false),
+    /**
+     * This type exists to carry ONE room's own specifications, so no interface
+     * offers it as a type to group other rooms under. Reservations, rate plans,
+     * availability and channel mappings still key on it exactly as before —
+     * being private changes who may pick it, not what it is.
+     */
+    isPrivate: boolean('is_private').notNull().default(false),
     /** Internal code the hotel already uses ("DLX-KING"). Unique per property. */
     code: varchar('code', { length: 32 }),
     /** Free text — "Ground", "LG", "2nd — garden wing" are all real answers. */
@@ -292,6 +299,47 @@ export const roomTypePhotos = pgTable(
   }),
 );
 
+/**
+ * Photos of ONE physical room, mirroring `roomTypePhotos` (and through it
+ * `propertyPhotos`) exactly: the row holds the object KEY, the bytes live in
+ * the object store, and clients receive short-lived presigned URLs.
+ *
+ * Rooms carry their own photos because on this platform they genuinely differ —
+ * the point of a room-first inventory is that 201's garden view is 201's, not
+ * something inherited from a type it shares with 202.
+ */
+export const roomPhotos = pgTable(
+  'room_photos',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    propertyId: uuid('property_id')
+      .notNull()
+      .references(() => properties.id, { onDelete: 'cascade' }),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => rooms.id, { onDelete: 'cascade' }),
+    storageKey: varchar('storage_key', { length: 512 }).notNull(),
+    contentType: varchar('content_type', { length: 128 }).notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    // The same vocabulary as room_type_photos, so one Flutter enum serves both.
+    category: varchar('category', { length: 24 })
+      .notNull()
+      .default('ROOM')
+      .$type<RoomTypePhotoCategory>(),
+    isPrimary: boolean('is_primary').notNull().default(false),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    roomIdx: index('room_photos_room_idx').on(t.roomId),
+    primaryUnique: uniqueIndex('room_photos_primary_unique')
+      .on(t.roomId)
+      .where(sql`is_primary`),
+  }),
+);
+
 /** ROOM-scoped amenities every room of this type has. */
 export const roomTypeAmenities = pgTable(
   'room_type_amenities',
@@ -407,6 +455,7 @@ export type RoomType = typeof roomTypes.$inferSelect;
 export type RoomTypeBed = typeof roomTypeBeds.$inferSelect;
 export type RoomTypePhoto = typeof roomTypePhotos.$inferSelect;
 export type Room = typeof rooms.$inferSelect;
+export type RoomPhoto = typeof roomPhotos.$inferSelect;
 
 /**
  * A date-ranged rate override for a room type (Phase 4). Over [start_date,
