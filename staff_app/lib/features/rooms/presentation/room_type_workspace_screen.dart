@@ -13,6 +13,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/primitives.dart';
 import '../../../core/widgets/states.dart';
 import '../application/rooms_controllers.dart';
+import '../application/units_controllers.dart';
 import '../data/room_models.dart';
 import '../data/unit_models.dart';
 import 'room_widgets.dart';
@@ -219,6 +220,11 @@ class _RoomTypeWorkspaceScreenState
   bool _busy = false;
   String? _submitError;
 
+  /// Photos chosen while a NEW room is being filled in, before the record
+  /// exists to attach them to. Uploaded the moment the room (or its shared
+  /// type) is saved. Empty and unused when editing an existing room.
+  final List<PendingPhoto> _pendingPhotos = [];
+
   /// Room identity — the fields that belong to the physical room rather than
   /// to its specifications.
   String _number = '';
@@ -395,19 +401,24 @@ class _RoomTypeWorkspaceScreenState
       ),
     );
     if (!mounted) return;
+
+    // The buffered photos attach to the room when it is unique, or to the
+    // shared type when several rooms were made — that is where identical rooms
+    // read their cover from.
+    final owner = numbers.length > 1
+        ? PhotoOwner.roomType(created.roomTypeId)
+        : PhotoOwner.room(created.id);
+    await _uploadPending(owner);
+    if (!mounted) return;
+
     setState(() => _dirty = false);
 
     if (numbers.length > 1) {
       messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            '${numbers.length} rooms created — add the shared photos once.',
-          ),
-        ),
+        SnackBar(content: Text('${numbers.length} rooms created.')),
       );
-      // Several identical rooms share ONE type, and their photos belong to that
-      // type so every room shows them. So we open the shared type, where the
-      // photo gallery uploads once for all of them.
+      // Open the shared type so any further photos or rates are entered once
+      // for all of them.
       router.go(Routes.roomType(created.roomTypeId));
       return;
     }
@@ -418,6 +429,40 @@ class _RoomTypeWorkspaceScreenState
     // Straight into the saved room, so photos and rates become available
     // without the hotelier hunting for the row they just made.
     router.go(Routes.room(created.id));
+  }
+
+  /// Sends the photos buffered while the room was being filled in. Failures are
+  /// surfaced but do not undo the room: the record exists, and the photos can
+  /// be added again from its gallery rather than losing the whole entry.
+  Future<void> _uploadPending(PhotoOwner owner) async {
+    if (_pendingPhotos.isEmpty) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final actions = ref.read(unitsActionsProvider);
+    var uploaded = 0;
+    try {
+      for (final photo in _pendingPhotos) {
+        await actions.uploadPhoto(
+          owner,
+          bytes: photo.bytes,
+          filename: photo.name,
+          category: photo.category,
+        );
+        uploaded += 1;
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              uploaded == 0
+                  ? 'Room saved, but the photos did not upload: ${e.message}'
+                  : '$uploaded of ${_pendingPhotos.length} photos uploaded, '
+                        'then: ${e.message}',
+            ),
+          ),
+        );
+      }
+    }
   }
 
   /// The create payload. [NewRoomType] carries the fields the original API has
@@ -529,6 +574,26 @@ class _RoomTypeWorkspaceScreenState
             children: [
               _roomHeader(context),
               gapSection,
+              // Photos lead the form — you show the room before you describe it,
+              // the way a listing opens on its gallery. On a new room these are
+              // buffered and uploaded on save; on a saved room the gallery is
+              // live. Several identical rooms share their type's photos, so the
+              // showcase there points at the type.
+              PhotosSection(
+                // A new room has no record yet, so photos buffer locally. A
+                // saved unique room owns its photos; a saved room that shares a
+                // type shows that type's photos, which is where they live.
+                owner: widget.roomId == null
+                    ? null
+                    : (_specsArePrivate
+                          ? PhotoOwner.room(widget.roomId!)
+                          : PhotoOwner.roomType(
+                              _roomTypeIdOfRoom ?? widget.roomId!,
+                            )),
+                pending: widget.roomId == null ? _pendingPhotos : null,
+                onPendingChanged: () => _touch(() {}),
+              ),
+              gapSection,
               _roomIdentity(context),
               gapSection,
               if (!_specsArePrivate) ...[_sharedSpecsNote(context), gapSection],
@@ -549,12 +614,6 @@ class _RoomTypeWorkspaceScreenState
                     ],
                   ),
                 ),
-              ),
-              gapSection,
-              PhotosSection(
-                owner: widget.roomId == null
-                    ? null
-                    : PhotoOwner.room(widget.roomId!),
               ),
               gapSection,
               AmenitiesSection(
@@ -686,18 +745,22 @@ class _RoomTypeWorkspaceScreenState
             onChanged: (v) => _touch(() => _floor = v),
           ),
         ),
-        gapMd,
-        _Field(
-          label: 'Status',
-          child: DropdownButtonFormField<RoomStatus>(
-            initialValue: _roomStatus,
-            items: [
-              for (final s in RoomStatus.values)
-                DropdownMenuItem(value: s, child: Text(s.label)),
-            ],
-            onChanged: (v) => _touch(() => _roomStatus = v ?? _roomStatus),
+        // Status is set once a room is in service — a brand-new room is simply
+        // available — so the picker appears only when editing an existing room.
+        if (widget.roomId != null) ...[
+          gapMd,
+          _Field(
+            label: 'Status',
+            child: DropdownButtonFormField<RoomStatus>(
+              initialValue: _roomStatus,
+              items: [
+                for (final s in RoomStatus.values)
+                  DropdownMenuItem(value: s, child: Text(s.label)),
+              ],
+              onChanged: (v) => _touch(() => _roomStatus = v ?? _roomStatus),
+            ),
           ),
-        ),
+        ],
         gapMd,
         _Field(
           label: 'Notes',
@@ -924,7 +987,7 @@ class _RoomTypeWorkspaceScreenState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _Field(
-            label: 'Room type name',
+            label: 'Room name',
             required: true,
             child: TextFormField(
               initialValue: d.name,
