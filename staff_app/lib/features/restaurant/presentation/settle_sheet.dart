@@ -61,14 +61,20 @@ class _SettleSheetState extends ConsumerState<SettleSheet> {
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await ref.read(restaurantActionsProvider).settle(
+      await ref
+          .read(restaurantActionsProvider)
+          .settle(
             widget.order.id,
             _method,
             reservationId: _method.isRoomCharge ? _guest!.id : null,
           );
       navigator.pop();
       messenger.showSnackBar(
-        SnackBar(content: Text('${widget.order.orderNumber} settled · ${_method.label}')),
+        SnackBar(
+          content: Text(
+            '${widget.order.orderNumber} settled · ${_method.label}',
+          ),
+        ),
       );
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -90,9 +96,16 @@ class _SettleSheetState extends ConsumerState<SettleSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Settle bill', style: AppTypography.display(size: 19, color: c.foreground)),
+              Text(
+                'Settle bill',
+                style: AppTypography.display(size: 19, color: c.foreground),
+              ),
               const SizedBox(height: Sp.md),
-              MoneyRow(label: 'Total due', value: widget.order.totalLabel, strong: true),
+              MoneyRow(
+                label: 'Total due',
+                value: widget.order.totalLabel,
+                strong: true,
+              ),
               const SizedBox(height: Sp.lg),
 
               const LabelXs('Payment method'),
@@ -143,7 +156,9 @@ class _SettleSheetState extends ConsumerState<SettleSheet> {
               const SizedBox(height: Sp.lg),
               FilledButton(
                 onPressed: _busy ? null : _settle,
-                child: Text('Take ${_method.label} · ${widget.order.totalLabel}'),
+                child: Text(
+                  'Take ${_method.label} · ${widget.order.totalLabel}',
+                ),
               ),
             ],
           ),
@@ -170,9 +185,8 @@ class _GuestPicker extends ConsumerWidget {
     final guests = ref.watch(inHouseGuestsProvider(query));
     return guests.when(
       loading: () => const ListSkeleton(rows: 2, height: 52),
-      error: (e, _) => RestaurantErrorNote(
-        message: 'Could not load in-house guests. $e',
-      ),
+      error: (e, _) =>
+          RestaurantErrorNote(message: 'Could not load in-house guests. $e'),
       data: (list) => list.isEmpty
           ? Text(
               'No checked-in guests match. A room charge needs a guest who is '
@@ -189,7 +203,9 @@ class _GuestPicker extends ConsumerWidget {
                       selected?.id == g.id
                           ? Icons.radio_button_checked
                           : Icons.radio_button_unchecked,
-                      color: selected?.id == g.id ? c.primary : c.mutedForeground,
+                      color: selected?.id == g.id
+                          ? c.primary
+                          : c.mutedForeground,
                     ),
                     title: Text(g.guestName),
                     subtitle: g.subtitle.isEmpty ? null : Text(g.subtitle),

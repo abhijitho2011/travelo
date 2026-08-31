@@ -52,10 +52,12 @@ class GateLogEntry {
   factory GateLogEntry.fromJson(Map j) => GateLogEntry(
     id: (j['id'] ?? '').toString(),
     movement: GateMovement.fromWire(j['movement'] as String?),
-    subject: (j['subject'] as String?) ?? (j['vehicleNumber'] as String?) ?? '—',
+    subject:
+        (j['subject'] as String?) ?? (j['vehicleNumber'] as String?) ?? '—',
     at:
-        DateTime.tryParse((j['at'] ?? j['createdAt'] ?? '').toString())
-            ?.toLocal() ??
+        DateTime.tryParse(
+          (j['at'] ?? j['createdAt'] ?? '').toString(),
+        )?.toLocal() ??
         DateTime.now(),
     detail: j['detail'] as String?,
   );
@@ -94,7 +96,9 @@ class Visitor {
     visiting: j['visiting'] as String?,
     purpose: j['purpose'] as String?,
     passNumber: j['passNumber'] as String?,
-    departedAt: DateTime.tryParse((j['departedAt'] ?? '').toString())?.toLocal(),
+    departedAt: DateTime.tryParse(
+      (j['departedAt'] ?? '').toString(),
+    )?.toLocal(),
   );
 }
 
@@ -120,8 +124,9 @@ class LostFoundItem {
     id: (j['id'] ?? '').toString(),
     description: (j['description'] as String?) ?? 'Item',
     foundAt:
-        DateTime.tryParse((j['foundAt'] ?? j['createdAt'] ?? '').toString())
-            ?.toLocal() ??
+        DateTime.tryParse(
+          (j['foundAt'] ?? j['createdAt'] ?? '').toString(),
+        )?.toLocal() ??
         DateTime.now(),
     location: j['location'] as String?,
     status: j['status'] as String?,
@@ -196,8 +201,9 @@ class Incident {
     severity: IncidentSeverity.fromWire(j['severity'] as String?),
     status: IncidentStatus.fromWire(j['status'] as String?),
     reportedAt:
-        DateTime.tryParse((j['reportedAt'] ?? j['createdAt'] ?? '').toString())
-            ?.toLocal() ??
+        DateTime.tryParse(
+          (j['reportedAt'] ?? j['createdAt'] ?? '').toString(),
+        )?.toLocal() ??
         DateTime.now(),
     location: j['location'] as String?,
     assignedTo: j['assignedTo'] as String?,
@@ -254,7 +260,11 @@ class SecurityShift {
 
 @immutable
 class RosterMember {
-  const RosterMember({required this.id, required this.name, required this.role});
+  const RosterMember({
+    required this.id,
+    required this.name,
+    required this.role,
+  });
 
   final String id;
   final String name;
@@ -262,15 +272,17 @@ class RosterMember {
 
   factory RosterMember.fromJson(Map j) => RosterMember(
     id: (j['id'] ?? '').toString(),
-    name: [j['firstName'], j['lastName']]
-        .where((p) => p != null && p.toString().trim().isNotEmpty)
-        .join(' ')
-        .trim()
-        .isEmpty
-        ? 'Staff'
-        : [j['firstName'], j['lastName']]
+    name:
+        [j['firstName'], j['lastName']]
             .where((p) => p != null && p.toString().trim().isNotEmpty)
-            .join(' '),
+            .join(' ')
+            .trim()
+            .isEmpty
+        ? 'Staff'
+        : [
+            j['firstName'],
+            j['lastName'],
+          ].where((p) => p != null && p.toString().trim().isNotEmpty).join(' '),
     role: (j['role'] as String?) ?? '',
   );
 }

@@ -37,7 +37,8 @@ import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/reception/presentation/check_in_screen.dart';
 import '../../features/reception/presentation/reception_dashboard_screen.dart';
-import '../../features/reception/data/reception_models.dart' show NewBookingSeed;
+import '../../features/reception/data/reception_models.dart'
+    show NewBookingSeed;
 import '../../features/reception/presentation/reservation_calendar_screen.dart';
 import '../../features/reception/presentation/reservation_detail_screen.dart';
 import '../../features/reception/presentation/reservation_form_screen.dart';
@@ -113,10 +114,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
     routes: [
       // ------------------------------------------------ unauthenticated ---
-      GoRoute(
-        path: Routes.splash,
-        builder: (_, _) => const HomeRedirect(),
-      ),
+      GoRoute(path: Routes.splash, builder: (_, _) => const HomeRedirect()),
       GoRoute(path: Routes.login, builder: (_, _) => const LoginScreen()),
       GoRoute(path: Routes.otp, builder: (_, _) => const OtpScreen()),
       GoRoute(
@@ -239,7 +237,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
 
           // Room attendant / cleaning staff (built)
-          GoRoute(path: Routes.myTasks, builder: (_, _) => const MyTasksScreen()),
+          GoRoute(
+            path: Routes.myTasks,
+            builder: (_, _) => const MyTasksScreen(),
+          ),
           GoRoute(
             path: Routes.taskPattern,
             builder: (_, state) =>
@@ -273,12 +274,18 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
 
           // Common
-          GoRoute(path: Routes.profile, builder: (_, _) => const ProfileScreen()),
+          GoRoute(
+            path: Routes.profile,
+            builder: (_, _) => const ProfileScreen(),
+          ),
           GoRoute(
             path: Routes.notifications,
             builder: (_, _) => const NotificationsScreen(),
           ),
-          GoRoute(path: Routes.support, builder: (_, _) => const SupportScreen()),
+          GoRoute(
+            path: Routes.support,
+            builder: (_, _) => const SupportScreen(),
+          ),
           GoRoute(
             path: Routes.settings,
             builder: (_, _) => const SettingsScreen(),
@@ -289,7 +296,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
 
           // ------------------- operations domains ---------------------------
-          GoRoute(path: Routes.accounts, builder: (_, _) => const AccountsScreen()),
+          GoRoute(
+            path: Routes.accounts,
+            builder: (_, _) => const AccountsScreen(),
+          ),
           GoRoute(
             path: Routes.accountsExpenses,
             builder: (_, _) => const ExpensesScreen(),
@@ -355,7 +365,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: Routes.myTables,
             builder: (_, _) => const MyTablesScreen(),
           ),
-          GoRoute(path: Routes.kitchen, builder: (_, _) => const KitchenScreen()),
+          GoRoute(
+            path: Routes.kitchen,
+            builder: (_, _) => const KitchenScreen(),
+          ),
           GoRoute(
             path: Routes.restaurantMenu,
             builder: (_, _) => const MenuManagementScreen(),
@@ -399,8 +412,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: Routes.inventoryPoPattern,
-            builder: (_, state) =>
-                PurchaseOrderDetailScreen(poId: state.pathParameters['id'] ?? ''),
+            builder: (_, state) => PurchaseOrderDetailScreen(
+              poId: state.pathParameters['id'] ?? '',
+            ),
           ),
           GoRoute(
             path: Routes.securityManager,

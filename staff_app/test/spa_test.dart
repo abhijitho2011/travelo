@@ -26,19 +26,28 @@ void main() {
     });
 
     test('unknown values degrade instead of throwing', () {
-      expect(SpaAppointmentStatus.fromWire('TELEPORTED'), SpaAppointmentStatus.booked);
+      expect(
+        SpaAppointmentStatus.fromWire('TELEPORTED'),
+        SpaAppointmentStatus.booked,
+      );
       expect(SpaBillStatus.fromWire(null), SpaBillStatus.unpaid);
       expect(SpaPaymentMethod.fromWire('CHEQUE'), isNull);
-      expect(SpaPaymentMethod.fromWire('room-charge'), SpaPaymentMethod.roomCharge);
+      expect(
+        SpaPaymentMethod.fromWire('room-charge'),
+        SpaPaymentMethod.roomCharge,
+      );
     });
   });
 
   group('appointment moves the app will offer', () {
-    test('a booked appointment can be started, an in-progress one completed', () {
-      expect(SpaAppointmentStatus.booked.canStart, isTrue);
-      expect(SpaAppointmentStatus.inProgress.canComplete, isTrue);
-      expect(SpaAppointmentStatus.booked.canComplete, isFalse);
-    });
+    test(
+      'a booked appointment can be started, an in-progress one completed',
+      () {
+        expect(SpaAppointmentStatus.booked.canStart, isTrue);
+        expect(SpaAppointmentStatus.inProgress.canComplete, isTrue);
+        expect(SpaAppointmentStatus.booked.canComplete, isFalse);
+      },
+    );
 
     test('completed / cancelled / no-show are terminal', () {
       expect(SpaAppointmentStatus.completed.isTerminal, isTrue);
@@ -49,18 +58,21 @@ void main() {
   });
 
   group('price snapshot', () {
-    test('an appointment reads the snapshotted price, whatever key the server used', () {
-      final a = SpaAppointment.fromJson({
-        'id': 'a1',
-        'guestName': 'Asha',
-        'serviceNameSnapshot': 'Deep Tissue',
-        'pricePaiseSnapshot': 30000,
-        'status': 'BOOKED',
-      });
-      expect(a.pricePaise, 30000);
-      expect(a.serviceName, 'Deep Tissue');
-      expect(a.priceLabel, contains('300'));
-    });
+    test(
+      'an appointment reads the snapshotted price, whatever key the server used',
+      () {
+        final a = SpaAppointment.fromJson({
+          'id': 'a1',
+          'guestName': 'Asha',
+          'serviceNameSnapshot': 'Deep Tissue',
+          'pricePaiseSnapshot': 30000,
+          'status': 'BOOKED',
+        });
+        expect(a.pricePaise, 30000);
+        expect(a.serviceName, 'Deep Tissue');
+        expect(a.priceLabel, contains('300'));
+      },
+    );
 
     test('a service carries its live price and duration', () {
       final s = SpaService.fromJson({
@@ -97,7 +109,10 @@ void main() {
     });
 
     test('the therapist lands on My Appointments', () {
-      expect(RoleConfig.of(StaffRole.spaStaff).homeRoute, Routes.spaAppointments);
+      expect(
+        RoleConfig.of(StaffRole.spaStaff).homeRoute,
+        Routes.spaAppointments,
+      );
     });
   });
 }

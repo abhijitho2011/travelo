@@ -10,12 +10,15 @@ import 'package:tavelo_staff/features/maintenance/data/work_order_models.dart';
 /// technician can do next, and how the two new roles are wired.
 void main() {
   group('HkTaskStatus', () {
-    test('parses however the server spelt it, unknown falls back to pending', () {
-      expect(HkTaskStatus.fromWire('IN_PROGRESS'), HkTaskStatus.inProgress);
-      expect(HkTaskStatus.fromWire('rejected'), HkTaskStatus.rejected);
-      expect(HkTaskStatus.fromWire('???'), HkTaskStatus.pending);
-      expect(HkTaskStatus.fromWire(null), HkTaskStatus.pending);
-    });
+    test(
+      'parses however the server spelt it, unknown falls back to pending',
+      () {
+        expect(HkTaskStatus.fromWire('IN_PROGRESS'), HkTaskStatus.inProgress);
+        expect(HkTaskStatus.fromWire('rejected'), HkTaskStatus.rejected);
+        expect(HkTaskStatus.fromWire('???'), HkTaskStatus.pending);
+        expect(HkTaskStatus.fromWire(null), HkTaskStatus.pending);
+      },
+    );
 
     test('the attendant only ever drives start then complete', () {
       expect(HkTaskStatus.pending.attendantAction, 'start');
@@ -76,7 +79,10 @@ void main() {
       );
       expect(wo(WoStatus.open).actions, [WoAction.accept]);
       expect(wo(WoStatus.accepted).actions, [WoAction.start]);
-      expect(wo(WoStatus.inProgress).actions, [WoAction.pause, WoAction.complete]);
+      expect(wo(WoStatus.inProgress).actions, [
+        WoAction.pause,
+        WoAction.complete,
+      ]);
       expect(wo(WoStatus.paused).actions, [WoAction.resume]);
       expect(wo(WoStatus.completed).actions, isEmpty);
       expect(wo(WoStatus.cancelled).actions, isEmpty);
@@ -126,12 +132,21 @@ void main() {
               'id': 'r1',
               'number': '101',
               'status': 'DIRTY',
-              'task': {'id': 't1', 'type': 'CHECKOUT_CLEAN', 'status': 'PENDING'},
+              'task': {
+                'id': 't1',
+                'type': 'CHECKOUT_CLEAN',
+                'status': 'PENDING',
+              },
             },
           ],
         },
         'areaTasks': [
-          {'id': 'a1', 'type': 'AREA_CLEAN', 'status': 'PENDING', 'area': 'Lobby'},
+          {
+            'id': 'a1',
+            'type': 'AREA_CLEAN',
+            'status': 'PENDING',
+            'area': 'Lobby',
+          },
         ],
       });
       expect(b.totalRooms, 2);
@@ -152,7 +167,10 @@ void main() {
     });
 
     test('the technician lands on their work orders', () {
-      expect(RoleConfig.of(StaffRole.technician).homeRoute, Routes.myWorkOrders);
+      expect(
+        RoleConfig.of(StaffRole.technician).homeRoute,
+        Routes.myWorkOrders,
+      );
       expect(RoleConfig.of(StaffRole.technician).built, isTrue);
     });
 

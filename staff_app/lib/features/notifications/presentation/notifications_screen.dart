@@ -26,9 +26,7 @@ class NotificationsScreen extends ConsumerWidget {
         PageHeader(
           eyebrow: 'Account',
           title: 'Notifications',
-          subtitle: unread == 0
-              ? 'You are up to date.'
-              : '$unread unread',
+          subtitle: unread == 0 ? 'You are up to date.' : '$unread unread',
           actions: [
             if (unread > 0)
               OutlinedButton.icon(

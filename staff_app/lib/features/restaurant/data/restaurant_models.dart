@@ -310,7 +310,9 @@ class OrderLine {
   String get lineTotalLabel => formatPaise(lineTotalPaise);
 
   factory OrderLine.fromJson(Map json) {
-    final price = _int(_pick(json, ['pricePaise', 'price_paise_snapshot', 'pricePaiseSnapshot']));
+    final price = _int(
+      _pick(json, ['pricePaise', 'price_paise_snapshot', 'pricePaiseSnapshot']),
+    );
     final qty = _int(_pick(json, ['qty']), 1);
     return OrderLine(
       id: _str(_pick(json, ['id'])) ?? '',
@@ -318,7 +320,9 @@ class OrderLine {
       pricePaise: price,
       qty: qty,
       lineTotalPaise: _int(_pick(json, ['lineTotalPaise']), price * qty),
-      kotStatus: KotStatus.fromWire(_str(_pick(json, ['kotStatus', 'kot_status']))),
+      kotStatus: KotStatus.fromWire(
+        _str(_pick(json, ['kotStatus', 'kot_status'])),
+      ),
       notes: _str(_pick(json, ['notes'])),
       menuItemId: _str(_pick(json, ['menuItemId', 'menu_item_id'])),
     );
@@ -392,7 +396,9 @@ class RestaurantOrder {
     items: _mapList(_pick(json, ['items'])).map(OrderLine.fromJson).toList(),
     tableId: _str(_pick(json, ['tableId', 'table_id'])),
     tableName: _str(_pick(json, ['tableName', 'table_name'])),
-    paymentMethod: PaymentMethod.fromWire(_str(_pick(json, ['paymentMethod', 'payment_method']))),
+    paymentMethod: PaymentMethod.fromWire(
+      _str(_pick(json, ['paymentMethod', 'payment_method'])),
+    ),
     reservationId: _str(_pick(json, ['reservationId', 'reservation_id'])),
     createdAt: _date(_pick(json, ['createdAt', 'created_at'])),
     billedAt: _date(_pick(json, ['billedAt', 'billed_at'])),
@@ -459,8 +465,7 @@ class RestaurantSummary {
 
   String get revenueLabel => formatPaise(revenuePaise);
 
-  int get totalTables =>
-      tablesByStatus.values.fold(0, (sum, n) => sum + n);
+  int get totalTables => tablesByStatus.values.fold(0, (sum, n) => sum + n);
 
   factory RestaurantSummary.fromJson(Map json) {
     final tables = <RestaurantTableStatus, int>{};
@@ -476,7 +481,9 @@ class RestaurantSummary {
       rawMethods.forEach((k, v) {
         final m = PaymentMethod.fromWire(k.toString());
         if (m != null) {
-          final revenue = v is Map ? _int(_pick(v, ['revenuePaise', 'revenue_paise'])) : _int(v);
+          final revenue = v is Map
+              ? _int(_pick(v, ['revenuePaise', 'revenue_paise']))
+              : _int(v);
           methods[m] = revenue;
         }
       });
@@ -515,7 +522,9 @@ class InHouseGuest {
     id: _str(_pick(json, ['id'])) ?? '',
     guestName: _str(_pick(json, ['guestName', 'guest_name'])) ?? '—',
     roomNumber: _str(_pick(json, ['roomNumber', 'room_number'])),
-    reservationNumber: _str(_pick(json, ['reservationNumber', 'reservation_number'])),
+    reservationNumber: _str(
+      _pick(json, ['reservationNumber', 'reservation_number']),
+    ),
   );
 }
 

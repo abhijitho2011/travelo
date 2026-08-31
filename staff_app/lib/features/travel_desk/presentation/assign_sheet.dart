@@ -13,14 +13,19 @@ class AssignSheet extends ConsumerStatefulWidget {
 
   final TransportRequest request;
 
-  static Future<void> show(BuildContext context, WidgetRef ref, TransportRequest request) =>
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        showDragHandle: true,
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.85),
-        builder: (_) => AssignSheet(request: request),
-      );
+  static Future<void> show(
+    BuildContext context,
+    WidgetRef ref,
+    TransportRequest request,
+  ) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+    ),
+    builder: (_) => AssignSheet(request: request),
+  );
 
   @override
   ConsumerState<AssignSheet> createState() => _AssignSheetState();
@@ -52,7 +57,11 @@ class _AssignSheetState extends ConsumerState<AssignSheet> {
     try {
       await ref
           .read(travelDeskActionsProvider)
-          .assign(widget.request.id, driverStaffId: _driverId!, vehicleId: _vehicleId);
+          .assign(
+            widget.request.id,
+            driverStaffId: _driverId!,
+            vehicleId: _vehicleId,
+          );
       navigator.pop();
     } on ApiException catch (e) {
       setState(() {
@@ -78,11 +87,16 @@ class _AssignSheetState extends ConsumerState<AssignSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Assign ${widget.request.guestName}', style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            'Assign ${widget.request.guestName}',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
           const SizedBox(height: Sp.md),
           drivers.when(
             loading: () => const ListSkeleton(rows: 1, height: 56),
-            error: (e, _) => Text('Could not load drivers: ${e is ApiException ? e.message : e}'),
+            error: (e, _) => Text(
+              'Could not load drivers: ${e is ApiException ? e.message : e}',
+            ),
             data: (list) => list.isEmpty
                 ? const EmptyState(
                     title: 'No drivers found',
@@ -105,24 +119,39 @@ class _AssignSheetState extends ConsumerState<AssignSheet> {
             error: (_, _) => const SizedBox.shrink(),
             data: (list) => DropdownButtonFormField<String?>(
               initialValue: _vehicleId,
-              decoration: const InputDecoration(labelText: 'Vehicle (optional)'),
+              decoration: const InputDecoration(
+                labelText: 'Vehicle (optional)',
+              ),
               items: [
                 const DropdownMenuItem(value: null, child: Text('No vehicle')),
-                for (final v in list.where((v) => v.status == VehicleStatus.available || v.id == _vehicleId))
-                  DropdownMenuItem(value: v.id, child: Text('${v.name} (${v.plate})')),
+                for (final v in list.where(
+                  (v) =>
+                      v.status == VehicleStatus.available || v.id == _vehicleId,
+                ))
+                  DropdownMenuItem(
+                    value: v.id,
+                    child: Text('${v.name} (${v.plate})'),
+                  ),
               ],
               onChanged: (v) => setState(() => _vehicleId = v),
             ),
           ),
           if (_error != null) ...[
             const SizedBox(height: Sp.md),
-            Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            Text(
+              _error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
           ],
           const SizedBox(height: Sp.lg),
           FilledButton(
             onPressed: _busy ? null : _assign,
             child: _busy
-                ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : const Text('Assign'),
           ),
         ],

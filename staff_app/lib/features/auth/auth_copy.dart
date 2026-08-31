@@ -70,8 +70,7 @@ class AuthMessage {
     ),
     ApiErrorCodes.accountSuspended => AuthMessage(
       title: 'Account suspended',
-      body:
-          'Your account is suspended, so access to Tavelo is paused.',
+      body: 'Your account is suspended, so access to Tavelo is paused.',
       detail:
           'Your General Manager can lift the suspension. Nothing you have '
           'already recorded has been lost.',
@@ -141,8 +140,7 @@ class AuthMessage {
       'Too many attempts. Please wait a few minutes before trying again.',
     ApiErrorCodes.network =>
       "We couldn't reach Tavelo. Check your connection and try again.",
-    ApiErrorCodes.transport =>
-      'The connection dropped. Please try again.',
+    ApiErrorCodes.transport => 'The connection dropped. Please try again.',
     _ => e.message,
   };
 

@@ -37,7 +37,10 @@ class DriverScreen extends ConsumerWidget {
         gapSection,
         trips.when(
           loading: () => const ListSkeleton(rows: 4),
-          error: (e, _) => ErrorState(error: e, onRetry: () => ref.invalidate(myTripsProvider)),
+          error: (e, _) => ErrorState(
+            error: e,
+            onRetry: () => ref.invalidate(myTripsProvider),
+          ),
           data: (list) {
             if (list.isEmpty) {
               return const EmptyState(
@@ -52,7 +55,10 @@ class DriverScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (active.isNotEmpty) ...[
-                  SectionHeader(title: 'Active', icon: Icons.play_circle_outline),
+                  SectionHeader(
+                    title: 'Active',
+                    icon: Icons.play_circle_outline,
+                  ),
                   for (final t in active) _TripCard(trip: t),
                   gapSection,
                 ],
@@ -76,9 +82,10 @@ class _TripCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final route = [trip.fromLocation, trip.toLocation]
-        .where((s) => s != null && s.isNotEmpty)
-        .join(' → ');
+    final route = [
+      trip.fromLocation,
+      trip.toLocation,
+    ].where((s) => s != null && s.isNotEmpty).join(' → ');
     return Padding(
       padding: const EdgeInsets.only(bottom: Sp.md),
       child: SoftCard(
@@ -112,7 +119,10 @@ class _TripCard extends StatelessWidget {
             ),
             if (route.isNotEmpty) ...[
               const SizedBox(height: 2),
-              Text(route, style: AppTypography.body(size: 12.5, color: c.mutedForeground)),
+              Text(
+                route,
+                style: AppTypography.body(size: 12.5, color: c.mutedForeground),
+              ),
             ],
           ],
         ),

@@ -31,9 +31,7 @@ class OrderScreen extends ConsumerWidget {
     final order = ref.watch(orderProvider(orderId));
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(order.value?.orderNumber ?? 'Order'),
-      ),
+      appBar: AppBar(title: Text(order.value?.orderNumber ?? 'Order')),
       body: order.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => ErrorState(
@@ -60,7 +58,8 @@ class _OrderBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
-    final canAddItems = order.status.isOpen && ref.watch(canProvider(P.orderUpdate));
+    final canAddItems =
+        order.status.isOpen && ref.watch(canProvider(P.orderUpdate));
 
     return Stack(
       children: [
@@ -75,11 +74,17 @@ class _OrderBody extends ConsumerWidget {
                     children: [
                       Text(
                         order.where,
-                        style: AppTypography.display(size: 20, color: c.foreground),
+                        style: AppTypography.display(
+                          size: 20,
+                          color: c.foreground,
+                        ),
                       ),
                       Text(
                         '${order.guestCount} guests · ${order.orderNumber}',
-                        style: AppTypography.body(size: 12.5, color: c.mutedForeground),
+                        style: AppTypography.body(
+                          size: 12.5,
+                          color: c.mutedForeground,
+                        ),
                       ),
                     ],
                   ),
@@ -112,13 +117,20 @@ class _OrderBody extends ConsumerWidget {
             Panel(
               title: order.status.isOpen ? 'Running total' : 'Bill',
               child: order.status.isOpen
-                  ? MoneyRow(label: 'Subtotal (so far)', value: order.runningSubtotalLabel)
+                  ? MoneyRow(
+                      label: 'Subtotal (so far)',
+                      value: order.runningSubtotalLabel,
+                    )
                   : Column(
                       children: [
                         MoneyRow(label: 'Subtotal', value: order.subtotalLabel),
                         MoneyRow(label: 'Tax', value: order.taxLabel),
                         const SizedBox(height: 4),
-                        MoneyRow(label: 'Total', value: order.totalLabel, strong: true),
+                        MoneyRow(
+                          label: 'Total',
+                          value: order.totalLabel,
+                          strong: true,
+                        ),
                         if (order.paymentMethod != null) ...[
                           const SizedBox(height: 6),
                           Align(
@@ -158,7 +170,11 @@ class _OrderBody extends ConsumerWidget {
     );
   }
 
-  Future<void> _openMenu(BuildContext context, WidgetRef ref, RestaurantOrder order) async {
+  Future<void> _openMenu(
+    BuildContext context,
+    WidgetRef ref,
+    RestaurantOrder order,
+  ) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -181,7 +197,8 @@ class _OrderLineRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
     final canKot = order.status.isOpen && ref.watch(canProvider(P.kotUpdate));
-    final canCancel = order.status.isOpen && ref.watch(canProvider(P.orderUpdate));
+    final canCancel =
+        order.status.isOpen && ref.watch(canProvider(P.orderUpdate));
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -214,16 +231,26 @@ class _OrderLineRow extends ConsumerWidget {
                 if (line.notes != null)
                   Text(
                     line.notes!,
-                    style: AppTypography.body(size: 11.5, color: c.mutedForeground),
+                    style: AppTypography.body(
+                      size: 11.5,
+                      color: c.mutedForeground,
+                    ),
                   ),
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    StatusBadge(tone: line.kotStatus.tone, label: line.kotStatus.label, dense: true),
+                    StatusBadge(
+                      tone: line.kotStatus.tone,
+                      label: line.kotStatus.label,
+                      dense: true,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       line.lineTotalLabel,
-                      style: AppTypography.numeric(size: 12, color: c.mutedForeground),
+                      style: AppTypography.numeric(
+                        size: 12,
+                        color: c.mutedForeground,
+                      ),
                     ),
                   ],
                 ),
@@ -253,7 +280,9 @@ class _OrderLineRow extends ConsumerWidget {
     try {
       await ref.read(restaurantActionsProvider).setKot(order.id, line.id, to);
     } on ApiException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(RestaurantErrors.friendly(e))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(RestaurantErrors.friendly(e))),
+      );
     }
   }
 
@@ -262,7 +291,9 @@ class _OrderLineRow extends ConsumerWidget {
     try {
       await ref.read(restaurantActionsProvider).cancelItem(order.id, line.id);
     } on ApiException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(RestaurantErrors.friendly(e))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(RestaurantErrors.friendly(e))),
+      );
     }
   }
 }
@@ -330,9 +361,13 @@ class _OrderActions extends ConsumerWidget {
     final messenger = ScaffoldMessenger.of(context);
     try {
       await ref.read(restaurantActionsProvider).bill(order.id);
-      messenger.showSnackBar(const SnackBar(content: Text('Bill ready to settle.')));
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Bill ready to settle.')),
+      );
     } on ApiException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(RestaurantErrors.friendly(e))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(RestaurantErrors.friendly(e))),
+      );
     }
   }
 
@@ -344,7 +379,9 @@ class _OrderActions extends ConsumerWidget {
       await ref.read(restaurantActionsProvider).cancelOrder(order.id, reason);
       messenger.showSnackBar(const SnackBar(content: Text('Order voided.')));
     } on ApiException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(RestaurantErrors.friendly(e))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(RestaurantErrors.friendly(e))),
+      );
     }
   }
 }
@@ -401,7 +438,8 @@ class _MenuCartSheetState extends ConsumerState<_MenuCartSheet> {
   String? _error;
 
   int get _cartCount => _cart.values.fold(0, (sum, l) => sum + l.qty);
-  int get _cartTotal => _cart.values.fold(0, (sum, l) => sum + l.lineTotalPaise);
+  int get _cartTotal =>
+      _cart.values.fold(0, (sum, l) => sum + l.lineTotalPaise);
 
   void _add(MenuItem item) {
     setState(() {
@@ -460,7 +498,10 @@ class _MenuCartSheetState extends ConsumerState<_MenuCartSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Add to order', style: AppTypography.display(size: 18, color: c.foreground)),
+            Text(
+              'Add to order',
+              style: AppTypography.display(size: 18, color: c.foreground),
+            ),
             const SizedBox(height: Sp.sm),
             Flexible(
               child: menu.when(
@@ -468,12 +509,16 @@ class _MenuCartSheetState extends ConsumerState<_MenuCartSheet> {
                 error: (e, _) => ErrorState(error: e),
                 data: (categories) {
                   final active = categories
-                      .map((cat) => MenuCategory(
-                            id: cat.id,
-                            name: cat.name,
-                            sortOrder: cat.sortOrder,
-                            items: cat.items.where((i) => i.status.isOrderable).toList(),
-                          ))
+                      .map(
+                        (cat) => MenuCategory(
+                          id: cat.id,
+                          name: cat.name,
+                          sortOrder: cat.sortOrder,
+                          items: cat.items
+                              .where((i) => i.status.isOrderable)
+                              .toList(),
+                        ),
+                      )
                       .where((cat) => cat.items.isNotEmpty)
                       .toList();
                   if (active.isEmpty) {
@@ -565,16 +610,16 @@ class _MenuPickRow extends StatelessWidget {
                 ),
                 Text(
                   item.priceLabel,
-                  style: AppTypography.numeric(size: 12, color: c.mutedForeground),
+                  style: AppTypography.numeric(
+                    size: 12,
+                    color: c.mutedForeground,
+                  ),
                 ),
               ],
             ),
           ),
           if (qty == 0)
-            OutlinedButton(
-              onPressed: onAdd,
-              child: const Text('Add'),
-            )
+            OutlinedButton(onPressed: onAdd, child: const Text('Add'))
           else
             Row(
               children: [

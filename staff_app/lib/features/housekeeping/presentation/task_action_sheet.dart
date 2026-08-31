@@ -59,7 +59,9 @@ class _TaskActionSheetState extends ConsumerState<_TaskActionSheet> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok)));
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -112,12 +114,16 @@ class _TaskActionSheetState extends ConsumerState<_TaskActionSheet> {
           // ---- Assign ----
           PermissionGate(
             permission: P.taskAssign,
-            child: _AssignSection(task: task, busy: _busy, onAssign: (staffId) {
-              _run(
-                () => ref.read(boardActionsProvider).assign(task.id, staffId),
-                'Task assigned',
-              );
-            }),
+            child: _AssignSection(
+              task: task,
+              busy: _busy,
+              onAssign: (staffId) {
+                _run(
+                  () => ref.read(boardActionsProvider).assign(task.id, staffId),
+                  'Task assigned',
+                );
+              },
+            ),
           ),
 
           // ---- Inspect ----
@@ -152,13 +158,15 @@ class _TaskActionSheetState extends ConsumerState<_TaskActionSheet> {
                           onPressed: _busy
                               ? null
                               : () => _run(
-                                    () => ref.read(boardActionsProvider).inspect(
-                                          task.id,
-                                          pass: false,
-                                          notes: _notes.text.trim(),
-                                        ),
-                                    'Task rejected — a re-clean was raised',
-                                  ),
+                                  () => ref
+                                      .read(boardActionsProvider)
+                                      .inspect(
+                                        task.id,
+                                        pass: false,
+                                        notes: _notes.text.trim(),
+                                      ),
+                                  'Task rejected — a re-clean was raised',
+                                ),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: c.critical,
                           ),
@@ -172,13 +180,15 @@ class _TaskActionSheetState extends ConsumerState<_TaskActionSheet> {
                           onPressed: _busy
                               ? null
                               : () => _run(
-                                    () => ref.read(boardActionsProvider).inspect(
-                                          task.id,
-                                          pass: true,
-                                          notes: _notes.text.trim(),
-                                        ),
-                                    'Passed — room is ready',
-                                  ),
+                                  () => ref
+                                      .read(boardActionsProvider)
+                                      .inspect(
+                                        task.id,
+                                        pass: true,
+                                        notes: _notes.text.trim(),
+                                      ),
+                                  'Passed — room is ready',
+                                ),
                           icon: const Icon(Icons.check, size: 18),
                           label: const Text('Pass'),
                         ),

@@ -26,7 +26,10 @@ class DriverTripScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Trip')),
       body: trip.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => ErrorState(error: e, onRetry: () => ref.invalidate(myTripProvider(tripId))),
+        error: (e, _) => ErrorState(
+          error: e,
+          onRetry: () => ref.invalidate(myTripProvider(tripId)),
+        ),
         data: (t) => t == null
             ? const EmptyState(
                 title: 'Trip not found',
@@ -67,9 +70,10 @@ class _TripDetailState extends ConsumerState<_TripDetail> {
     final c = context.colors;
     final t = widget.trip;
     final next = t.nextDriverStep;
-    final route = [t.fromLocation, t.toLocation]
-        .where((s) => s != null && s.isNotEmpty)
-        .join('\n→ ');
+    final route = [
+      t.fromLocation,
+      t.toLocation,
+    ].where((s) => s != null && s.isNotEmpty).join('\n→ ');
 
     return PageBody(
       children: [
@@ -93,7 +97,8 @@ class _TripDetailState extends ConsumerState<_TripDetail> {
               _row(context, 'Type', t.type.label),
               _row(context, 'Pickup', Fmt.dateTime(t.pickupAt)),
               if (route.isNotEmpty) _row(context, 'Route', route),
-              if (t.vehicleName != null) _row(context, 'Vehicle', t.vehicleName!),
+              if (t.vehicleName != null)
+                _row(context, 'Vehicle', t.vehicleName!),
               _row(context, 'Fare', t.fareLabel),
               if (t.note != null) _row(context, 'Note', t.note!),
               _row(context, 'Progress', t.driverStage?.label ?? '—'),
@@ -105,7 +110,11 @@ class _TripDetailState extends ConsumerState<_TripDetail> {
           FilledButton.icon(
             onPressed: _busy ? null : () => _step(next),
             icon: _busy
-                ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    height: 16,
+                    width: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : const Icon(Icons.arrow_forward),
             label: Text(next.label),
           )

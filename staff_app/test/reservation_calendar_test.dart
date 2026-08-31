@@ -60,22 +60,25 @@ void main() {
       expect(last.room.roomTypeName, 'Suite');
     });
 
-    test('the unassigned lane comes first, and only when it holds something', () {
-      final rooms = [_room('r1', '101', 'Deluxe')];
+    test(
+      'the unassigned lane comes first, and only when it holds something',
+      () {
+        final rooms = [_room('r1', '101', 'Deluxe')];
 
-      // Nothing unassigned: the rack opens straight on the first room.
-      expect(_data(rooms: rooms).lanes.first, isA<CalendarRoomLane>());
+        // Nothing unassigned: the rack opens straight on the first room.
+        expect(_data(rooms: rooms).lanes.first, isA<CalendarRoomLane>());
 
-      final held = _res(
-        'a',
-        checkIn: DateTime(2026, 9, 2),
-        checkOut: DateTime(2026, 9, 4),
-      );
-      final withHeld = _data(rooms: rooms, unassigned: [held]).lanes;
-      expect(withHeld.first, isA<CalendarUnassignedLane>());
-      expect((withHeld.first as CalendarUnassignedLane).count, 1);
-      expect(withHeld.length, 2);
-    });
+        final held = _res(
+          'a',
+          checkIn: DateTime(2026, 9, 2),
+          checkOut: DateTime(2026, 9, 4),
+        );
+        final withHeld = _data(rooms: rooms, unassigned: [held]).lanes;
+        expect(withHeld.first, isA<CalendarUnassignedLane>());
+        expect((withHeld.first as CalendarUnassignedLane).count, 1);
+        expect(withHeld.length, 2);
+      },
+    );
 
     test('no rooms and nothing unassigned means no lanes at all', () {
       expect(_data(rooms: const []).lanes, isEmpty);
@@ -85,7 +88,10 @@ void main() {
   group('window arithmetic', () {
     test('the window ends exactly windowDays after it starts', () {
       final data = _data(rooms: const []);
-      expect(data.windowEnd.difference(data.windowStart).inDays, kCalendarWindowDays);
+      expect(
+        data.windowEnd.difference(data.windowStart).inDays,
+        kCalendarWindowDays,
+      );
     });
   });
 }

@@ -100,7 +100,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 padding: const EdgeInsets.only(right: Sp.sm),
                 child: Text(
                   '+91',
-                  style: AppTypography.numeric(size: 15, color: c.mutedForeground),
+                  style: AppTypography.numeric(
+                    size: 15,
+                    color: c.mutedForeground,
+                  ),
                 ),
               ),
             ),
@@ -115,9 +118,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         const SizedBox(height: Sp.lg),
         FilledButton(
           onPressed: auth.busy ? null : _sendOtp,
-          child: auth.busy
-              ? const _ButtonSpinner()
-              : const Text('Send OTP'),
+          child: auth.busy ? const _ButtonSpinner() : const Text('Send OTP'),
         ),
 
         const SizedBox(height: Sp.xl),
@@ -139,8 +140,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         OutlinedButton.icon(
           onPressed: auth.busy
               ? null
-              : () =>
-                    ref.read(authControllerProvider.notifier).signInWithGoogle(),
+              : () => ref
+                    .read(authControllerProvider.notifier)
+                    .signInWithGoogle(),
           icon: const _GoogleGlyph(),
           label: const Text('Continue with Google'),
         ),

@@ -7,32 +7,40 @@ final inventorySummaryProvider = FutureProvider.autoDispose<InventorySummary?>(
   (ref) => ref.watch(inventoryRepositoryProvider).summary(),
 );
 
-final itemsLowStockFilterProvider = StateProvider.autoDispose<bool>((_) => false);
+final itemsLowStockFilterProvider = StateProvider.autoDispose<bool>(
+  (_) => false,
+);
 
 final itemsProvider = FutureProvider.autoDispose<List<InventoryItem>>((ref) {
   final lowStock = ref.watch(itemsLowStockFilterProvider);
   return ref.watch(inventoryRepositoryProvider).items(lowStock: lowStock);
 });
 
-final movementsProvider =
-    FutureProvider.autoDispose.family<List<StockMovement>, String?>(
-      (ref, itemId) => ref.watch(inventoryRepositoryProvider).movements(itemId: itemId),
+final movementsProvider = FutureProvider.autoDispose
+    .family<List<StockMovement>, String?>(
+      (ref, itemId) =>
+          ref.watch(inventoryRepositoryProvider).movements(itemId: itemId),
     );
 
 final suppliersProvider = FutureProvider.autoDispose<List<Supplier>>(
   (ref) => ref.watch(inventoryRepositoryProvider).suppliers(),
 );
 
-final poStatusFilterProvider = StateProvider.autoDispose<PurchaseOrderStatus?>((_) => null);
+final poStatusFilterProvider = StateProvider.autoDispose<PurchaseOrderStatus?>(
+  (_) => null,
+);
 
-final purchaseOrdersProvider = FutureProvider.autoDispose<List<PurchaseOrder>>((ref) {
+final purchaseOrdersProvider = FutureProvider.autoDispose<List<PurchaseOrder>>((
+  ref,
+) {
   final status = ref.watch(poStatusFilterProvider);
   return ref.watch(inventoryRepositoryProvider).purchaseOrders(status: status);
 });
 
-final purchaseOrderProvider = FutureProvider.autoDispose.family<PurchaseOrder?, String>(
-  (ref, id) => ref.watch(inventoryRepositoryProvider).purchaseOrder(id),
-);
+final purchaseOrderProvider = FutureProvider.autoDispose
+    .family<PurchaseOrder?, String>(
+      (ref, id) => ref.watch(inventoryRepositoryProvider).purchaseOrder(id),
+    );
 
 class InventoryActions {
   const InventoryActions(this._ref);
@@ -51,7 +59,10 @@ class InventoryActions {
     return i;
   }
 
-  Future<InventoryItem> updateItem(String id, Map<String, dynamic> changes) async {
+  Future<InventoryItem> updateItem(
+    String id,
+    Map<String, dynamic> changes,
+  ) async {
     final i = await _repo.updateItem(id, changes);
     _invalidateAll();
     return i;
@@ -82,7 +93,10 @@ class InventoryActions {
     return p;
   }
 
-  Future<PurchaseOrder> setPoStatus(String id, PurchaseOrderStatus status) async {
+  Future<PurchaseOrder> setPoStatus(
+    String id,
+    PurchaseOrderStatus status,
+  ) async {
     final p = await _repo.setPoStatus(id, status);
     _ref.invalidate(purchaseOrdersProvider);
     _ref.invalidate(purchaseOrderProvider(id));

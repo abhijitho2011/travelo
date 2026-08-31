@@ -242,7 +242,8 @@ class _CheckInFlowState extends ConsumerState<_CheckInFlow> {
         PageHeader(
           eyebrow: 'Front office · ${r.reservationNumber}',
           title: 'Check in ${r.guestName}',
-          subtitle: 'Step ${_index + 1} of ${steps.length} · '
+          subtitle:
+              'Step ${_index + 1} of ${steps.length} · '
               '${_current.title}',
         ),
         gapMd,
@@ -610,7 +611,9 @@ class _ConfirmArrival extends StatelessWidget {
         _Line(label: 'Room', value: roomNumber ?? Fmt.dash),
         _Line(
           label: 'ID',
-          value: idType == null ? Fmt.dash : '${Fmt.humanise(idType!)} $idNumber',
+          value: idType == null
+              ? Fmt.dash
+              : '${Fmt.humanise(idType!)} $idNumber',
         ),
         _Line(label: 'Nights', value: r.nightsLabel),
         _Line(label: 'Balance', value: r.balanceLabel),

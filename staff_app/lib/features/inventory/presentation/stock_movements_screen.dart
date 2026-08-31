@@ -20,11 +20,17 @@ class StockMovementsScreen extends ConsumerWidget {
     return PageBody(
       onRefresh: () async => ref.invalidate(movementsProvider(null)),
       children: [
-        const PageHeader(title: 'Stock movements', subtitle: 'The store ledger.'),
+        const PageHeader(
+          title: 'Stock movements',
+          subtitle: 'The store ledger.',
+        ),
         gapSection,
         movements.when(
           loading: () => const ListSkeleton(rows: 6),
-          error: (e, _) => ErrorState(error: e, onRetry: () => ref.invalidate(movementsProvider(null))),
+          error: (e, _) => ErrorState(
+            error: e,
+            onRetry: () => ref.invalidate(movementsProvider(null)),
+          ),
           data: (list) => list.isEmpty
               ? const EmptyState(
                   title: 'No movements yet',
@@ -44,11 +50,17 @@ class StockMovementsScreen extends ConsumerWidget {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    StatusBadge(tone: m.type.tone, label: m.type.label, dense: true),
+                                    StatusBadge(
+                                      tone: m.type.tone,
+                                      label: m.type.label,
+                                      dense: true,
+                                    ),
                                     const SizedBox(height: 4),
                                     Text(
                                       [m.reason, Fmt.ago(m.createdAt)]
-                                          .where((s) => s != null && s != Fmt.dash)
+                                          .where(
+                                            (s) => s != null && s != Fmt.dash,
+                                          )
                                           .join(' · '),
                                       style: AppTypography.body(
                                         size: 12,

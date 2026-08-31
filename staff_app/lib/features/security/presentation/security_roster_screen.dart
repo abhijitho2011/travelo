@@ -46,7 +46,10 @@ class SecurityRosterScreen extends ConsumerWidget {
         gapSection,
         shifts.when(
           loading: () => const ListSkeleton(rows: 3, height: 68),
-          error: (e, _) => ErrorState(error: e, onRetry: () => ref.invalidate(securityShiftsProvider)),
+          error: (e, _) => ErrorState(
+            error: e,
+            onRetry: () => ref.invalidate(securityShiftsProvider),
+          ),
           data: (list) => list.isEmpty
               ? const EmptyState(
                   title: 'No shifts scheduled',
@@ -110,7 +113,9 @@ class _ShiftRowState extends ConsumerState<_ShiftRow> {
     setState(() => _busy = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await ref.read(securityRepositoryProvider).setShiftStatus(widget.shift.id, status);
+      await ref
+          .read(securityRepositoryProvider)
+          .setShiftStatus(widget.shift.id, status);
       ref.invalidate(securityShiftsProvider);
       ref.invalidate(securityDashboardProvider);
     } on ApiException catch (e) {
@@ -128,20 +133,28 @@ class _ShiftRowState extends ConsumerState<_ShiftRow> {
       subtitle: [
         if (s.startAt != null) 'From ${Fmt.time(s.startAt)}',
       ].join(' · '),
-      badge: StatusBadge(tone: s.status.tone, label: s.status.label, dense: true),
+      badge: StatusBadge(
+        tone: s.status.tone,
+        label: s.status.label,
+        dense: true,
+      ),
       trailing: _busy
-          ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+          ? const SizedBox(
+              height: 18,
+              width: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
           : PermissionGate(
               permission: P.shiftAssign,
               child: switch (s.status) {
                 SecurityShiftStatus.scheduled => TextButton(
-                    onPressed: () => _set(SecurityShiftStatus.active),
-                    child: const Text('Start'),
-                  ),
+                  onPressed: () => _set(SecurityShiftStatus.active),
+                  child: const Text('Start'),
+                ),
                 SecurityShiftStatus.active => TextButton(
-                    onPressed: () => _set(SecurityShiftStatus.ended),
-                    child: const Text('End'),
-                  ),
+                  onPressed: () => _set(SecurityShiftStatus.ended),
+                  child: const Text('End'),
+                ),
                 SecurityShiftStatus.ended => const SizedBox.shrink(),
               },
             ),
@@ -171,15 +184,23 @@ Future<void> _addShift(BuildContext context, WidgetRef ref) async {
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Assign')),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Assign'),
+        ),
       ],
     ),
   );
   if (saved != true) return;
   if (staffId.text.trim().isEmpty || area.text.trim().isEmpty) return;
   try {
-    await ref.read(securityRepositoryProvider).createShift(
+    await ref
+        .read(securityRepositoryProvider)
+        .createShift(
           staffId: staffId.text.trim(),
           area: area.text.trim(),
           startAt: DateTime.now(),

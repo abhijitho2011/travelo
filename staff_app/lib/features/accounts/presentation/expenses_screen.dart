@@ -35,7 +35,10 @@ class ExpensesScreen extends ConsumerWidget {
       body: PageBody(
         onRefresh: () async => ref.invalidate(expensesProvider),
         children: [
-          const PageHeader(title: 'Expenses', subtitle: 'The property expense register.'),
+          const PageHeader(
+            title: 'Expenses',
+            subtitle: 'The property expense register.',
+          ),
           gapMd,
           SectionHeader(
             title: 'Register',
@@ -55,11 +58,15 @@ class ExpensesScreen extends ConsumerWidget {
           ),
           expenses.when(
             loading: () => const ListSkeleton(rows: 5),
-            error: (e, _) => ErrorState(error: e, onRetry: () => ref.invalidate(expensesProvider)),
+            error: (e, _) => ErrorState(
+              error: e,
+              onRetry: () => ref.invalidate(expensesProvider),
+            ),
             data: (list) => list.isEmpty
                 ? const EmptyState(
                     title: 'No expenses recorded',
-                    hint: 'Log utilities, supplies, salaries and the rest here.',
+                    hint:
+                        'Log utilities, supplies, salaries and the rest here.',
                     icon: Icons.receipt_long_outlined,
                   )
                 : Column(
@@ -83,7 +90,9 @@ class _ExpenseRow extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: Sp.md),
       child: SoftCard(
-        onTap: ref.hasPermission(P.expenseUpdate) ? () => _openActions(context, ref, e) : null,
+        onTap: ref.hasPermission(P.expenseUpdate)
+            ? () => _openActions(context, ref, e)
+            : null,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -92,22 +101,37 @@ class _ExpenseRow extends ConsumerWidget {
                 Expanded(
                   child: Text(
                     e.category.label,
-                    style: AppTypography.body(size: 14, weight: FontWeight.w700, color: c.foreground),
+                    style: AppTypography.body(
+                      size: 14,
+                      weight: FontWeight.w700,
+                      color: c.foreground,
+                    ),
                   ),
                 ),
                 Text(
                   e.amountLabel,
-                  style: AppTypography.numeric(size: 14, weight: FontWeight.w700, color: c.foreground),
+                  style: AppTypography.numeric(
+                    size: 14,
+                    weight: FontWeight.w700,
+                    color: c.foreground,
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 4),
             Row(
               children: [
-                StatusBadge(tone: e.status.tone, label: e.status.label, dense: true),
+                StatusBadge(
+                  tone: e.status.tone,
+                  label: e.status.label,
+                  dense: true,
+                ),
                 const SizedBox(width: 8),
                 Text(
-                  [e.vendor, Fmt.dayMonth(e.incurredOn)].where((s) => s != null && s != Fmt.dash).join(' · '),
+                  [
+                    e.vendor,
+                    Fmt.dayMonth(e.incurredOn),
+                  ].where((s) => s != null && s != Fmt.dash).join(' · '),
                   style: AppTypography.body(size: 12, color: c.mutedForeground),
                 ),
               ],
@@ -143,9 +167,13 @@ class _ExpenseRow extends ConsumerWidget {
                   Navigator.of(sheetCtx).pop();
                   final messenger = ScaffoldMessenger.of(context);
                   try {
-                    await ref.read(accountsActionsProvider).setStatus(e.id, next);
+                    await ref
+                        .read(accountsActionsProvider)
+                        .setStatus(e.id, next);
                   } on ApiException catch (err) {
-                    messenger.showSnackBar(SnackBar(content: Text(err.message)));
+                    messenger.showSnackBar(
+                      SnackBar(content: Text(err.message)),
+                    );
                   }
                 },
               ),
@@ -160,14 +188,19 @@ class _ExpenseFormSheet extends ConsumerStatefulWidget {
   const _ExpenseFormSheet({this.existing});
   final Expense? existing;
 
-  static Future<void> show(BuildContext context, WidgetRef ref, {Expense? existing}) =>
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        showDragHandle: true,
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.9),
-        builder: (_) => _ExpenseFormSheet(existing: existing),
-      );
+  static Future<void> show(
+    BuildContext context,
+    WidgetRef ref, {
+    Expense? existing,
+  }) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+    ),
+    builder: (_) => _ExpenseFormSheet(existing: existing),
+  );
 
   @override
   ConsumerState<_ExpenseFormSheet> createState() => _ExpenseFormSheetState();
@@ -268,7 +301,10 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
               const SizedBox(height: Sp.md),
               TextFormField(
                 controller: _amount,
-                decoration: const InputDecoration(labelText: 'Amount (₹)', prefixText: '₹ '),
+                decoration: const InputDecoration(
+                  labelText: 'Amount (₹)',
+                  prefixText: '₹ ',
+                ),
                 keyboardType: TextInputType.number,
                 validator: (v) {
                   final n = double.tryParse((v ?? '').trim());
@@ -279,7 +315,9 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
               const SizedBox(height: Sp.md),
               TextFormField(
                 controller: _vendor,
-                decoration: const InputDecoration(labelText: 'Vendor (optional)'),
+                decoration: const InputDecoration(
+                  labelText: 'Vendor (optional)',
+                ),
               ),
               const SizedBox(height: Sp.md),
               InkWell(
@@ -305,14 +343,25 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
               ),
               if (_error != null) ...[
                 const SizedBox(height: Sp.md),
-                Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
               ],
               const SizedBox(height: Sp.lg),
               FilledButton(
                 onPressed: _busy ? null : _save,
                 child: _busy
-                    ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                    : Text(widget.existing == null ? 'Save expense' : 'Save changes'),
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(
+                        widget.existing == null
+                            ? 'Save expense'
+                            : 'Save changes',
+                      ),
               ),
             ],
           ),

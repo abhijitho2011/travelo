@@ -119,23 +119,24 @@ void main() {
   });
   const hrPermissions = PermissionSet({'staff.read'});
 
-  testWidgets('the tablet sidebar lists every destination, with no More entry', (
-    tester,
-  ) async {
-    await pumpShell(
-      tester,
-      config: gm,
-      permissions: gmPermissions,
-      surface: shortTablet,
-    );
+  testWidgets(
+    'the tablet sidebar lists every destination, with no More entry',
+    (tester) async {
+      await pumpShell(
+        tester,
+        config: gm,
+        permissions: gmPermissions,
+        surface: shortTablet,
+      );
 
-    // The tablet now renders the Tavelo sidebar in place of a NavigationRail,
-    // and the phone-only bottom bar / More entry never appear beside it.
-    expect(find.byType(TaveloSidebar), findsOneWidget);
-    expect(find.byType(NavigationRail), findsNothing);
-    expect(find.byType(NavigationBar), findsNothing);
-    expect(find.text('More'), findsNothing);
-  });
+      // The tablet now renders the Tavelo sidebar in place of a NavigationRail,
+      // and the phone-only bottom bar / More entry never appear beside it.
+      expect(find.byType(TaveloSidebar), findsOneWidget);
+      expect(find.byType(NavigationRail), findsNothing);
+      expect(find.byType(NavigationBar), findsNothing);
+      expect(find.text('More'), findsNothing);
+    },
+  );
 
   testWidgets('sidebar destinations that live under More navigate', (
     tester,
@@ -149,8 +150,11 @@ void main() {
 
     // 'Settings' is a moreMenu entry — on a tablet it is a sidebar destination
     // reachable in one tap rather than through the More sheet.
-    await tester.scrollUntilVisible(find.text('Settings'), 200,
-        scrollable: find.byType(Scrollable).first);
+    await tester.scrollUntilVisible(
+      find.text('Settings'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
 
@@ -191,7 +195,10 @@ void main() {
 
     await tester.tap(find.text('More'));
     await tester.pumpAndSettle();
-    expect(find.text(gm.visibleMore(gmPermissions).first.label), findsOneWidget);
+    expect(
+      find.text(gm.visibleMore(gmPermissions).first.label),
+      findsOneWidget,
+    );
   });
 
   testWidgets('HR gets Team, Submitted, Profile and a More sheet on a phone', (
@@ -216,9 +223,7 @@ void main() {
     expect(find.text('Settings'), findsOneWidget);
   });
 
-  testWidgets('the sidebar reflects the active destination', (
-    tester,
-  ) async {
+  testWidgets('the sidebar reflects the active destination', (tester) async {
     await pumpShell(
       tester,
       config: hr,

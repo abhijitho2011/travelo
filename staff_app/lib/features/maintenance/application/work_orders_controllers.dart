@@ -29,20 +29,23 @@ class WorkOrderQueueController
   @override
   Future<List<WorkOrder>> build(WoStatus? filter) => ref
       .watch(workOrdersRepositoryProvider)
-      .list(status: filter?.name.toUpperCase() == 'INPROGRESS'
-          ? 'IN_PROGRESS'
-          : filter?.name.toUpperCase());
+      .list(
+        status: filter?.name.toUpperCase() == 'INPROGRESS'
+            ? 'IN_PROGRESS'
+            : filter?.name.toUpperCase(),
+      );
 
   Future<void> refresh() async {
     state = await AsyncValue.guard(() => build(arg));
   }
 }
 
-final workOrderQueueProvider = AsyncNotifierProvider.family<
-  WorkOrderQueueController,
-  List<WorkOrder>,
-  WoStatus?
->(WorkOrderQueueController.new);
+final workOrderQueueProvider =
+    AsyncNotifierProvider.family<
+      WorkOrderQueueController,
+      List<WorkOrder>,
+      WoStatus?
+    >(WorkOrderQueueController.new);
 
 /// One work order, for the detail screen.
 final workOrderProvider = FutureProvider.family<WorkOrder?, String>(

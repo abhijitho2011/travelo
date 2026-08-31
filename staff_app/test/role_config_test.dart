@@ -98,7 +98,11 @@ void main() {
           isNot(contains(StaffRole.assistantGeneralManager)),
           reason: actor.wire,
         );
-        expect(creatable, isNot(contains(StaffRole.unknown)), reason: actor.wire);
+        expect(
+          creatable,
+          isNot(contains(StaffRole.unknown)),
+          reason: actor.wire,
+        );
       }
     });
 
@@ -119,7 +123,10 @@ void main() {
     test('a GM and an AGM may create HR, and share one creatable set', () {
       final gm = StaffRole.creatableRolesFor(StaffRole.generalManager);
       expect(gm, contains(StaffRole.hr));
-      expect(StaffRole.creatableRolesFor(StaffRole.assistantGeneralManager), gm);
+      expect(
+        StaffRole.creatableRolesFor(StaffRole.assistantGeneralManager),
+        gm,
+      );
     });
 
     test('every other role may create nothing at all', () {
@@ -129,11 +136,7 @@ void main() {
             actor == StaffRole.hr) {
           continue;
         }
-        expect(
-          StaffRole.creatableRolesFor(actor),
-          isEmpty,
-          reason: actor.wire,
-        );
+        expect(StaffRole.creatableRolesFor(actor), isEmpty, reason: actor.wire);
       }
     });
 
@@ -160,10 +163,7 @@ void main() {
     test('the Add-staff screen is reachable for HR via the team route', () {
       // `/management/team/new` canonicalises to `/management/team`, so HR needs
       // no separate entry — but it must not fall outside the role's map.
-      expect(
-        RoleConfig.of(StaffRole.hr).allowedRoutes,
-        contains(Routes.team),
-      );
+      expect(RoleConfig.of(StaffRole.hr).allowedRoutes, contains(Routes.team));
     });
 
     test('an unknown wire value degrades instead of throwing', () {
@@ -203,7 +203,9 @@ void main() {
 
     test('no role repeats a destination inside its own More list', () {
       for (final role in StaffRole.values) {
-        final routes = RoleConfig.of(role).moreMenu.map((i) => i.route).toList();
+        final routes = RoleConfig.of(
+          role,
+        ).moreMenu.map((i) => i.route).toList();
         expect(routes.toSet().length, routes.length, reason: role.wire);
       }
     });
@@ -224,11 +226,7 @@ void main() {
         );
         // Settings, Profile and Help & support all stay inside the role's
         // allowed routes so the hub can always link to them.
-        for (final route in [
-          Routes.settings,
-          Routes.profile,
-          Routes.support,
-        ]) {
+        for (final route in [Routes.settings, Routes.profile, Routes.support]) {
           expect(config.allowedRoutes, contains(route), reason: role.wire);
         }
       }

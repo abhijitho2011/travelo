@@ -65,7 +65,8 @@ final roleConfigProvider = Provider<RoleConfig>(
 );
 
 final permissionsProvider = Provider<PermissionSet>(
-  (ref) => ref.watch(sessionProvider)?.permissions ?? const PermissionSet.empty(),
+  (ref) =>
+      ref.watch(sessionProvider)?.permissions ?? const PermissionSet.empty(),
 );
 
 /// `ref.watch(canProvider('reservation.cancel'))` — the single question every

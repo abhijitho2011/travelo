@@ -279,7 +279,10 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                   ),
                   label: Text(
                     task.status.actionLabel,
-                    style: AppTypography.body(size: 15, weight: FontWeight.w700),
+                    style: AppTypography.body(
+                      size: 15,
+                      weight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),

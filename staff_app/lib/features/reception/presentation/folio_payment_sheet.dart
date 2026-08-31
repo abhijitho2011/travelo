@@ -139,7 +139,10 @@ class _FolioPaymentSheetState extends ConsumerState<FolioPaymentSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(title, style: AppTypography.display(size: 18, color: c.foreground)),
+            Text(
+              title,
+              style: AppTypography.display(size: 18, color: c.foreground),
+            ),
             const SizedBox(height: Sp.xs),
             Text(
               widget.guestName,
@@ -150,7 +153,9 @@ class _FolioPaymentSheetState extends ConsumerState<FolioPaymentSheet> {
             TextField(
               controller: _amount,
               autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
               ],
@@ -173,7 +178,9 @@ class _FolioPaymentSheetState extends ConsumerState<FolioPaymentSheet> {
                   ChoiceChip(
                     label: Text(m),
                     selected: _method == m,
-                    onSelected: _busy ? null : (_) => setState(() => _method = m),
+                    onSelected: _busy
+                        ? null
+                        : (_) => setState(() => _method = m),
                   ),
               ],
             ),

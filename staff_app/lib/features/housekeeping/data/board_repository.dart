@@ -74,13 +74,18 @@ class BoardRepository {
     }
   }
 
-  Future<void> assign(String taskId, String staffId) =>
-      _api.post('/housekeeping/tasks/$taskId/assign', body: {'staffId': staffId});
+  Future<void> assign(String taskId, String staffId) => _api.post(
+    '/housekeeping/tasks/$taskId/assign',
+    body: {'staffId': staffId},
+  );
 
   Future<void> inspect(String taskId, {required bool pass, String? notes}) =>
       _api.post(
         '/housekeeping/tasks/$taskId/inspect',
-        body: {'pass': pass, if (notes != null && notes.isNotEmpty) 'notes': notes},
+        body: {
+          'pass': pass,
+          if (notes != null && notes.isNotEmpty) 'notes': notes,
+        },
       );
 }
 

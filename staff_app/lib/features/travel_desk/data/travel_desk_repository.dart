@@ -58,7 +58,10 @@ class TravelDeskRepository {
     return _one(data, TransportRequest.fromJson, 'transport request');
   }
 
-  Future<TransportRequest> update(String id, Map<String, dynamic> changes) async {
+  Future<TransportRequest> update(
+    String id,
+    Map<String, dynamic> changes,
+  ) async {
     final data = await _api.patch('/travel-desk/requests/$id', body: changes);
     return _one(data, TransportRequest.fromJson, 'transport request');
   }

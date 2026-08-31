@@ -24,10 +24,14 @@ class EventDetailScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Event')),
       body: async.when(
-        loading: () => const Padding(padding: EdgeInsets.all(16), child: ListSkeleton()),
+        loading: () =>
+            const Padding(padding: EdgeInsets.all(16), child: ListSkeleton()),
         error: (e, _) => Padding(
           padding: const EdgeInsets.all(16),
-          child: ErrorState(error: e, onRetry: () => ref.invalidate(eventProvider(eventId))),
+          child: ErrorState(
+            error: e,
+            onRetry: () => ref.invalidate(eventProvider(eventId)),
+          ),
         ),
         data: (event) {
           if (event == null) {
@@ -64,9 +68,16 @@ class _EventBody extends ConsumerWidget {
         Row(
           children: [
             Expanded(
-              child: Text(e.name, style: Theme.of(context).textTheme.titleLarge),
+              child: Text(
+                e.name,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
             ),
-            StatusBadge(tone: e.status.tone, label: e.status.label, dense: true),
+            StatusBadge(
+              tone: e.status.tone,
+              label: e.status.label,
+              dense: true,
+            ),
           ],
         ),
         gapSm,
@@ -81,7 +92,8 @@ class _EventBody extends ConsumerWidget {
               if (e.startAt != null) _detail('Starts', Fmt.dateTime(e.startAt)),
               _detail('Guests', e.guestCount.toString()),
               _detail('Revenue', e.revenueLabel),
-              if (e.roomBlock != null) _detail('Room block', e.roomBlock.toString()),
+              if (e.roomBlock != null)
+                _detail('Room block', e.roomBlock.toString()),
               if (e.package != null) _detail('Package', e.package!),
             ],
           ),
@@ -91,7 +103,8 @@ class _EventBody extends ConsumerWidget {
         gapMd,
         Panel(
           title: 'Checklist',
-          description: '${e.tasks.where((t) => t.done).length}/${e.tasks.length} done',
+          description:
+              '${e.tasks.where((t) => t.done).length}/${e.tasks.length} done',
           actions: [
             PermissionGate(
               permission: P.eventUpdate,
@@ -115,12 +128,15 @@ class _EventBody extends ConsumerWidget {
                         task: e.tasks[i],
                         onToggle: (done) async {
                           try {
-                            await repo.updateTask(e.tasks[i].id, {'done': done});
+                            await repo.updateTask(e.tasks[i].id, {
+                              'done': done,
+                            });
                             await _refresh(ref);
                           } on ApiException catch (err) {
                             if (context.mounted) {
-                              ScaffoldMessenger.of(context)
-                                  .showSnackBar(SnackBar(content: Text(err.message)));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(err.message)),
+                              );
                             }
                           }
                         },
@@ -130,8 +146,9 @@ class _EventBody extends ConsumerWidget {
                             await _refresh(ref);
                           } on ApiException catch (err) {
                             if (context.mounted) {
-                              ScaffoldMessenger.of(context)
-                                  .showSnackBar(SnackBar(content: Text(err.message)));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(err.message)),
+                              );
                             }
                           }
                         },
@@ -145,17 +162,21 @@ class _EventBody extends ConsumerWidget {
   }
 
   Widget _detail(String label, String value) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(width: 110, child: LabelXs(label)),
-            Expanded(child: Text(value)),
-          ],
-        ),
-      );
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(width: 110, child: LabelXs(label)),
+        Expanded(child: Text(value)),
+      ],
+    ),
+  );
 
-  Future<void> _addTask(BuildContext context, WidgetRef ref, String eventId) async {
+  Future<void> _addTask(
+    BuildContext context,
+    WidgetRef ref,
+    String eventId,
+  ) async {
     final controller = TextEditingController();
     final title = await showDialog<String>(
       context: context,
@@ -167,7 +188,10 @@ class _EventBody extends ConsumerWidget {
           textCapitalization: TextCapitalization.sentences,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, controller.text.trim()),
             child: const Text('Add'),
@@ -177,11 +201,15 @@ class _EventBody extends ConsumerWidget {
     );
     if (title != null && title.isNotEmpty) {
       try {
-        await ref.read(eventsRepositoryProvider).addTask(eventId, {'title': title});
+        await ref.read(eventsRepositoryProvider).addTask(eventId, {
+          'title': title,
+        });
         await _refresh(ref);
       } on ApiException catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(e.message)));
         }
       }
     }
@@ -212,7 +240,9 @@ class _StatusActions extends ConsumerWidget {
                   onChanged();
                 } on ApiException catch (e) {
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(e.message)));
                   }
                 }
               },
@@ -228,7 +258,9 @@ class _StatusActions extends ConsumerWidget {
                 onChanged();
               } on ApiException catch (e) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(e.message)));
                 }
               }
             },
@@ -241,7 +273,11 @@ class _StatusActions extends ConsumerWidget {
 }
 
 class _TaskRow extends StatelessWidget {
-  const _TaskRow({required this.task, required this.onToggle, required this.onDelete});
+  const _TaskRow({
+    required this.task,
+    required this.onToggle,
+    required this.onDelete,
+  });
 
   final EventTask task;
   final ValueChanged<bool> onToggle;
@@ -258,7 +294,9 @@ class _TaskRow extends StatelessWidget {
             ? const TextStyle(decoration: TextDecoration.lineThrough)
             : null,
       ),
-      subtitle: task.dueAt != null ? Text('Due ${Fmt.dayMonth(task.dueAt)}') : null,
+      subtitle: task.dueAt != null
+          ? Text('Due ${Fmt.dayMonth(task.dueAt)}')
+          : null,
       secondary: PermissionGate(
         permission: P.eventUpdate,
         child: IconButton(

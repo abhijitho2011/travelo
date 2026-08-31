@@ -10,8 +10,11 @@ enum NotificationKind {
   security,
   system;
 
-  static NotificationKind fromWire(String? v) => NotificationKind.values
-      .firstWhere((k) => k.name == v?.toLowerCase(), orElse: () => NotificationKind.system);
+  static NotificationKind fromWire(String? v) =>
+      NotificationKind.values.firstWhere(
+        (k) => k.name == v?.toLowerCase(),
+        orElse: () => NotificationKind.system,
+      );
 
   /// The server sends a dotted notification `type` (e.g. `staff.approved`,
   /// `work_order.assigned`), not one of our coarse kinds. Map it by its leading
@@ -20,10 +23,21 @@ enum NotificationKind {
     final head = (type ?? '').toLowerCase().split('.').first;
     return switch (head) {
       'task' || 'housekeeping' || 'kot' => NotificationKind.task,
-      'approval' || 'staff' || 'expense' || 'purchase' => NotificationKind.approval,
-      'reservation' || 'booking' || 'checkin' || 'checkout' => NotificationKind.reservation,
-      'maintenance' || 'work_order' || 'workorder' => NotificationKind.maintenance,
-      'security' || 'incident' || 'visitor' || 'patrol' => NotificationKind.security,
+      'approval' ||
+      'staff' ||
+      'expense' ||
+      'purchase' => NotificationKind.approval,
+      'reservation' ||
+      'booking' ||
+      'checkin' ||
+      'checkout' => NotificationKind.reservation,
+      'maintenance' ||
+      'work_order' ||
+      'workorder' => NotificationKind.maintenance,
+      'security' ||
+      'incident' ||
+      'visitor' ||
+      'patrol' => NotificationKind.security,
       _ => NotificationKind.system,
     };
   }
@@ -77,8 +91,10 @@ class StaffNotification {
     // `route`, so every notification rendered unread, as `system`, with no deep
     // link. Read the real fields, keeping the old names as fallbacks.
     final meta = json['meta'];
-    final route = (json['route'] ??
-        (meta is Map ? (meta['route'] ?? meta['relatedType']) : null)) as String?;
+    final route =
+        (json['route'] ??
+                (meta is Map ? (meta['route'] ?? meta['relatedType']) : null))
+            as String?;
     return StaffNotification(
       id: (json['id'] ?? '').toString(),
       title: (json['title'] as String?) ?? 'Notification',

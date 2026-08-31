@@ -7,9 +7,10 @@ final myTripsProvider = FutureProvider.autoDispose<List<TransportRequest>>(
   (ref) => ref.watch(driverRepositoryProvider).myTrips(),
 );
 
-final myTripProvider = FutureProvider.autoDispose.family<TransportRequest?, String>(
-  (ref, id) => ref.watch(driverRepositoryProvider).trip(id),
-);
+final myTripProvider = FutureProvider.autoDispose
+    .family<TransportRequest?, String>(
+      (ref, id) => ref.watch(driverRepositoryProvider).trip(id),
+    );
 
 class DriverActions {
   const DriverActions(this._ref);

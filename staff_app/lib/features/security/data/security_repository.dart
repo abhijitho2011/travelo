@@ -15,10 +15,11 @@ class SecurityRepository {
 
   final ApiClient _api;
 
-  Future<List<GateLogEntry>> gateLog({bool vehiclesOnly = false}) =>
-      _read('/security/gate-log', GateLogEntry.fromJson, query: {
-        if (vehiclesOnly) 'kind': 'vehicle',
-      });
+  Future<List<GateLogEntry>> gateLog({bool vehiclesOnly = false}) => _read(
+    '/security/gate-log',
+    GateLogEntry.fromJson,
+    query: {if (vehiclesOnly) 'kind': 'vehicle'},
+  );
 
   Future<void> recordMovement({
     required GateMovement movement,
@@ -61,16 +62,14 @@ class SecurityRepository {
   Future<void> updateLostFound(String id, String status) =>
       _api.patch('/security/lost-found/\$id', body: {'status': status});
 
-  Future<void> logFoundItem({
-    required String description,
-    String? location,
-  }) => _api.post(
-    '/security/lost-found',
-    body: {
-      'description': description,
-      if (location != null && location.isNotEmpty) 'location': location,
-    },
-  );
+  Future<void> logFoundItem({required String description, String? location}) =>
+      _api.post(
+        '/security/lost-found',
+        body: {
+          'description': description,
+          if (location != null && location.isNotEmpty) 'location': location,
+        },
+      );
 
   Future<List<Incident>> incidents() =>
       _read('/security/incidents', Incident.fromJson);
@@ -93,8 +92,10 @@ class SecurityRepository {
   Future<void> assignIncident(String id, String staffId) =>
       _api.post('/security/incidents/$id/assign', body: {'staffId': staffId});
 
-  Future<void> resolveIncident(String id, String resolution) =>
-      _api.post('/security/incidents/$id/resolve', body: {'resolution': resolution});
+  Future<void> resolveIncident(String id, String resolution) => _api.post(
+    '/security/incidents/$id/resolve',
+    body: {'resolution': resolution},
+  );
 
   Future<SecurityDashboard?> dashboard() async {
     try {
@@ -116,11 +117,14 @@ class SecurityRepository {
     required String staffId,
     required String area,
     required DateTime startAt,
-  }) => _api.post('/security/shifts', body: {
-        'staffId': staffId,
-        'area': area,
-        'startAt': startAt.toUtc().toIso8601String(),
-      });
+  }) => _api.post(
+    '/security/shifts',
+    body: {
+      'staffId': staffId,
+      'area': area,
+      'startAt': startAt.toUtc().toIso8601String(),
+    },
+  );
 
   Future<void> setShiftStatus(String id, SecurityShiftStatus status) =>
       _api.patch('/security/shifts/$id', body: {'status': status.wire});
@@ -172,9 +176,10 @@ final incidentsProvider = FutureProvider.autoDispose<List<Incident>>(
   (ref) => ref.watch(securityRepositoryProvider).incidents(),
 );
 
-final securityDashboardProvider = FutureProvider.autoDispose<SecurityDashboard?>(
-  (ref) => ref.watch(securityRepositoryProvider).dashboard(),
-);
+final securityDashboardProvider =
+    FutureProvider.autoDispose<SecurityDashboard?>(
+      (ref) => ref.watch(securityRepositoryProvider).dashboard(),
+    );
 
 final securityShiftsProvider = FutureProvider.autoDispose<List<SecurityShift>>(
   (ref) => ref.watch(securityRepositoryProvider).shifts(),

@@ -26,7 +26,8 @@ class SpaAppointmentsScreen extends ConsumerWidget {
     final async = ref.watch(spaAppointmentsProvider(!isManager));
 
     return PageBody(
-      onRefresh: () async => ref.invalidate(spaAppointmentsProvider(!isManager)),
+      onRefresh: () async =>
+          ref.invalidate(spaAppointmentsProvider(!isManager)),
       children: [
         PageHeader(
           eyebrow: 'Spa',
@@ -122,42 +123,56 @@ class _AppointmentCardState extends ConsumerState<_AppointmentCard> {
       ].join(' · '),
       highPriority: !a.hasTherapist && widget.isManager,
       actions: _busy
-          ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+          ? const SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
           : Wrap(
               spacing: 4,
               children: [
-              if (a.status.canStart)
-                PermissionGate(
-                  permission: P.spaBookingUpdate,
-                  child: TextButton(
-                    onPressed: () => _run(() => repo.setStatus(a.id, SpaAppointmentStatus.inProgress)),
-                    child: const Text('Start'),
+                if (a.status.canStart)
+                  PermissionGate(
+                    permission: P.spaBookingUpdate,
+                    child: TextButton(
+                      onPressed: () => _run(
+                        () => repo.setStatus(
+                          a.id,
+                          SpaAppointmentStatus.inProgress,
+                        ),
+                      ),
+                      child: const Text('Start'),
+                    ),
                   ),
-                ),
-              if (a.status.canComplete)
-                PermissionGate(
-                  permission: P.spaBookingUpdate,
-                  child: FilledButton(
-                    onPressed: () => _run(() => repo.setStatus(a.id, SpaAppointmentStatus.completed)),
-                    child: const Text('Complete'),
+                if (a.status.canComplete)
+                  PermissionGate(
+                    permission: P.spaBookingUpdate,
+                    child: FilledButton(
+                      onPressed: () => _run(
+                        () => repo.setStatus(
+                          a.id,
+                          SpaAppointmentStatus.completed,
+                        ),
+                      ),
+                      child: const Text('Complete'),
+                    ),
                   ),
-                ),
-              if (!a.status.isTerminal)
-                PermissionGate(
-                  permission: P.spaBookingUpdate,
-                  child: TextButton(
-                    onPressed: () => _editNotes(a),
-                    child: const Text('Notes'),
+                if (!a.status.isTerminal)
+                  PermissionGate(
+                    permission: P.spaBookingUpdate,
+                    child: TextButton(
+                      onPressed: () => _editNotes(a),
+                      child: const Text('Notes'),
+                    ),
                   ),
-                ),
-              if (widget.isManager && !a.status.isTerminal)
-                PermissionGate(
-                  permission: P.spaRosterUpdate,
-                  child: TextButton(
-                    onPressed: () => _assign(a),
-                    child: Text(a.hasTherapist ? 'Reassign' : 'Assign'),
+                if (widget.isManager && !a.status.isTerminal)
+                  PermissionGate(
+                    permission: P.spaRosterUpdate,
+                    child: TextButton(
+                      onPressed: () => _assign(a),
+                      child: Text(a.hasTherapist ? 'Reassign' : 'Assign'),
+                    ),
                   ),
-                ),
               ],
             ),
     );
@@ -175,7 +190,10 @@ class _AppointmentCardState extends ConsumerState<_AppointmentCard> {
           decoration: const InputDecoration(hintText: 'Treatment notes'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, controller.text.trim()),
             child: const Text('Save'),
@@ -191,7 +209,9 @@ class _AppointmentCardState extends ConsumerState<_AppointmentCard> {
   Future<void> _assign(SpaAppointment a) async {
     final id = await _promptStaffId(context);
     if (id != null && id.isNotEmpty) {
-      await _run(() => ref.read(spaRepositoryProvider).assignTherapist(a.id, id));
+      await _run(
+        () => ref.read(spaRepositoryProvider).assignTherapist(a.id, id),
+      );
     }
   }
 }
@@ -209,7 +229,10 @@ Future<String?> _promptStaffId(BuildContext context) {
         decoration: const InputDecoration(labelText: 'Therapist staff id'),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Cancel'),
+        ),
         FilledButton(
           onPressed: () => Navigator.pop(ctx, controller.text.trim()),
           child: const Text('Assign'),
@@ -291,13 +314,17 @@ class _BookFormState extends ConsumerState<_BookForm> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Book appointment', style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                'Book appointment',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _guest,
                 decoration: const InputDecoration(labelText: 'Guest name'),
                 textCapitalization: TextCapitalization.words,
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
               const SizedBox(height: 12),
               services.when(
@@ -308,7 +335,10 @@ class _BookFormState extends ConsumerState<_BookForm> {
                   decoration: const InputDecoration(labelText: 'Service'),
                   items: [
                     for (final s in list)
-                      DropdownMenuItem(value: s, child: Text('${s.name} · ${s.priceLabel}')),
+                      DropdownMenuItem(
+                        value: s,
+                        child: Text('${s.name} · ${s.priceLabel}'),
+                      ),
                   ],
                   onChanged: (v) => setState(() => _service = v),
                 ),
@@ -323,7 +353,10 @@ class _BookFormState extends ConsumerState<_BookForm> {
               ),
               if (_error != null) ...[
                 const SizedBox(height: 8),
-                Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
               ],
               const SizedBox(height: 16),
               FilledButton(
@@ -351,7 +384,13 @@ class _BookFormState extends ConsumerState<_BookForm> {
     );
     if (time == null) return;
     setState(() {
-      _startAt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+      _startAt = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
     });
   }
 }

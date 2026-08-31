@@ -70,7 +70,8 @@ final assignableRoomsProvider = FutureProvider.autoDispose
       final rooms = await ref
           .watch(roomsRepositoryProvider)
           .rooms(RoomFilter(roomTypeId: roomTypeId));
-      return rooms.where((r) => kAssignableRoomStatuses.contains(r.status))
+      return rooms
+          .where((r) => kAssignableRoomStatuses.contains(r.status))
           .toList(growable: false);
     });
 

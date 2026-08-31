@@ -19,10 +19,7 @@ class NotificationsRepository {
     try {
       final data = await _api.get('/notifications');
       if (data is List) {
-        return data
-            .whereType<Map>()
-            .map(StaffNotification.fromJson)
-            .toList();
+        return data.whereType<Map>().map(StaffNotification.fromJson).toList();
       }
       if (data is Map && data['items'] is List) {
         return (data['items'] as List)
@@ -106,9 +103,7 @@ class NotificationsController extends AsyncNotifier<List<StaffNotification>> {
   Future<void> markAllRead() async {
     final current = state.value;
     if (current == null) return;
-    state = AsyncValue.data([
-      for (final n in current) n.copyWith(read: true),
-    ]);
+    state = AsyncValue.data([for (final n in current) n.copyWith(read: true)]);
     // One server call, not one per unread row.
     await ref.read(notificationsRepositoryProvider).markAllRead();
   }

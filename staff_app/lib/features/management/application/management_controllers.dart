@@ -17,16 +17,15 @@ class ManagementOverview {
   bool get isEmpty => snapshot == null && alerts.isEmpty;
 }
 
-final managementOverviewProvider = FutureProvider.autoDispose<ManagementOverview>(
-  (ref) async {
-    final repo = ref.watch(managementRepositoryProvider);
-    final results = await Future.wait([repo.snapshot(), repo.alerts()]);
-    return ManagementOverview(
-      snapshot: results[0] as HotelSnapshot?,
-      alerts: results[1] as List<OperationalAlert>,
-    );
-  },
-);
+final managementOverviewProvider =
+    FutureProvider.autoDispose<ManagementOverview>((ref) async {
+      final repo = ref.watch(managementRepositoryProvider);
+      final results = await Future.wait([repo.snapshot(), repo.alerts()]);
+      return ManagementOverview(
+        snapshot: results[0] as HotelSnapshot?,
+        alerts: results[1] as List<OperationalAlert>,
+      );
+    });
 
 // ---------------------------------------------------------------- approvals
 
@@ -59,9 +58,7 @@ class ApprovalsController extends AsyncNotifier<List<ApprovalItem>> {
         .decideApproval(item, approve: approve, reason: reason);
     // Optimistically drop the row, then reconcile with the server.
     final current = state.value ?? const [];
-    state = AsyncValue.data(
-      current.where((a) => a.id != item.id).toList(),
-    );
+    state = AsyncValue.data(current.where((a) => a.id != item.id).toList());
     ref.invalidate(teamProvider);
     await refresh();
   }
@@ -74,9 +71,7 @@ final pendingApprovalCountProvider = Provider<int>(
 
 // --------------------------------------------------------------------- team
 
-final teamFilterProvider = StateProvider<TeamFilter>(
-  (_) => const TeamFilter(),
-);
+final teamFilterProvider = StateProvider<TeamFilter>((_) => const TeamFilter());
 
 final teamProvider = FutureProvider.autoDispose<List<TeamMember>>((ref) {
   final filter = ref.watch(teamFilterProvider);
@@ -96,8 +91,7 @@ final teamAwaitingApprovalProvider =
           .team(const TeamFilter());
       return all
           .where(
-            (m) =>
-                m.awaitingApproval || m.status == AccountStatus.approved,
+            (m) => m.awaitingApproval || m.status == AccountStatus.approved,
           )
           .toList(growable: false);
     });

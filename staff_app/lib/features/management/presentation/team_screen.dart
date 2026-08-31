@@ -440,8 +440,10 @@ class _TeamMemberCardState extends ConsumerState<TeamMemberCard> {
                       onPressed: _busy
                           ? null
                           : () => _run(
-                              () =>
-                                  actions.setStatus(m.id, AccountStatus.blocked),
+                              () => actions.setStatus(
+                                m.id,
+                                AccountStatus.blocked,
+                              ),
                               '${m.firstName} blocked',
                             ),
                       child: const Text('Block'),

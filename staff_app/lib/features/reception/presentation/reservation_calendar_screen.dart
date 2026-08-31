@@ -25,11 +25,22 @@ const double _dateHeadH = 46;
 const double _handleW = 16;
 
 DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
-int _daysBetween(DateTime a, DateTime b) => _dateOnly(b).difference(_dateOnly(a)).inDays;
+int _daysBetween(DateTime a, DateTime b) =>
+    _dateOnly(b).difference(_dateOnly(a)).inDays;
 
 const _monthsShort = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
 String _dayMonth(DateTime d) => '${d.day} ${_monthsShort[d.month - 1]}';
@@ -68,10 +79,12 @@ class ReservationCalendarScreen extends ConsumerStatefulWidget {
   const ReservationCalendarScreen({super.key});
 
   @override
-  ConsumerState<ReservationCalendarScreen> createState() => _ReservationCalendarScreenState();
+  ConsumerState<ReservationCalendarScreen> createState() =>
+      _ReservationCalendarScreenState();
 }
 
-class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarScreen> {
+class _ReservationCalendarScreenState
+    extends ConsumerState<ReservationCalendarScreen> {
   final _datesCtrl = ScrollController();
   final _gridCtrl = ScrollController();
   bool _syncing = false;
@@ -90,7 +103,12 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
     if (_syncing || !to.hasClients || !from.hasClients) return;
     if (to.offset == from.offset) return;
     _syncing = true;
-    to.jumpTo(from.offset.clamp(to.position.minScrollExtent, to.position.maxScrollExtent));
+    to.jumpTo(
+      from.offset.clamp(
+        to.position.minScrollExtent,
+        to.position.maxScrollExtent,
+      ),
+    );
     _syncing = false;
   }
 
@@ -107,7 +125,9 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
   }
 
   void _today() {
-    ref.read(calendarWindowStartProvider.notifier).state = _dateOnly(DateTime.now());
+    ref.read(calendarWindowStartProvider.notifier).state = _dateOnly(
+      DateTime.now(),
+    );
   }
 
   bool get _canEdit => ref.watch(permissionsProvider).has(P.reservationUpdate);
@@ -179,7 +199,9 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
     final newCheckOut = _dateOnly(lastNight).add(const Duration(days: 1));
     if (!newCheckOut.isAfter(_dateOnly(current))) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Drag past the current check-out to extend a stay.')),
+        const SnackBar(
+          content: Text('Drag past the current check-out to extend a stay.'),
+        ),
       );
       return;
     }
@@ -187,7 +209,7 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
     final ok = await _confirm(
       'Extend stay?',
       '${r.guestName} will stay $extraNights more '
-      '${extraNights == 1 ? 'night' : 'nights'}, to ${_dayMonth(newCheckOut)}.',
+          '${extraNights == 1 ? 'night' : 'nights'}, to ${_dayMonth(newCheckOut)}.',
     );
     if (!ok || !mounted) return;
 
@@ -196,7 +218,9 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
     try {
       await ref.read(reservationActionsProvider).extendStay(r.id, newCheckOut);
       messenger.showSnackBar(
-        SnackBar(content: Text('${r.guestName} extended to ${_dayMonth(newCheckOut)}')),
+        SnackBar(
+          content: Text('${r.guestName} extended to ${_dayMonth(newCheckOut)}'),
+        ),
       );
     } on ApiException catch (e) {
       messenger.showSnackBar(
@@ -279,7 +303,11 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _chevron(c, Icons.chevron_left, () => _shift(-kCalendarWindowDays)),
+                    _chevron(
+                      c,
+                      Icons.chevron_left,
+                      () => _shift(-kCalendarWindowDays),
+                    ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 2),
                       child: Text(
@@ -291,7 +319,11 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
                         ),
                       ),
                     ),
-                    _chevron(c, Icons.chevron_right, () => _shift(kCalendarWindowDays)),
+                    _chevron(
+                      c,
+                      Icons.chevron_right,
+                      () => _shift(kCalendarWindowDays),
+                    ),
                   ],
                 ),
               ),
@@ -400,7 +432,10 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
                 Text(
                   '${data.rooms.length} '
                   '${data.rooms.length == 1 ? 'room' : 'rooms'} · $days nights',
-                  style: AppTypography.body(size: 11.5, color: c.mutedForeground),
+                  style: AppTypography.body(
+                    size: 11.5,
+                    color: c.mutedForeground,
+                  ),
                 ),
               ],
             ),
@@ -420,7 +455,10 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
                       child: Row(
                         children: [
                           for (int i = 0; i < days; i++)
-                            _dayHead(c, data.windowStart.add(Duration(days: i))),
+                            _dayHead(
+                              c,
+                              data.windowStart.add(Duration(days: i)),
+                            ),
                         ],
                       ),
                     ),
@@ -445,7 +483,8 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
                       scrollDirection: Axis.horizontal,
                       child: Column(
                         children: [
-                          for (final lane in lanes) _laneRow(c, lane, data, gridW),
+                          for (final lane in lanes)
+                            _laneRow(c, lane, data, gridW),
                         ],
                       ),
                     ),
@@ -466,7 +505,10 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
       padding: const EdgeInsets.symmetric(horizontal: Sp.md),
       decoration: BoxDecoration(
         color: c.surface,
-        border: Border(right: BorderSide(color: c.border), bottom: BorderSide(color: c.border)),
+        border: Border(
+          right: BorderSide(color: c.border),
+          bottom: BorderSide(color: c.border),
+        ),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -476,7 +518,11 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
             'Unassigned',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: AppTypography.body(size: 12.5, weight: FontWeight.w600, color: c.foreground),
+            style: AppTypography.body(
+              size: 12.5,
+              weight: FontWeight.w600,
+              color: c.foreground,
+            ),
           ),
           Text(
             '$count awaiting a room',
@@ -495,13 +541,20 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
       alignment: Alignment.centerLeft,
       decoration: BoxDecoration(
         color: c.surface,
-        border: Border(right: BorderSide(color: c.border), bottom: BorderSide(color: c.border)),
+        border: Border(
+          right: BorderSide(color: c.border),
+          bottom: BorderSide(color: c.border),
+        ),
       ),
       child: Row(
         children: [
           Text(
             room.number,
-            style: AppTypography.body(size: 13.5, weight: FontWeight.w700, color: c.foreground),
+            style: AppTypography.body(
+              size: 13.5,
+              weight: FontWeight.w700,
+              color: c.foreground,
+            ),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -517,47 +570,54 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
     ),
   };
 
-  Widget _laneRow(AppColors c, CalendarLane lane, CalendarData data, double gridW) =>
-      switch (lane) {
-        CalendarUnassignedLane() => _TapeRow(
-          width: gridW,
-          windowStart: data.windowStart,
-          days: data.windowDays,
-          reservations: data.unassigned,
-          canEdit: _canEdit,
-          onOpen: (r) => context.go(Routes.reservation(r.id)),
-          onExtend: _onDropExtend,
-        ),
-        CalendarRoomLane(:final room) => DragTarget<Reservation>(
-          onWillAcceptWithDetails: (d) => _canEdit && d.data.roomId != room.id,
-          onAcceptWithDetails: (d) => _onDropMove(d.data, room),
-          builder: (context, candidate, _) => _TapeRow(
-            width: gridW,
-            windowStart: data.windowStart,
-            days: data.windowDays,
-            reservations: data.byRoom[room.id] ?? const [],
-            canEdit: _canEdit,
-            highlight: candidate.isNotEmpty,
-            onOpen: (r) => context.go(Routes.reservation(r.id)),
-            onExtend: _onDropExtend,
-            onEmptyTap: (date) => context.go(
-              Routes.reservationNew,
-              extra: NewBookingSeed(
-                checkIn: date,
-                roomId: room.id,
-                roomTypeId: room.roomTypeId,
-              ),
-            ),
+  Widget _laneRow(
+    AppColors c,
+    CalendarLane lane,
+    CalendarData data,
+    double gridW,
+  ) => switch (lane) {
+    CalendarUnassignedLane() => _TapeRow(
+      width: gridW,
+      windowStart: data.windowStart,
+      days: data.windowDays,
+      reservations: data.unassigned,
+      canEdit: _canEdit,
+      onOpen: (r) => context.go(Routes.reservation(r.id)),
+      onExtend: _onDropExtend,
+    ),
+    CalendarRoomLane(:final room) => DragTarget<Reservation>(
+      onWillAcceptWithDetails: (d) => _canEdit && d.data.roomId != room.id,
+      onAcceptWithDetails: (d) => _onDropMove(d.data, room),
+      builder: (context, candidate, _) => _TapeRow(
+        width: gridW,
+        windowStart: data.windowStart,
+        days: data.windowDays,
+        reservations: data.byRoom[room.id] ?? const [],
+        canEdit: _canEdit,
+        highlight: candidate.isNotEmpty,
+        onOpen: (r) => context.go(Routes.reservation(r.id)),
+        onExtend: _onDropExtend,
+        onEmptyTap: (date) => context.go(
+          Routes.reservationNew,
+          extra: NewBookingSeed(
+            checkIn: date,
+            roomId: room.id,
+            roomTypeId: room.roomTypeId,
           ),
         ),
-      };
+      ),
+    ),
+  };
 
   Widget _corner(AppColors c) => Container(
     width: _labelW,
     height: _dateHeadH,
     decoration: BoxDecoration(
       color: c.surface,
-      border: Border(right: BorderSide(color: c.border), bottom: BorderSide(color: c.border)),
+      border: Border(
+        right: BorderSide(color: c.border),
+        bottom: BorderSide(color: c.border),
+      ),
     ),
     alignment: Alignment.centerLeft,
     padding: const EdgeInsets.only(left: Sp.md),
@@ -566,13 +626,17 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
 
   Widget _dayHead(AppColors c, DateTime day) {
     final isToday = _dateOnly(day) == _dateOnly(DateTime.now());
-    final weekend = day.weekday == DateTime.saturday || day.weekday == DateTime.sunday;
+    final weekend =
+        day.weekday == DateTime.saturday || day.weekday == DateTime.sunday;
     return Container(
       width: _cellW,
       height: _dateHeadH,
       decoration: BoxDecoration(
         color: isToday ? c.accent : (weekend ? c.surface : c.card),
-        border: Border(right: BorderSide(color: c.border), bottom: BorderSide(color: c.border)),
+        border: Border(
+          right: BorderSide(color: c.border),
+          bottom: BorderSide(color: c.border),
+        ),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -611,7 +675,11 @@ class _ReservationCalendarScreenState extends ConsumerState<ReservationCalendarS
             const SizedBox(height: Sp.md),
             Text(
               'Could not load the calendar',
-              style: AppTypography.body(size: 14, weight: FontWeight.w600, color: c.foreground),
+              style: AppTypography.body(
+                size: 14,
+                weight: FontWeight.w600,
+                color: c.foreground,
+              ),
             ),
             const SizedBox(height: Sp.xs),
             Text(
@@ -684,7 +752,8 @@ class _TapeRow extends StatelessWidget {
   }
 
   Widget _cell(BuildContext context, AppColors c, DateTime date) {
-    final weekend = date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
+    final weekend =
+        date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
     // Typed target: only an extend-grip lands here. A whole-pill move carries
     // a Reservation and is caught by the row's own DragTarget instead.
     return DragTarget<_ExtendIntent>(
@@ -719,7 +788,10 @@ class _TapeRow extends StatelessWidget {
       final co = r.checkOut;
       if (ci == null || co == null) continue;
       final startIdx = _daysBetween(windowStart, ci).clamp(0, days);
-      final endIdx = _daysBetween(windowStart, co).clamp(0, days); // checkout exclusive
+      final endIdx = _daysBetween(
+        windowStart,
+        co,
+      ).clamp(0, days); // checkout exclusive
       if (endIdx <= startIdx) continue;
 
       final draggable = canEdit && _isLive(r.status);
@@ -778,7 +850,10 @@ class _Pill extends StatelessWidget {
     final body = GestureDetector(
       onTap: onOpen,
       child: Container(
-        padding: EdgeInsets.only(left: 10, right: showHandle ? _handleW + 4 : 8),
+        padding: EdgeInsets.only(
+          left: 10,
+          right: showHandle ? _handleW + 4 : 8,
+        ),
         alignment: Alignment.centerLeft,
         decoration: BoxDecoration(
           color: bg,
@@ -845,7 +920,8 @@ class _Pill extends StatelessWidget {
         : body;
 
     return Tooltip(
-      message: '${reservation.reservationNumber} · ${reservation.guestName}\n'
+      message:
+          '${reservation.reservationNumber} · ${reservation.guestName}\n'
           '${reservation.status.label}',
       child: Stack(
         children: [
@@ -897,7 +973,11 @@ class _Pill extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: AppTypography.body(size: 12, weight: FontWeight.w600, color: c.foreground),
+          style: AppTypography.body(
+            size: 12,
+            weight: FontWeight.w600,
+            color: c.foreground,
+          ),
         ),
       ),
     );

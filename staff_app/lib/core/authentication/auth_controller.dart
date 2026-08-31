@@ -75,11 +75,11 @@ class AuthController extends StateNotifier<AuthState> {
         '/auth/otp/request',
         body: {'mobile': mobile},
       );
-      final expiresAt = _parseDate(
-        data is Map ? data['expiresAt'] : null,
-      ) ?? DateTime.now().add(
-        const Duration(seconds: AppConfig.otpValiditySeconds),
-      );
+      final expiresAt =
+          _parseDate(data is Map ? data['expiresAt'] : null) ??
+          DateTime.now().add(
+            const Duration(seconds: AppConfig.otpValiditySeconds),
+          );
       state = state.copyWith(
         status: AuthStatus.otpPending,
         mobile: mobile,

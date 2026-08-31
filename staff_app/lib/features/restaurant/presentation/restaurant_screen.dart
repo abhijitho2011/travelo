@@ -62,8 +62,10 @@ class RestaurantScreen extends ConsumerWidget {
 
         summary.when(
           loading: () => const KpiSkeleton(count: 4),
-          error: (e, _) =>
-              ErrorState(error: e, onRetry: () => ref.invalidate(summaryProvider)),
+          error: (e, _) => ErrorState(
+            error: e,
+            onRetry: () => ref.invalidate(summaryProvider),
+          ),
           data: (s) => s == null
               ? const EmptyState(
                   title: 'The outlet is not set up yet',
@@ -181,7 +183,11 @@ class _FloorGrid extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      StatusBadge(tone: t.status.tone, label: t.status.label, dense: true),
+                      StatusBadge(
+                        tone: t.status.tone,
+                        label: t.status.label,
+                        dense: true,
+                      ),
                     ],
                   ),
                 ),

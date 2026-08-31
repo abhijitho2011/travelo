@@ -183,7 +183,13 @@ class StockMovement {
 
 @immutable
 class Supplier {
-  const Supplier({required this.id, required this.name, this.contact, this.phone, this.email});
+  const Supplier({
+    required this.id,
+    required this.name,
+    this.contact,
+    this.phone,
+    this.email,
+  });
 
   final String id;
   final String name;
@@ -258,7 +264,9 @@ class PurchaseOrder {
     id: (_pick(json, ['id']) ?? '').toString(),
     poNumber: _str(_pick(json, ['poNumber'])) ?? '—',
     status: PurchaseOrderStatus.fromWire(_pick(json, ['status'])?.toString()),
-    lines: _mapList(_pick(json, ['lines'])).map(PurchaseOrderLine.fromJson).toList(),
+    lines: _mapList(
+      _pick(json, ['lines']),
+    ).map(PurchaseOrderLine.fromJson).toList(),
     totalPaise: _int(_pick(json, ['totalPaise'])),
     supplierId: _str(_pick(json, ['supplierId'])),
     supplierName: _str(_pick(json, ['supplierName'])),

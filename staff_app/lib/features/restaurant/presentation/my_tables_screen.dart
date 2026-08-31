@@ -59,8 +59,10 @@ class MyTablesScreen extends ConsumerWidget {
 
         tables.when(
           loading: () => const ListSkeleton(rows: 2, height: 120),
-          error: (e, _) =>
-              ErrorState(error: e, onRetry: () => ref.invalidate(tablesProvider)),
+          error: (e, _) => ErrorState(
+            error: e,
+            onRetry: () => ref.invalidate(tablesProvider),
+          ),
           data: (list) => list.isEmpty
               ? const EmptyState(
                   title: 'No tables yet',
@@ -100,7 +102,10 @@ class _TableGrid extends StatelessWidget {
           runSpacing: spacing,
           children: [
             for (final t in tables)
-              SizedBox(width: width, child: _TableCard(table: t)),
+              SizedBox(
+                width: width,
+                child: _TableCard(table: t),
+              ),
           ],
         );
       },
@@ -142,7 +147,11 @@ class _TableCard extends ConsumerWidget {
             style: AppTypography.body(size: 11.5, color: c.mutedForeground),
           ),
           const SizedBox(height: Sp.sm),
-          StatusBadge(tone: table.status.tone, label: table.status.label, dense: true),
+          StatusBadge(
+            tone: table.status.tone,
+            label: table.status.label,
+            dense: true,
+          ),
         ],
       ),
     );
@@ -154,9 +163,9 @@ class _TableCard extends ConsumerWidget {
       return;
     }
     if (table.status == RestaurantTableStatus.blocked) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${table.name} is blocked.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${table.name} is blocked.')));
       return;
     }
     if (table.status == RestaurantTableStatus.open) {
@@ -241,7 +250,9 @@ class _GuestCountSheetState extends State<_GuestCountSheet> {
                   ),
                 ),
                 IconButton.filledTonal(
-                  onPressed: _count < 50 ? () => setState(() => _count++) : null,
+                  onPressed: _count < 50
+                      ? () => setState(() => _count++)
+                      : null,
                   icon: const Icon(Icons.add),
                 ),
               ],
@@ -249,7 +260,9 @@ class _GuestCountSheetState extends State<_GuestCountSheet> {
             const SizedBox(height: Sp.lg),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(_count),
-              child: Text(widget.isTakeaway ? 'Start order' : 'Seat & start order'),
+              child: Text(
+                widget.isTakeaway ? 'Start order' : 'Seat & start order',
+              ),
             ),
           ],
         ),
@@ -272,6 +285,8 @@ Future<void> _createAndOpen(
         .createOrder(tableId: tableId, guestCount: guestCount);
     router.go(Routes.restaurantOrder(order.id));
   } on ApiException catch (e) {
-    messenger.showSnackBar(SnackBar(content: Text(RestaurantErrors.friendly(e))));
+    messenger.showSnackBar(
+      SnackBar(content: Text(RestaurantErrors.friendly(e))),
+    );
   }
 }

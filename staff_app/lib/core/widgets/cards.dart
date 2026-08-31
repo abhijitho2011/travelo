@@ -147,7 +147,10 @@ class TaskCard extends StatelessWidget {
                           padding: const EdgeInsets.only(top: 2),
                           child: Text(
                             note!,
-                            style: AppTypography.body(size: 12, color: c.warning),
+                            style: AppTypography.body(
+                              size: 12,
+                              color: c.warning,
+                            ),
                           ),
                         ),
                       if (meta != null)
@@ -167,10 +170,7 @@ class TaskCard extends StatelessWidget {
                 StatusBadge(tone: statusTone, label: statusLabel),
               ],
             ),
-            if (actions != null) ...[
-              const SizedBox(height: Sp.md),
-              actions!,
-            ],
+            if (actions != null) ...[const SizedBox(height: Sp.md), actions!],
           ],
         ),
       ),
@@ -497,10 +497,7 @@ class ApprovalCard extends StatelessWidget {
               Container(
                 width: 34,
                 height: 34,
-                decoration: BoxDecoration(
-                  color: c.accent,
-                  borderRadius: R.rSm,
-                ),
+                decoration: BoxDecoration(color: c.accent, borderRadius: R.rSm),
                 alignment: Alignment.center,
                 child: Icon(icon, size: 17, color: c.accentForeground),
               ),

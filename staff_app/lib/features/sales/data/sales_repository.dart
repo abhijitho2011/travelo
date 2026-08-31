@@ -29,7 +29,10 @@ class SalesRepository {
       if (columns is List) {
         return columns.whereType<Map>().map((c) {
           final leads = (c['leads'] is List)
-              ? (c['leads'] as List).whereType<Map>().map(Lead.fromJson).toList()
+              ? (c['leads'] as List)
+                    .whereType<Map>()
+                    .map(Lead.fromJson)
+                    .toList()
               : <Lead>[];
           return PipelineColumn(
             stage: LeadStage.fromWire(c['stage']?.toString()),
@@ -65,7 +68,10 @@ class SalesRepository {
   }
 
   Future<Lead> moveStage(String id, LeadStage stage) async {
-    final data = await _api.patch('/sales/leads/$id/stage', body: {'stage': stage.wire});
+    final data = await _api.patch(
+      '/sales/leads/$id/stage',
+      body: {'stage': stage.wire},
+    );
     return _one(data, Lead.fromJson, 'lead');
   }
 

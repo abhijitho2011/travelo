@@ -42,7 +42,11 @@ class _ReceptionDashboardScreenState
 
   // -------------------------------------------------------------- actions --
 
-  Future<bool> _confirm(String title, String message, String confirmLabel) async {
+  Future<bool> _confirm(
+    String title,
+    String message,
+    String confirmLabel,
+  ) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -70,7 +74,9 @@ class _ReceptionDashboardScreenState
     try {
       await op();
     } on ApiException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(ReservationErrors.friendly(e))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(ReservationErrors.friendly(e))),
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -87,7 +93,9 @@ class _ReceptionDashboardScreenState
     await _run(() async {
       await ref.read(reservationActionsProvider).checkIn(r.id);
       messenger.showSnackBar(
-        SnackBar(content: Text('${r.guestName} checked in to room ${r.roomNumber}')),
+        SnackBar(
+          content: Text('${r.guestName} checked in to room ${r.roomNumber}'),
+        ),
       );
     });
   }
@@ -102,7 +110,9 @@ class _ReceptionDashboardScreenState
     final messenger = ScaffoldMessenger.of(context);
     await _run(() async {
       await ref.read(reservationActionsProvider).checkOut(r.id);
-      messenger.showSnackBar(SnackBar(content: Text('${r.guestName} checked out')));
+      messenger.showSnackBar(
+        SnackBar(content: Text('${r.guestName} checked out')),
+      );
     });
   }
 
@@ -110,9 +120,11 @@ class _ReceptionDashboardScreenState
     // A card only makes sense against a stay that is here or arriving —
     // exactly the two lists the board already holds.
     final eligible = [...board.inHouse, ...board.arrivals]
-        .where((r) =>
-            r.status == ReservationStatus.checkedIn ||
-            r.status == ReservationStatus.confirmed)
+        .where(
+          (r) =>
+              r.status == ReservationStatus.checkedIn ||
+              r.status == ReservationStatus.confirmed,
+        )
         .toList(growable: false);
     if (eligible.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -140,7 +152,11 @@ class _ReceptionDashboardScreenState
               ),
               for (final r in eligible)
                 ListTile(
-                  leading: Icon(Icons.key_outlined, size: 20, color: c.mutedForeground),
+                  leading: Icon(
+                    Icons.key_outlined,
+                    size: 20,
+                    color: c.mutedForeground,
+                  ),
                   title: Text(r.guestName),
                   subtitle: Text(
                     r.roomNumber != null
@@ -161,7 +177,9 @@ class _ReceptionDashboardScreenState
       final card = await ref.read(keyCardsRepositoryProvider).issue(chosen.id);
       ref.invalidate(keyCardsProvider);
       messenger.showSnackBar(
-        SnackBar(content: Text('${card.cardNumber} issued to ${chosen.guestName}')),
+        SnackBar(
+          content: Text('${card.cardNumber} issued to ${chosen.guestName}'),
+        ),
       );
     });
   }
@@ -173,12 +191,14 @@ class _ReceptionDashboardScreenState
         final ok = await _confirm(
           'Replace card?',
           '${card.cardNumber} stops working and a new card is issued for the '
-          'same stay.',
+              'same stay.',
           'Replace',
         );
         if (!ok || !mounted) return;
         await _run(() async {
-          final fresh = await ref.read(keyCardsRepositoryProvider).replace(card.id);
+          final fresh = await ref
+              .read(keyCardsRepositoryProvider)
+              .replace(card.id);
           ref.invalidate(keyCardsProvider);
           messenger.showSnackBar(
             SnackBar(content: Text('Replaced with ${fresh.cardNumber}')),
@@ -194,10 +214,16 @@ class _ReceptionDashboardScreenState
         );
         if (!ok || !mounted) return;
         await _run(() async {
-          await ref.read(keyCardsRepositoryProvider).deactivate(card.id, lost: lost);
+          await ref
+              .read(keyCardsRepositoryProvider)
+              .deactivate(card.id, lost: lost);
           ref.invalidate(keyCardsProvider);
           messenger.showSnackBar(
-            SnackBar(content: Text('${card.cardNumber} ${lost ? 'marked lost' : 'deactivated'}')),
+            SnackBar(
+              content: Text(
+                '${card.cardNumber} ${lost ? 'marked lost' : 'deactivated'}',
+              ),
+            ),
           );
         });
     }
@@ -251,14 +277,13 @@ class _ReceptionDashboardScreenState
           ],
         ),
         gapSection,
-        if (_busy) ...[
-          const LinearProgressIndicator(minHeight: 2),
-          gapSm,
-        ],
+        if (_busy) ...[const LinearProgressIndicator(minHeight: 2), gapSm],
         board.when(
           loading: () => const KpiSkeleton(count: 8),
-          error: (e, _) =>
-              ErrorState(error: e, onRetry: () => ref.invalidate(deskTodayProvider)),
+          error: (e, _) => ErrorState(
+            error: e,
+            onRetry: () => ref.invalidate(deskTodayProvider),
+          ),
           data: (data) => data == null
               ? const EmptyState(
                   title: 'The desk board is not available yet',
@@ -275,8 +300,9 @@ class _ReceptionDashboardScreenState
 
   Widget _board(BuildContext context, DeskBoard board) {
     final counts = board.counts;
-    final unassignedArrivals =
-        board.arrivals.where((r) => r.roomId == null || r.roomId!.isEmpty).length;
+    final unassignedArrivals = board.arrivals
+        .where((r) => r.roomId == null || r.roomId!.isEmpty)
+        .length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -366,7 +392,10 @@ class _ReceptionDashboardScreenState
             icon: Icons.flight_land_outlined,
           ),
           if (board.arrivals.isEmpty)
-            _cardEmpty(c, 'Nobody left to check in — every arrival is in house.')
+            _cardEmpty(
+              c,
+              'Nobody left to check in — every arrival is in house.',
+            )
           else
             for (final r in board.arrivals) _arrivalRow(context, r),
         ],
@@ -384,7 +413,9 @@ class _ReceptionDashboardScreenState
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: Sp.lg, vertical: Sp.md),
         decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: c.border.withValues(alpha: 0.7))),
+          border: Border(
+            top: BorderSide(color: c.border.withValues(alpha: 0.7)),
+          ),
         ),
         child: Row(
           children: [
@@ -411,7 +442,10 @@ class _ReceptionDashboardScreenState
                     ].join(' · '),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: AppTypography.body(size: 11, color: c.mutedForeground),
+                    style: AppTypography.body(
+                      size: 11,
+                      color: c.mutedForeground,
+                    ),
                   ),
                 ],
               ),
@@ -486,7 +520,9 @@ class _ReceptionDashboardScreenState
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: Sp.lg, vertical: Sp.md),
         decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: c.border.withValues(alpha: 0.7))),
+          border: Border(
+            top: BorderSide(color: c.border.withValues(alpha: 0.7)),
+          ),
         ),
         child: Row(
           children: [
@@ -574,7 +610,10 @@ class _ReceptionDashboardScreenState
                         ),
                         Text(
                           'Issue, replace or deactivate — every action is audited',
-                          style: AppTypography.body(size: 11, color: c.mutedForeground),
+                          style: AppTypography.body(
+                            size: 11,
+                            color: c.mutedForeground,
+                          ),
                         ),
                       ],
                     ),
@@ -600,9 +639,14 @@ class _ReceptionDashboardScreenState
                 'Key cards are unavailable right now — pull to refresh.',
               ),
               data: (items) => items.isEmpty
-                  ? _cardEmpty(c, 'No cards issued yet. Issue one against a stay.')
+                  ? _cardEmpty(
+                      c,
+                      'No cards issued yet. Issue one against a stay.',
+                    )
                   : Column(
-                      children: [for (final card in items) _keyCardRow(context, card)],
+                      children: [
+                        for (final card in items) _keyCardRow(context, card),
+                      ],
                     ),
             ),
           ],
@@ -651,7 +695,10 @@ class _ReceptionDashboardScreenState
                     detail,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: AppTypography.body(size: 10.5, color: c.mutedForeground),
+                    style: AppTypography.body(
+                      size: 10.5,
+                      color: c.mutedForeground,
+                    ),
                   ),
               ],
             ),
@@ -734,7 +781,11 @@ class _ReceptionDashboardScreenState
     ),
     child: Text(
       label,
-      style: AppTypography.body(size: 10.5, weight: FontWeight.w600, color: tone),
+      style: AppTypography.body(
+        size: 10.5,
+        weight: FontWeight.w600,
+        color: tone,
+      ),
     ),
   );
 }

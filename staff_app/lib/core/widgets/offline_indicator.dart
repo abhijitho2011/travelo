@@ -118,7 +118,8 @@ class PendingSyncSheet extends ConsumerWidget {
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: queue.operations.length,
-                  separatorBuilder: (_, _) => Divider(height: 1, color: c.border),
+                  separatorBuilder: (_, _) =>
+                      Divider(height: 1, color: c.border),
                   itemBuilder: (context, i) {
                     final op = queue.operations[i];
                     return ListTile(

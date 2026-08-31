@@ -39,7 +39,10 @@ class RestaurantRepository {
     return _one(data, RestaurantTable.fromJson, 'table');
   }
 
-  Future<RestaurantTable> updateTable(String id, Map<String, dynamic> changes) async {
+  Future<RestaurantTable> updateTable(
+    String id,
+    Map<String, dynamic> changes,
+  ) async {
     final data = await _api.patch('/restaurant/tables/$id', body: changes);
     return _one(data, RestaurantTable.fromJson, 'table');
   }
@@ -129,7 +132,10 @@ class RestaurantRepository {
     }
   }
 
-  Future<RestaurantOrder> createOrder({String? tableId, required int guestCount}) async {
+  Future<RestaurantOrder> createOrder({
+    String? tableId,
+    required int guestCount,
+  }) async {
     final data = await _api.post(
       '/restaurant/orders',
       body: {if (tableId != null) 'tableId': tableId, 'guestCount': guestCount},
@@ -145,7 +151,11 @@ class RestaurantRepository {
     return _one(data, RestaurantOrder.fromJson, 'order');
   }
 
-  Future<RestaurantOrder> setKot(String orderId, String itemId, KotStatus status) async {
+  Future<RestaurantOrder> setKot(
+    String orderId,
+    String itemId,
+    KotStatus status,
+  ) async {
     final data = await _api.post(
       '/restaurant/orders/$orderId/items/$itemId/kot',
       body: {'status': status.wire},
@@ -154,7 +164,9 @@ class RestaurantRepository {
   }
 
   Future<RestaurantOrder> cancelItem(String orderId, String itemId) async {
-    final data = await _api.post('/restaurant/orders/$orderId/items/$itemId/cancel');
+    final data = await _api.post(
+      '/restaurant/orders/$orderId/items/$itemId/cancel',
+    );
     return _one(data, RestaurantOrder.fromJson, 'order');
   }
 
@@ -219,7 +231,10 @@ class RestaurantRepository {
     try {
       final data = await _api.get(
         '/reservations',
-        query: {'status': 'CHECKED_IN', if (query != null && query.isNotEmpty) 'q': query},
+        query: {
+          'status': 'CHECKED_IN',
+          if (query != null && query.isNotEmpty) 'q': query,
+        },
       );
       return _listOf(data, InHouseGuest.fromJson);
     } on ApiException catch (e) {
@@ -281,7 +296,8 @@ class RestaurantErrors {
   static String friendly(ApiException error) => switch (error.code) {
     tableOccupied =>
       'That table already has an open order. Open it from the table instead.',
-    tableUnavailable => 'That table is blocked and cannot take an order right now.',
+    tableUnavailable =>
+      'That table is blocked and cannot take an order right now.',
     menuItemUnavailable =>
       'That dish is off the menu right now. The kitchen has 86’d it.',
     orderNotOpen => 'This order has moved on and can no longer be changed.',

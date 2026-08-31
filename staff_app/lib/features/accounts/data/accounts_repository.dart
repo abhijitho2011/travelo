@@ -22,7 +22,10 @@ class AccountsRepository {
     }
   }
 
-  Future<List<Expense>> expenses({ExpenseStatus? status, ExpenseCategory? category}) async {
+  Future<List<Expense>> expenses({
+    ExpenseStatus? status,
+    ExpenseCategory? category,
+  }) async {
     try {
       final data = await _api.get(
         '/accounts/expenses',
@@ -56,7 +59,8 @@ class AccountsRepository {
     return _one(data, Expense.fromJson, 'expense');
   }
 
-  Future<void> deleteExpense(String id) => _api.delete('/accounts/expenses/$id');
+  Future<void> deleteExpense(String id) =>
+      _api.delete('/accounts/expenses/$id');
 
   static List<T> _listOf<T>(dynamic data, T Function(Map) parse) {
     if (data is List) return data.whereType<Map>().map(parse).toList();

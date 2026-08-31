@@ -29,10 +29,7 @@ class ProfileScreen extends ConsumerWidget {
     if (session == null) {
       return const PageBody(
         children: [
-          EmptyState(
-            title: 'Not signed in',
-            icon: Icons.person_off_outlined,
-          ),
+          EmptyState(title: 'Not signed in', icon: Icons.person_off_outlined),
         ],
       );
     }
@@ -40,7 +37,8 @@ class ProfileScreen extends ConsumerWidget {
     final user = session.user;
 
     return PageBody(
-      onRefresh: () => ref.read(authControllerProvider.notifier).refreshSession(),
+      onRefresh: () =>
+          ref.read(authControllerProvider.notifier).refreshSession(),
       children: [
         const PageHeader(eyebrow: 'Account', title: 'Profile'),
         gapSection,
@@ -67,7 +65,10 @@ class ProfileScreen extends ConsumerWidget {
                   children: [
                     Text(
                       user.fullName,
-                      style: AppTypography.display(size: 19, color: c.foreground),
+                      style: AppTypography.display(
+                        size: 19,
+                        color: c.foreground,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -298,7 +299,10 @@ class _Row extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: AppTypography.body(size: 12.5, color: c.mutedForeground),
+                  style: AppTypography.body(
+                    size: 12.5,
+                    color: c.mutedForeground,
+                  ),
                 ),
                 Text(
                   value,
@@ -322,7 +326,11 @@ class _Row extends StatelessWidget {
           if (locked)
             Tooltip(
               message: 'Only your manager can change this',
-              child: Icon(Icons.lock_outline, size: 15, color: c.mutedForeground),
+              child: Icon(
+                Icons.lock_outline,
+                size: 15,
+                color: c.mutedForeground,
+              ),
             ),
         ],
       ),

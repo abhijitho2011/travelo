@@ -43,8 +43,10 @@ class MenuManagementScreen extends ConsumerWidget {
       ),
       body: menu.when(
         loading: () => const ListSkeleton(rows: 3, height: 90),
-        error: (e, _) =>
-            ErrorState(error: e, onRetry: () => ref.invalidate(menuAllProvider)),
+        error: (e, _) => ErrorState(
+          error: e,
+          onRetry: () => ref.invalidate(menuAllProvider),
+        ),
         data: (categories) => categories.isEmpty
             ? EmptyState(
                 title: 'No menu yet',
@@ -70,13 +72,19 @@ class MenuManagementScreen extends ConsumerWidget {
   }
 
   Future<void> _addCategory(BuildContext context, WidgetRef ref) async {
-    final name = await _promptText(context, title: 'New category', label: 'Name');
+    final name = await _promptText(
+      context,
+      title: 'New category',
+      label: 'Name',
+    );
     if (name == null || !context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     try {
       await ref.read(restaurantActionsProvider).createCategory(name);
     } on ApiException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(RestaurantErrors.friendly(e))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(RestaurantErrors.friendly(e))),
+      );
     }
   }
 }
@@ -135,7 +143,9 @@ class _CategoryPanel extends ConsumerWidget {
         'veg': result.veg,
       });
     } on ApiException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(RestaurantErrors.friendly(e))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(RestaurantErrors.friendly(e))),
+      );
     }
   }
 }
@@ -173,12 +183,17 @@ class _ItemRow extends ConsumerWidget {
                   children: [
                     Text(
                       item.priceLabel,
-                      style: AppTypography.numeric(size: 12, color: c.mutedForeground),
+                      style: AppTypography.numeric(
+                        size: 12,
+                        color: c.mutedForeground,
+                      ),
                     ),
                     if (item.status != MenuItemStatus.active) ...[
                       const SizedBox(width: 6),
                       StatusBadge(
-                        tone: archived ? StatusTone.neutral : StatusTone.warning,
+                        tone: archived
+                            ? StatusTone.neutral
+                            : StatusTone.warning,
                         label: item.status.label,
                         dense: true,
                       ),
@@ -210,12 +225,20 @@ class _ItemRow extends ConsumerWidget {
     );
   }
 
-  Future<void> _availability(BuildContext context, WidgetRef ref, bool on) async {
+  Future<void> _availability(
+    BuildContext context,
+    WidgetRef ref,
+    bool on,
+  ) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await ref.read(restaurantActionsProvider).setItemAvailability(item.id, on);
+      await ref
+          .read(restaurantActionsProvider)
+          .setItemAvailability(item.id, on);
     } on ApiException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(RestaurantErrors.friendly(e))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(RestaurantErrors.friendly(e))),
+      );
     }
   }
 
@@ -230,7 +253,9 @@ class _ItemRow extends ConsumerWidget {
         'veg': result.veg,
       });
     } on ApiException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(RestaurantErrors.friendly(e))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(RestaurantErrors.friendly(e))),
+      );
     }
   }
 
@@ -250,7 +275,9 @@ class _ItemRow extends ConsumerWidget {
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: context.colors.destructive),
+            style: FilledButton.styleFrom(
+              backgroundColor: context.colors.destructive,
+            ),
             child: const Text('Remove'),
           ),
         ],
@@ -261,7 +288,9 @@ class _ItemRow extends ConsumerWidget {
     try {
       await ref.read(restaurantActionsProvider).deleteItem(item.id);
     } on ApiException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(RestaurantErrors.friendly(e))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(RestaurantErrors.friendly(e))),
+      );
     }
   }
 }
@@ -282,7 +311,9 @@ Future<_ItemResult?> _itemDialog(
 }) {
   final nameCtrl = TextEditingController(text: existing?.name ?? '');
   final priceCtrl = TextEditingController(
-    text: existing != null ? (existing.pricePaise / 100).toStringAsFixed(0) : '',
+    text: existing != null
+        ? (existing.pricePaise / 100).toStringAsFixed(0)
+        : '',
   );
   bool veg = existing?.veg ?? true;
 

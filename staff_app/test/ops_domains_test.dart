@@ -70,24 +70,40 @@ void main() {
 
     test('lead pipeline offers only legal next stages', () {
       expect(LeadStage.lead.nextStages, [LeadStage.contacted, LeadStage.lost]);
-      expect(LeadStage.proposal.nextStages,
-          [LeadStage.negotiation, LeadStage.confirmed, LeadStage.lost]);
+      expect(LeadStage.proposal.nextStages, [
+        LeadStage.negotiation,
+        LeadStage.confirmed,
+        LeadStage.lost,
+      ]);
       expect(LeadStage.confirmed.nextStages, isEmpty);
       expect(LeadStage.lost.nextStages, isEmpty);
     });
 
     test('driver step advances with the trip', () {
-      TransportRequest at(TransportStatus s, DriverStage? stage) => TransportRequest(
+      TransportRequest at(TransportStatus s, DriverStage? stage) =>
+          TransportRequest(
             id: 'x',
             guestName: 'G',
             type: TransportType.pickup,
             status: s,
             driverStage: stage,
           );
-      expect(at(TransportStatus.assigned, null).nextDriverStep, DriverStep.accept);
-      expect(at(TransportStatus.inProgress, DriverStage.accepted).nextDriverStep, DriverStep.onTheWay);
-      expect(at(TransportStatus.inProgress, DriverStage.arrived).nextDriverStep, DriverStep.pickedUp);
-      expect(at(TransportStatus.inProgress, DriverStage.pickedUp).nextDriverStep, DriverStep.complete);
+      expect(
+        at(TransportStatus.assigned, null).nextDriverStep,
+        DriverStep.accept,
+      );
+      expect(
+        at(TransportStatus.inProgress, DriverStage.accepted).nextDriverStep,
+        DriverStep.onTheWay,
+      );
+      expect(
+        at(TransportStatus.inProgress, DriverStage.arrived).nextDriverStep,
+        DriverStep.pickedUp,
+      );
+      expect(
+        at(TransportStatus.inProgress, DriverStage.pickedUp).nextDriverStep,
+        DriverStep.complete,
+      );
       expect(at(TransportStatus.completed, null).nextDriverStep, isNull);
     });
 
@@ -118,7 +134,11 @@ void main() {
 
     test('an accounts summary reads nested revenue', () {
       final s = AccountsSummary.fromJson({
-        'revenue': {'roomsPaise': 100000, 'fnbPaise': 40000, 'totalPaise': 140000},
+        'revenue': {
+          'roomsPaise': 100000,
+          'fnbPaise': 40000,
+          'totalPaise': 140000,
+        },
         'expensesTodayPaise': 30000,
         'receivablesCount': 3,
         'payablesCount': 2,
@@ -147,12 +167,17 @@ void main() {
     });
 
     test('inventory reaches items, movements and purchase orders', () {
-      final routes = RoleConfig.of(StaffRole.inventoryStoreManager).allowedRoutes;
-      expect(routes, containsAll([
-        Routes.inventoryItems,
-        Routes.inventoryMovements,
-        Routes.inventoryPurchaseOrders,
-      ]));
+      final routes = RoleConfig.of(
+        StaffRole.inventoryStoreManager,
+      ).allowedRoutes;
+      expect(
+        routes,
+        containsAll([
+          Routes.inventoryItems,
+          Routes.inventoryMovements,
+          Routes.inventoryPurchaseOrders,
+        ]),
+      );
     });
 
     test('accounts reaches the expense register', () {

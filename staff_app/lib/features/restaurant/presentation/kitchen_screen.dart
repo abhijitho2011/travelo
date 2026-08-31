@@ -33,7 +33,11 @@ class _KitchenScreenState extends ConsumerState<KitchenScreen> {
   Timer? _poll;
   KotStatus _stage = KotStatus.newTicket;
 
-  static const _stages = [KotStatus.newTicket, KotStatus.preparing, KotStatus.ready];
+  static const _stages = [
+    KotStatus.newTicket,
+    KotStatus.preparing,
+    KotStatus.ready,
+  ];
 
   @override
   void initState() {
@@ -63,14 +67,17 @@ class _KitchenScreenState extends ConsumerState<KitchenScreen> {
         PageHeader(
           eyebrow: 'Kitchen',
           title: 'Kitchen display',
-          subtitle: 'Live tickets, oldest first. Refreshes on its own every 15s.',
+          subtitle:
+              'Live tickets, oldest first. Refreshes on its own every 15s.',
         ),
         gapSection,
 
         tickets.when(
           loading: () => const ListSkeleton(rows: 3, height: 120),
-          error: (e, _) =>
-              ErrorState(error: e, onRetry: () => ref.invalidate(kitchenProvider)),
+          error: (e, _) => ErrorState(
+            error: e,
+            onRetry: () => ref.invalidate(kitchenProvider),
+          ),
           data: (list) {
             if (list.isEmpty) {
               return const EmptyState(
@@ -101,10 +108,8 @@ class _KitchenScreenState extends ConsumerState<KitchenScreen> {
     );
   }
 
-  static int _countIn(List<KitchenTicket> tickets, KotStatus stage) => tickets
-      .expand((t) => t.items)
-      .where((i) => i.kotStatus == stage)
-      .length;
+  static int _countIn(List<KitchenTicket> tickets, KotStatus stage) =>
+      tickets.expand((t) => t.items).where((i) => i.kotStatus == stage).length;
 
   List<Widget> _ticketsFor(List<KitchenTicket> tickets, KotStatus stage) {
     final cards = <Widget>[];
@@ -137,7 +142,11 @@ class _Lanes extends StatelessWidget {
 
   final List<KitchenTicket> tickets;
 
-  static const _stages = [KotStatus.newTicket, KotStatus.preparing, KotStatus.ready];
+  static const _stages = [
+    KotStatus.newTicket,
+    KotStatus.preparing,
+    KotStatus.ready,
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -160,7 +169,9 @@ class _Lanes extends StatelessWidget {
                           child: _TicketCard(
                             ticket: t,
                             stage: stage,
-                            items: t.items.where((i) => i.kotStatus == stage).toList(),
+                            items: t.items
+                                .where((i) => i.kotStatus == stage)
+                                .toList(),
                           ),
                         ),
                   ],
@@ -248,7 +259,10 @@ class _TicketCard extends ConsumerWidget {
                       children: [
                         Text(
                           line.name,
-                          style: AppTypography.body(size: 13, color: c.foreground),
+                          style: AppTypography.body(
+                            size: 13,
+                            color: c.foreground,
+                          ),
                         ),
                         if (line.notes != null)
                           Text(
@@ -325,7 +339,11 @@ class _StageActions extends ConsumerWidget {
     );
   }
 
-  Future<void> _advanceAll(BuildContext context, WidgetRef ref, KotStatus to) async {
+  Future<void> _advanceAll(
+    BuildContext context,
+    WidgetRef ref,
+    KotStatus to,
+  ) async {
     final messenger = ScaffoldMessenger.of(context);
     final actions = ref.read(restaurantActionsProvider);
     try {
@@ -333,7 +351,9 @@ class _StageActions extends ConsumerWidget {
         await actions.setKot(ticket.orderId, line.id, to);
       }
     } on ApiException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(RestaurantErrors.friendly(e))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(RestaurantErrors.friendly(e))),
+      );
     }
   }
 }

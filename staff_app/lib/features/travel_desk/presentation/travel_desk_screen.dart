@@ -73,13 +73,21 @@ class TravelDeskScreen extends ConsumerWidget {
             data: (s) => KpiGrid(
               minTileWidth: 150,
               children: [
-                KpiCard(label: "Today's transfers", value: Fmt.count(s?.todayCount)),
+                KpiCard(
+                  label: "Today's transfers",
+                  value: Fmt.count(s?.todayCount),
+                ),
                 KpiCard(
                   label: 'Pending',
                   value: Fmt.count(s?.pendingCount),
-                  tone: (s?.pendingCount ?? 0) > 0 ? context.colors.warning : null,
+                  tone: (s?.pendingCount ?? 0) > 0
+                      ? context.colors.warning
+                      : null,
                 ),
-                KpiCard(label: 'On the road', value: Fmt.count(s?.inProgressCount)),
+                KpiCard(
+                  label: 'On the road',
+                  value: Fmt.count(s?.inProgressCount),
+                ),
               ],
             ),
           ),
@@ -91,7 +99,9 @@ class TravelDeskScreen extends ConsumerWidget {
               onChanged: (v) => ref
                   .read(transportFilterProvider.notifier)
                   .update(
-                    (f) => v == null ? f.copyWith(clearStatus: true) : f.copyWith(status: v),
+                    (f) => v == null
+                        ? f.copyWith(clearStatus: true)
+                        : f.copyWith(status: v),
                   ),
             ),
           ),
@@ -108,9 +118,7 @@ class TravelDeskScreen extends ConsumerWidget {
                     icon: Icons.local_taxi_outlined,
                   )
                 : Column(
-                    children: [
-                      for (final r in list) _RequestRow(request: r),
-                    ],
+                    children: [for (final r in list) _RequestRow(request: r)],
                   ),
           ),
         ],
@@ -149,56 +157,73 @@ class _RequestRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
     final r = request;
-    final route = [r.fromLocation, r.toLocation].where((s) => s != null && s.isNotEmpty).join(' → ');
+    final route = [
+      r.fromLocation,
+      r.toLocation,
+    ].where((s) => s != null && s.isNotEmpty).join(' → ');
     return Padding(
       padding: const EdgeInsets.only(bottom: Sp.md),
       child: SoftCard(
-      onTap: () => _openActions(context, ref, r),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  r.guestName,
-                  style: AppTypography.body(
-                    size: 14,
-                    weight: FontWeight.w700,
-                    color: c.foreground,
-                  ),
-                ),
-              ),
-              StatusBadge(tone: r.status.tone, label: r.status.label, dense: true),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '${r.type.label} · ${Fmt.dateTime(r.pickupAt)}',
-            style: AppTypography.body(size: 12.5, color: c.mutedForeground),
-          ),
-          if (route.isNotEmpty) ...[
-            const SizedBox(height: 2),
-            Text(
-              route,
-              style: AppTypography.body(size: 12.5, color: c.mutedForeground),
-            ),
-          ],
-          if (r.driverName != null) ...[
-            const SizedBox(height: 4),
+        onTap: () => _openActions(context, ref, r),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Row(
               children: [
-                Icon(Icons.badge_outlined, size: 13, color: c.mutedForeground),
-                const SizedBox(width: 4),
-                Text(
-                  [r.driverName, r.vehicleName].where((s) => s != null).join(' · '),
-                  style: AppTypography.body(size: 12, color: c.mutedForeground),
+                Expanded(
+                  child: Text(
+                    r.guestName,
+                    style: AppTypography.body(
+                      size: 14,
+                      weight: FontWeight.w700,
+                      color: c.foreground,
+                    ),
+                  ),
+                ),
+                StatusBadge(
+                  tone: r.status.tone,
+                  label: r.status.label,
+                  dense: true,
                 ),
               ],
             ),
+            const SizedBox(height: 4),
+            Text(
+              '${r.type.label} · ${Fmt.dateTime(r.pickupAt)}',
+              style: AppTypography.body(size: 12.5, color: c.mutedForeground),
+            ),
+            if (route.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                route,
+                style: AppTypography.body(size: 12.5, color: c.mutedForeground),
+              ),
+            ],
+            if (r.driverName != null) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(
+                    Icons.badge_outlined,
+                    size: 13,
+                    color: c.mutedForeground,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    [
+                      r.driverName,
+                      r.vehicleName,
+                    ].where((s) => s != null).join(' · '),
+                    style: AppTypography.body(
+                      size: 12,
+                      color: c.mutedForeground,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
-        ],
-      ),
+        ),
       ),
     );
   }
@@ -217,7 +242,9 @@ class _RequestRow extends ConsumerWidget {
               ListTile(
                 leading: const Icon(Icons.person_add_alt_1_outlined),
                 title: Text(
-                  r.status == TransportStatus.assigned ? 'Reassign driver' : 'Assign driver',
+                  r.status == TransportStatus.assigned
+                      ? 'Reassign driver'
+                      : 'Assign driver',
                 ),
                 onTap: () {
                   Navigator.of(sheetCtx).pop();
@@ -239,13 +266,20 @@ class _RequestRow extends ConsumerWidget {
                 r.status != TransportStatus.completed &&
                 r.status != TransportStatus.cancelled)
               ListTile(
-                leading: Icon(Icons.cancel_outlined, color: context.colors.critical),
+                leading: Icon(
+                  Icons.cancel_outlined,
+                  color: context.colors.critical,
+                ),
                 title: const Text('Cancel request'),
                 onTap: () async {
                   Navigator.of(sheetCtx).pop();
-                  await _run(context, ref, () => ref
-                      .read(travelDeskActionsProvider)
-                      .setStatus(r.id, TransportStatus.cancelled));
+                  await _run(
+                    context,
+                    ref,
+                    () => ref
+                        .read(travelDeskActionsProvider)
+                        .setStatus(r.id, TransportStatus.cancelled),
+                  );
                 },
               ),
           ],
@@ -254,7 +288,11 @@ class _RequestRow extends ConsumerWidget {
     );
   }
 
-  Future<void> _run(BuildContext context, WidgetRef ref, Future<void> Function() op) async {
+  Future<void> _run(
+    BuildContext context,
+    WidgetRef ref,
+    Future<void> Function() op,
+  ) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
       await op();

@@ -23,7 +23,10 @@ class InventoryRepository {
 
   // -------------------------------------------------------------------- items --
 
-  Future<List<InventoryItem>> items({bool lowStock = false, String? category}) async {
+  Future<List<InventoryItem>> items({
+    bool lowStock = false,
+    String? category,
+  }) async {
     try {
       final data = await _api.get(
         '/inventory/items',
@@ -44,7 +47,10 @@ class InventoryRepository {
     return _one(data, InventoryItem.fromJson, 'item');
   }
 
-  Future<InventoryItem> updateItem(String id, Map<String, dynamic> changes) async {
+  Future<InventoryItem> updateItem(
+    String id,
+    Map<String, dynamic> changes,
+  ) async {
     final data = await _api.patch('/inventory/items/$id', body: changes);
     return _one(data, InventoryItem.fromJson, 'item');
   }
@@ -94,7 +100,9 @@ class InventoryRepository {
 
   // ----------------------------------------------------------- purchase orders --
 
-  Future<List<PurchaseOrder>> purchaseOrders({PurchaseOrderStatus? status}) async {
+  Future<List<PurchaseOrder>> purchaseOrders({
+    PurchaseOrderStatus? status,
+  }) async {
     try {
       final data = await _api.get(
         '/inventory/purchase-orders',
@@ -122,7 +130,10 @@ class InventoryRepository {
     return _one(data, PurchaseOrder.fromJson, 'purchase order');
   }
 
-  Future<PurchaseOrder> setPoStatus(String id, PurchaseOrderStatus status) async {
+  Future<PurchaseOrder> setPoStatus(
+    String id,
+    PurchaseOrderStatus status,
+  ) async {
     final data = await _api.patch(
       '/inventory/purchase-orders/$id/status',
       body: {'status': status.wire},

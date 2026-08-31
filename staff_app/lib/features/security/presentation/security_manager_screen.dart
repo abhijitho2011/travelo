@@ -40,8 +40,10 @@ class SecurityManagerScreen extends ConsumerWidget {
         gapSection,
         async.when(
           loading: () => const KpiSkeleton(),
-          error: (e, _) =>
-              ErrorState(error: e, onRetry: () => ref.invalidate(securityDashboardProvider)),
+          error: (e, _) => ErrorState(
+            error: e,
+            onRetry: () => ref.invalidate(securityDashboardProvider),
+          ),
           data: (d) {
             if (d == null) {
               return const EmptyState(
@@ -56,11 +58,16 @@ class SecurityManagerScreen extends ConsumerWidget {
                 KpiGrid(
                   children: [
                     KpiCard(label: 'On duty', value: Fmt.count(d.activeStaff)),
-                    KpiCard(label: 'Visitors on site', value: Fmt.count(d.visitorsOnSite)),
+                    KpiCard(
+                      label: 'Visitors on site',
+                      value: Fmt.count(d.visitorsOnSite),
+                    ),
                     KpiCard(
                       label: 'Open incidents',
                       value: Fmt.count(d.openIncidents),
-                      tone: d.openIncidents > 0 ? Theme.of(context).colorScheme.error : null,
+                      tone: d.openIncidents > 0
+                          ? Theme.of(context).colorScheme.error
+                          : null,
                     ),
                     KpiCard(
                       label: 'High severity',
@@ -96,8 +103,8 @@ class SecurityManagerScreen extends ConsumerWidget {
   }
 
   String _severityLabel(String sev) => switch (sev) {
-        'HIGH' => 'High',
-        'MEDIUM' => 'Medium',
-        _ => 'Low',
-      };
+    'HIGH' => 'High',
+    'MEDIUM' => 'Medium',
+    _ => 'Low',
+  };
 }

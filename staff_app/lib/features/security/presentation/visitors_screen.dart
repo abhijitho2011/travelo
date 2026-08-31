@@ -44,8 +44,10 @@ class VisitorsScreen extends ConsumerWidget {
         gapSection,
         async.when(
           loading: () => const ListSkeleton(rows: 4, height: 72),
-          error: (e, _) =>
-              ErrorState(error: e, onRetry: () => ref.invalidate(visitorsProvider)),
+          error: (e, _) => ErrorState(
+            error: e,
+            onRetry: () => ref.invalidate(visitorsProvider),
+          ),
           data: (visitors) {
             if (visitors.isEmpty) {
               return const EmptyState(

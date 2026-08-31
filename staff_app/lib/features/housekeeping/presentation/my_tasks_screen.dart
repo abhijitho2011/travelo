@@ -212,7 +212,10 @@ class _TaskRowState extends ConsumerState<_TaskRow> {
                   padding: EdgeInsets.zero,
                   foregroundColor: c.warning,
                 ),
-                child: const Icon(Icons.report_gmailerrorred_outlined, size: 19),
+                child: const Icon(
+                  Icons.report_gmailerrorred_outlined,
+                  size: 19,
+                ),
               ),
             ),
           ),

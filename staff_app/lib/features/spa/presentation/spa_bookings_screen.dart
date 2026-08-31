@@ -45,19 +45,26 @@ class SpaBookingsScreen extends ConsumerWidget {
                   child: KpiGrid(
                     children: [
                       KpiCard(label: "Today's revenue", value: r.revenueLabel),
-                      KpiCard(label: 'Bills settled', value: Fmt.count(r.paidCount)),
+                      KpiCard(
+                        label: 'Bills settled',
+                        value: Fmt.count(r.paidCount),
+                      ),
                     ],
                   ),
                 ),
         ),
         bills.when(
           loading: () => const ListSkeleton(rows: 4, height: 76),
-          error: (e, _) => ErrorState(error: e, onRetry: () => ref.invalidate(spaBillsProvider)),
+          error: (e, _) => ErrorState(
+            error: e,
+            onRetry: () => ref.invalidate(spaBillsProvider),
+          ),
           data: (list) {
             if (list.isEmpty) {
               return const EmptyState(
                 title: 'No bills yet',
-                hint: 'A bill appears once a treatment is completed and raised.',
+                hint:
+                    'A bill appears once a treatment is completed and raised.',
                 icon: Icons.receipt_long_outlined,
               );
             }
@@ -116,9 +123,17 @@ class _BillRowState extends ConsumerState<_BillRow> {
         if (b.paymentMethod != null) b.paymentMethod!.label,
         if (b.refundReason != null) 'Refund: ${b.refundReason}',
       ].join(' · '),
-      badge: StatusBadge(tone: b.status.tone, label: b.status.label, dense: true),
+      badge: StatusBadge(
+        tone: b.status.tone,
+        label: b.status.label,
+        dense: true,
+      ),
       trailing: _busy
-          ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+          ? const SizedBox(
+              height: 18,
+              width: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
           : Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -169,8 +184,11 @@ class _BillRowState extends ConsumerState<_BillRow> {
       reservationId = await _promptReservation();
       if (reservationId == null || reservationId.isEmpty) return;
     }
-    await _run(() =>
-        ref.read(spaRepositoryProvider).settleBill(b.id, method, reservationId: reservationId));
+    await _run(
+      () => ref
+          .read(spaRepositoryProvider)
+          .settleBill(b.id, method, reservationId: reservationId),
+    );
   }
 
   Future<void> _refund(SpaBill b) async {
@@ -184,7 +202,10 @@ class _BillRowState extends ConsumerState<_BillRow> {
           decoration: const InputDecoration(labelText: 'Reason'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, controller.text.trim()),
             child: const Text('Refund'),
@@ -193,7 +214,9 @@ class _BillRowState extends ConsumerState<_BillRow> {
       ),
     );
     if (reason != null && reason.isNotEmpty) {
-      await _run(() => ref.read(spaRepositoryProvider).refundBill(b.id, reason));
+      await _run(
+        () => ref.read(spaRepositoryProvider).refundBill(b.id, reason),
+      );
     }
   }
 
@@ -211,7 +234,10 @@ class _BillRowState extends ConsumerState<_BillRow> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, controller.text.trim()),
             child: const Text('Charge room'),

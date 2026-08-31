@@ -50,7 +50,10 @@ void main() {
     test('an unknown status degrades to the least committal one', () {
       // PENDING blocks nothing. Falling back to CONFIRMED would make an
       // unrecognised value look like a room that has been sold.
-      expect(ReservationStatus.fromWire('TELEPORTED'), ReservationStatus.pending);
+      expect(
+        ReservationStatus.fromWire('TELEPORTED'),
+        ReservationStatus.pending,
+      );
       expect(ReservationStatus.fromWire(null), ReservationStatus.pending);
       expect(ReservationStatus.fromWire(''), ReservationStatus.pending);
     });
@@ -121,8 +124,10 @@ void main() {
     });
 
     test('an unknown source falls back to the commonest one', () {
-      expect(ReservationSource.fromWire('CARRIER_PIGEON'),
-          ReservationSource.walkIn);
+      expect(
+        ReservationSource.fromWire('CARRIER_PIGEON'),
+        ReservationSource.walkIn,
+      );
       expect(ReservationSource.fromWire('walk in'), ReservationSource.walkIn);
       expect(ReservationSource.fromWire(null), ReservationSource.walkIn);
     });
@@ -130,14 +135,8 @@ void main() {
 
   group('stay dates', () {
     test('check-out is exclusive, so 14th to 15th is one night', () {
-      expect(
-        nightsBetween(DateTime(2026, 3, 14), DateTime(2026, 3, 15)),
-        1,
-      );
-      expect(
-        nightsBetween(DateTime(2026, 3, 14), DateTime(2026, 3, 20)),
-        6,
-      );
+      expect(nightsBetween(DateTime(2026, 3, 14), DateTime(2026, 3, 15)), 1);
+      expect(nightsBetween(DateTime(2026, 3, 14), DateTime(2026, 3, 20)), 6);
     });
 
     test('the time of day never buys or loses a night', () {
@@ -188,10 +187,7 @@ void main() {
     });
 
     test('dateOnly throws the clock away', () {
-      expect(
-        dateOnly(DateTime(2026, 3, 4, 17, 45)),
-        DateTime(2026, 3, 4),
-      );
+      expect(dateOnly(DateTime(2026, 3, 4, 17, 45)), DateTime(2026, 3, 4));
     });
   });
 
@@ -255,20 +251,23 @@ void main() {
       expect(r.guestCount, 3);
     });
 
-    test('an empty payload yields a usable record rather than an exception', () {
-      final r = Reservation.fromJson(const <String, dynamic>{});
-      expect(r.id, '');
-      expect(r.reservationNumber, '—');
-      expect(r.guestName, 'Guest');
-      expect(r.status, ReservationStatus.pending);
-      expect(r.source, ReservationSource.walkIn);
-      expect(r.adults, 1);
-      expect(r.children, 0);
-      expect(r.nights, 0);
-      expect(r.checkIn, isNull);
-      expect(r.roomAssigned, isFalse);
-      expect(r.events, isEmpty);
-    });
+    test(
+      'an empty payload yields a usable record rather than an exception',
+      () {
+        final r = Reservation.fromJson(const <String, dynamic>{});
+        expect(r.id, '');
+        expect(r.reservationNumber, '—');
+        expect(r.guestName, 'Guest');
+        expect(r.status, ReservationStatus.pending);
+        expect(r.source, ReservationSource.walkIn);
+        expect(r.adults, 1);
+        expect(r.children, 0);
+        expect(r.nights, 0);
+        expect(r.checkIn, isNull);
+        expect(r.roomAssigned, isFalse);
+        expect(r.events, isEmpty);
+      },
+    );
 
     test('snake_case keys are read when camelCase is absent', () {
       final r = Reservation.fromJson(const <String, dynamic>{
@@ -432,7 +431,9 @@ void main() {
     });
 
     test('a counts block that is not an object leaves the tiles at zero', () {
-      final board = DeskBoard.fromJson(const <String, dynamic>{'counts': 'n/a'});
+      final board = DeskBoard.fromJson(const <String, dynamic>{
+        'counts': 'n/a',
+      });
       expect(board.counts.arrivals, 0);
       expect(board.counts.inHouse, 0);
     });
@@ -835,7 +836,11 @@ void main() {
           ...config.visibleNav(managementPermissions),
           ...config.visibleMore(managementPermissions),
         ].map((i) => i.route);
-        expect(visible, isNot(contains(Routes.reservations)), reason: role.wire);
+        expect(
+          visible,
+          isNot(contains(Routes.reservations)),
+          reason: role.wire,
+        );
       }
     });
 
@@ -884,9 +889,9 @@ void main() {
       // Even granted the key, the destination is not in their map — which is
       // what stops a server-side grant quietly widening their surface.
       expect(
-        RoleConfig.of(StaffRole.roomAttendant)
-            .visibleMore(housekeepingPermissions)
-            .map((i) => i.route),
+        RoleConfig.of(
+          StaffRole.roomAttendant,
+        ).visibleMore(housekeepingPermissions).map((i) => i.route),
         isNot(contains(Routes.reservations)),
       );
     });
@@ -944,8 +949,16 @@ void main() {
         'netPaidPaise': 330000,
         'balancePaise': 370000,
         'lineItems': [
-          {'kind': 'RESTAURANT', 'description': 'Restaurant ORD-1', 'amountPaise': 120000},
-          {'kind': 'SPA', 'description': 'Spa — Deep Tissue', 'amountPaise': 80000},
+          {
+            'kind': 'RESTAURANT',
+            'description': 'Restaurant ORD-1',
+            'amountPaise': 120000,
+          },
+          {
+            'kind': 'SPA',
+            'description': 'Spa — Deep Tissue',
+            'amountPaise': 80000,
+          },
         ],
         'payments': [
           {'direction': 'PAYMENT', 'method': 'CARD', 'amountPaise': 350000},

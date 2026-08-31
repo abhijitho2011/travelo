@@ -111,8 +111,10 @@ class HousekeepingBoard {
     final groups = <String, List<BoardRoom>>{};
     rawGroups.forEach((k, v) {
       if (v is List) {
-        groups[k.toString()] =
-            v.whereType<Map>().map(BoardRoom.fromJson).toList();
+        groups[k.toString()] = v
+            .whereType<Map>()
+            .map(BoardRoom.fromJson)
+            .toList();
       }
     });
     final rawCounts = (j['counts'] as Map?) ?? const {};

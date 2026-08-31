@@ -47,7 +47,10 @@ class SpaScreen extends ConsumerWidget {
         gapSection,
         async.when(
           loading: () => const KpiSkeleton(),
-          error: (e, _) => ErrorState(error: e, onRetry: () => ref.invalidate(spaDashboardProvider)),
+          error: (e, _) => ErrorState(
+            error: e,
+            onRetry: () => ref.invalidate(spaDashboardProvider),
+          ),
           data: (d) {
             if (d == null) {
               return const EmptyState(
@@ -66,7 +69,10 @@ class SpaScreen extends ConsumerWidget {
                     KpiCard(label: 'Today', value: Fmt.count(d.todayCount)),
                     KpiCard(label: 'Booked', value: Fmt.count(booked)),
                     KpiCard(label: 'In progress', value: Fmt.count(inProgress)),
-                    KpiCard(label: 'Completed', value: Fmt.count(d.completedCount)),
+                    KpiCard(
+                      label: 'Completed',
+                      value: Fmt.count(d.completedCount),
+                    ),
                   ],
                 ),
                 gapSection,
@@ -112,7 +118,11 @@ class _ScheduleRow extends StatelessWidget {
         if (a.startAt != null) Fmt.time(a.startAt),
         if (!a.hasTherapist) 'Unassigned',
       ].join(' · '),
-      badge: StatusBadge(tone: a.status.tone, label: a.status.label, dense: true),
+      badge: StatusBadge(
+        tone: a.status.tone,
+        label: a.status.label,
+        dense: true,
+      ),
     );
   }
 }

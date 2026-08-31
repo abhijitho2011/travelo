@@ -45,7 +45,8 @@ class WorkOrderCard extends StatelessWidget {
                     Text(
                       [
                         order.number,
-                        if (order.roomNumber != null) 'Room ${order.roomNumber}',
+                        if (order.roomNumber != null)
+                          'Room ${order.roomNumber}',
                         if (order.takesRoomOutOfService) 'off-board',
                       ].join(' · '),
                       style: AppTypography.numeric(

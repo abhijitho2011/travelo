@@ -55,7 +55,8 @@ class _HousekeepingTasksScreenState
           loading: () => const ListSkeleton(rows: 4, height: 110),
           error: (e, _) => ErrorState(
             error: e,
-            onRetry: () => ref.read(hkTaskListProvider(_filter).notifier).refresh(),
+            onRetry: () =>
+                ref.read(hkTaskListProvider(_filter).notifier).refresh(),
           ),
           data: (items) => items.isEmpty
               ? const EmptyState(
@@ -73,16 +74,21 @@ class _HousekeepingTasksScreenState
                           type: t.typeLabel,
                           note: t.guestRequest,
                           meta: [
-                            if (t.assigneeName != null) t.assigneeName!
-                            else 'Unassigned',
+                            if (t.assigneeName != null)
+                              t.assigneeName!
+                            else
+                              'Unassigned',
                             'Priority ${t.priority.label}',
                           ].join(' · '),
                           statusLabel: t.status.label,
                           statusTone: t.status.tone,
                           highPriority: t.priority == HkPriority.high,
-                          onTap: () =>
-                              showTaskActionSheet(context, ref, task: t,
-                                  roomNumber: t.roomNumber),
+                          onTap: () => showTaskActionSheet(
+                            context,
+                            ref,
+                            task: t,
+                            roomNumber: t.roomNumber,
+                          ),
                         ),
                       ),
                   ],

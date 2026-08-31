@@ -56,16 +56,28 @@ class EventsScreen extends ConsumerWidget {
                   child: KpiGrid(
                     children: [
                       KpiCard(label: 'Today', value: Fmt.count(d.todayCount)),
-                      KpiCard(label: 'Upcoming', value: Fmt.count(d.upcomingCount)),
-                      KpiCard(label: 'Pipeline value', value: d.upcomingRevenueLabel),
-                      KpiCard(label: 'Open tasks', value: Fmt.count(d.pendingTasks)),
+                      KpiCard(
+                        label: 'Upcoming',
+                        value: Fmt.count(d.upcomingCount),
+                      ),
+                      KpiCard(
+                        label: 'Pipeline value',
+                        value: d.upcomingRevenueLabel,
+                      ),
+                      KpiCard(
+                        label: 'Open tasks',
+                        value: Fmt.count(d.pendingTasks),
+                      ),
                     ],
                   ),
                 ),
         ),
         events.when(
           loading: () => const ListSkeleton(rows: 4, height: 88),
-          error: (e, _) => ErrorState(error: e, onRetry: () => ref.invalidate(eventsProvider)),
+          error: (e, _) => ErrorState(
+            error: e,
+            onRetry: () => ref.invalidate(eventsProvider),
+          ),
           data: (list) {
             if (list.isEmpty) {
               return const EmptyState(
@@ -76,10 +88,7 @@ class EventsScreen extends ConsumerWidget {
             }
             return Column(
               children: [
-                for (final e in list) ...[
-                  _EventCard(event: e),
-                  gapMd,
-                ],
+                for (final e in list) ...[_EventCard(event: e), gapMd],
               ],
             );
           },
@@ -198,19 +207,23 @@ class _EventFormState extends ConsumerState<_EventForm> {
                 controller: _name,
                 decoration: const InputDecoration(labelText: 'Event name'),
                 textCapitalization: TextCapitalization.words,
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _client,
                 decoration: const InputDecoration(labelText: 'Client name'),
                 textCapitalization: TextCapitalization.words,
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _venue,
-                decoration: const InputDecoration(labelText: 'Venue (optional)'),
+                decoration: const InputDecoration(
+                  labelText: 'Venue (optional)',
+                ),
               ),
               const SizedBox(height: 12),
               Row(
@@ -227,7 +240,9 @@ class _EventFormState extends ConsumerState<_EventForm> {
                   Expanded(
                     child: TextFormField(
                       controller: _rupees,
-                      decoration: const InputDecoration(labelText: 'Revenue (₹)'),
+                      decoration: const InputDecoration(
+                        labelText: 'Revenue (₹)',
+                      ),
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     ),
@@ -244,7 +259,10 @@ class _EventFormState extends ConsumerState<_EventForm> {
               ),
               if (_error != null) ...[
                 const SizedBox(height: 8),
-                Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
               ],
               const SizedBox(height: 16),
               FilledButton(
@@ -272,7 +290,13 @@ class _EventFormState extends ConsumerState<_EventForm> {
     );
     if (time == null) return;
     setState(() {
-      _startAt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+      _startAt = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
     });
   }
 }

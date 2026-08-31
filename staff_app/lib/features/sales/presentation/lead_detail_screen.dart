@@ -34,9 +34,15 @@ class LeadDetailScreen extends ConsumerWidget {
           : null,
       body: lead.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => ErrorState(error: e, onRetry: () => ref.invalidate(leadProvider(leadId))),
+        error: (e, _) => ErrorState(
+          error: e,
+          onRetry: () => ref.invalidate(leadProvider(leadId)),
+        ),
         data: (l) => l == null
-            ? const EmptyState(title: 'Lead not found', icon: Icons.help_outline)
+            ? const EmptyState(
+                title: 'Lead not found',
+                icon: Icons.help_outline,
+              )
             : _LeadDetail(lead: l),
       ),
     );
@@ -56,14 +62,20 @@ class _LeadDetail extends ConsumerWidget {
         Row(
           children: [
             Expanded(
-              child: Text(l.name, style: AppTypography.display(size: 22, color: c.foreground)),
+              child: Text(
+                l.name,
+                style: AppTypography.display(size: 22, color: c.foreground),
+              ),
             ),
             StatusBadge(tone: l.stage.tone, label: l.stage.label),
           ],
         ),
         if (l.company != null) ...[
           const SizedBox(height: 4),
-          Text(l.company!, style: AppTypography.body(size: 13.5, color: c.mutedForeground)),
+          Text(
+            l.company!,
+            style: AppTypography.body(size: 13.5, color: c.mutedForeground),
+          ),
         ],
         gapMd,
         Panel(
@@ -91,9 +103,13 @@ class _LeadDetail extends ConsumerWidget {
                     onPressed: () async {
                       final messenger = ScaffoldMessenger.of(context);
                       try {
-                        await ref.read(salesActionsProvider).moveStage(l.id, stage);
+                        await ref
+                            .read(salesActionsProvider)
+                            .moveStage(l.id, stage);
                       } on ApiException catch (e) {
-                        messenger.showSnackBar(SnackBar(content: Text(e.message)));
+                        messenger.showSnackBar(
+                          SnackBar(content: Text(e.message)),
+                        );
                       }
                     },
                     child: Text(stage.label),
@@ -138,7 +154,10 @@ class _LeadDetail extends ConsumerWidget {
                                 const SizedBox(height: 2),
                                 Text(
                                   a.note!,
-                                  style: AppTypography.body(size: 12.5, color: c.mutedForeground),
+                                  style: AppTypography.body(
+                                    size: 12.5,
+                                    color: c.mutedForeground,
+                                  ),
                                 ),
                               ],
                             ],
@@ -163,10 +182,16 @@ class _LeadDetail extends ConsumerWidget {
         children: [
           SizedBox(
             width: 72,
-            child: Text(label, style: AppTypography.body(size: 12.5, color: c.mutedForeground)),
+            child: Text(
+              label,
+              style: AppTypography.body(size: 12.5, color: c.mutedForeground),
+            ),
           ),
           Expanded(
-            child: Text(value, style: AppTypography.body(size: 13.5, color: c.foreground)),
+            child: Text(
+              value,
+              style: AppTypography.body(size: 13.5, color: c.foreground),
+            ),
           ),
         ],
       ),
@@ -178,13 +203,16 @@ class _ActivitySheet extends ConsumerStatefulWidget {
   const _ActivitySheet({required this.leadId});
   final String leadId;
 
-  static Future<void> show(BuildContext context, WidgetRef ref, String leadId) =>
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        showDragHandle: true,
-        builder: (_) => _ActivitySheet(leadId: leadId),
-      );
+  static Future<void> show(
+    BuildContext context,
+    WidgetRef ref,
+    String leadId,
+  ) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (_) => _ActivitySheet(leadId: leadId),
+  );
 
   @override
   ConsumerState<_ActivitySheet> createState() => _ActivitySheetState();
@@ -254,13 +282,20 @@ class _ActivitySheetState extends ConsumerState<_ActivitySheet> {
           ),
           if (_error != null) ...[
             const SizedBox(height: Sp.md),
-            Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            Text(
+              _error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
           ],
           const SizedBox(height: Sp.lg),
           FilledButton(
             onPressed: _busy ? null : _save,
             child: _busy
-                ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : const Text('Log'),
           ),
         ],

@@ -140,24 +140,27 @@ void main() {
       expect(type.createdAt, isNotNull);
     });
 
-    test('an empty payload yields a usable record rather than an exception', () {
-      final type = RoomType.fromJson(const <String, dynamic>{});
-      expect(type.id, '');
-      expect(type.name, 'Untitled room type');
-      expect(type.description, isNull);
-      expect(type.bedType, BedType.doubleBed);
-      expect(type.bedCount, 1);
-      expect(type.maxOccupancy, 2);
-      expect(type.maxAdults, 2);
-      expect(type.maxChildren, 0);
-      expect(type.airConditioned, isFalse);
-      expect(type.baseRate, 0);
-      expect(type.currency, 'INR');
-      expect(type.sizeSqft, isNull);
-      expect(type.status, RoomTypeStatus.active);
-      expect(type.amenities, isEmpty);
-      expect(type.roomCount, 0);
-    });
+    test(
+      'an empty payload yields a usable record rather than an exception',
+      () {
+        final type = RoomType.fromJson(const <String, dynamic>{});
+        expect(type.id, '');
+        expect(type.name, 'Untitled room type');
+        expect(type.description, isNull);
+        expect(type.bedType, BedType.doubleBed);
+        expect(type.bedCount, 1);
+        expect(type.maxOccupancy, 2);
+        expect(type.maxAdults, 2);
+        expect(type.maxChildren, 0);
+        expect(type.airConditioned, isFalse);
+        expect(type.baseRate, 0);
+        expect(type.currency, 'INR');
+        expect(type.sizeSqft, isNull);
+        expect(type.status, RoomTypeStatus.active);
+        expect(type.amenities, isEmpty);
+        expect(type.roomCount, 0);
+      },
+    );
 
     test('snake_case keys are read when camelCase is absent', () {
       final type = RoomType.fromJson(const <String, dynamic>{
@@ -276,18 +279,21 @@ void main() {
       expect(room.notes, 'Connecting door to 305');
     });
 
-    test('an empty payload yields a usable record rather than an exception', () {
-      final room = Room.fromJson(const <String, dynamic>{});
-      expect(room.id, '');
-      expect(room.roomTypeId, '');
-      expect(room.roomTypeName, 'Room');
-      expect(room.bedType, isNull);
-      expect(room.number, '—');
-      expect(room.floor, isNull);
-      expect(room.floorLabel, 'Floor not set');
-      expect(room.status, RoomStatus.available);
-      expect(room.amenities, isEmpty);
-    });
+    test(
+      'an empty payload yields a usable record rather than an exception',
+      () {
+        final room = Room.fromJson(const <String, dynamic>{});
+        expect(room.id, '');
+        expect(room.roomTypeId, '');
+        expect(room.roomTypeName, 'Room');
+        expect(room.bedType, isNull);
+        expect(room.number, '—');
+        expect(room.floor, isNull);
+        expect(room.floorLabel, 'Floor not set');
+        expect(room.status, RoomStatus.available);
+        expect(room.amenities, isEmpty);
+      },
+    );
 
     test('snake_case keys are read when camelCase is absent', () {
       final room = Room.fromJson(const <String, dynamic>{
@@ -319,11 +325,8 @@ void main() {
   });
 
   group('grouping the board by floor', () {
-    Room roomOn(int? floor, String number) => Room.fromJson({
-      'id': 'r_$number',
-      'number': number,
-      'floor': floor,
-    });
+    Room roomOn(int? floor, String number) =>
+        Room.fromJson({'id': 'r_$number', 'number': number, 'floor': floor});
 
     test('floors come out in order, with the unrecorded ones last', () {
       final groups = groupRoomsByFloor([
@@ -370,10 +373,13 @@ void main() {
 
   group('bulk creation', () {
     test('a range expands to exactly the numbers it will create', () {
-      expect(
-        BulkRoomRequest.expandRange(from: 101, to: 105),
-        ['101', '102', '103', '104', '105'],
-      );
+      expect(BulkRoomRequest.expandRange(from: 101, to: 105), [
+        '101',
+        '102',
+        '103',
+        '104',
+        '105',
+      ]);
     });
 
     test('a prefix and zero-padding land where the preview shows them', () {
@@ -382,10 +388,9 @@ void main() {
         ['A-007', 'A-008', 'A-009'],
       );
       // Padding never truncates a number that is already wider than the pad.
-      expect(
-        BulkRoomRequest.expandRange(from: 1200, to: 1200, pad: 3),
-        ['1200'],
-      );
+      expect(BulkRoomRequest.expandRange(from: 1200, to: 1200, pad: 3), [
+        '1200',
+      ]);
     });
 
     test('a backwards or single-step range never runs away', () {
@@ -394,17 +399,20 @@ void main() {
     });
 
     test('a typed list splits on commas, spaces and new lines', () {
-      expect(
-        BulkRoomRequest.parseNumbers('301, 302  303\n304'),
-        ['301', '302', '303', '304'],
-      );
+      expect(BulkRoomRequest.parseNumbers('301, 302  303\n304'), [
+        '301',
+        '302',
+        '303',
+        '304',
+      ]);
     });
 
     test('a typed list drops blanks and repeats but keeps the order typed', () {
-      expect(
-        BulkRoomRequest.parseNumbers(' 305,,301 , 305 , 302 '),
-        ['305', '301', '302'],
-      );
+      expect(BulkRoomRequest.parseNumbers(' 305,,301 , 305 , 302 '), [
+        '305',
+        '301',
+        '302',
+      ]);
       expect(BulkRoomRequest.parseNumbers('   '), isEmpty);
     });
 
@@ -436,11 +444,7 @@ void main() {
         from: 101,
         to: 102,
       );
-      expect(request.toJson(), {
-        'roomTypeId': 'rt_1',
-        'from': 101,
-        'to': 102,
-      });
+      expect(request.toJson(), {'roomTypeId': 'rt_1', 'from': 101, 'to': 102});
     });
 
     test('the list payload carries the numbers and no range keys', () {
@@ -526,9 +530,9 @@ void main() {
         {'status': 'ARCHIVED', 'q': 'suite'},
       );
       expect(
-        const RoomTypeFilter(status: RoomTypeStatus.active)
-            .copyWith(clearStatus: true)
-            .toQuery(),
+        const RoomTypeFilter(
+          status: RoomTypeStatus.active,
+        ).copyWith(clearStatus: true).toQuery(),
         isEmpty,
       );
     });
@@ -722,22 +726,24 @@ void main() {
       }
     });
 
-    test('a chef or a waiter sees neither — the server grants them no room key',
-        () {
-      for (final role in [StaffRole.chef, StaffRole.waiter]) {
-        final config = RoleConfig.of(role);
-        expect(
-          config.allowedRoutes,
-          isNot(contains(Routes.rooms)),
-          reason: role.wire,
-        );
-        expect(
-          config.allowedRoutes,
-          isNot(contains(Routes.roomTypes)),
-          reason: role.wire,
-        );
-      }
-    });
+    test(
+      'a chef or a waiter sees neither — the server grants them no room key',
+      () {
+        for (final role in [StaffRole.chef, StaffRole.waiter]) {
+          final config = RoleConfig.of(role);
+          expect(
+            config.allowedRoutes,
+            isNot(contains(Routes.rooms)),
+            reason: role.wire,
+          );
+          expect(
+            config.allowedRoutes,
+            isNot(contains(Routes.roomTypes)),
+            reason: role.wire,
+          );
+        }
+      },
+    );
 
     test('cleaning staff hold no room key, so they get no room destination', () {
       // They share the attendant's task list but not the attendant's room.read,

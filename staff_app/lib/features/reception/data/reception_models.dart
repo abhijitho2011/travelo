@@ -303,7 +303,8 @@ class Reservation {
       propertyId: _str(_pick(json, ['propertyId', 'property_id'])),
       reservationNumber:
           _str(_pick(json, ['reservationNumber', 'reservation_number'])) ?? '—',
-      roomTypeId: (_pick(json, ['roomTypeId', 'room_type_id']) ?? '').toString(),
+      roomTypeId: (_pick(json, ['roomTypeId', 'room_type_id']) ?? '')
+          .toString(),
       roomTypeName: _str(_pick(json, ['roomTypeName', 'room_type_name'])),
       roomId: _str(_pick(json, ['roomId', 'room_id'])),
       roomNumber: _str(_pick(json, ['roomNumber', 'room_number'])),
@@ -319,7 +320,8 @@ class Reservation {
       checkOut: checkOut,
       // The server sends `nights`, but deriving it when it is absent keeps a
       // half-filled payload from printing "0 nights" over a real stay.
-      nights: _intOrNull(json['nights']) ??
+      nights:
+          _intOrNull(json['nights']) ??
           (checkIn != null && checkOut != null
               ? nightsBetween(checkIn, checkOut)
               : 0),
@@ -327,7 +329,8 @@ class Reservation {
       ratePaise: _int(_pick(json, ['ratePaise', 'rate_paise'])),
       totalPaise: _int(_pick(json, ['totalPaise', 'total_paise'])),
       paidPaise: _int(_pick(json, ['paidPaise', 'paid_paise'])),
-      balancePaise: _intOrNull(_pick(json, ['balancePaise', 'balance_paise'])) ??
+      balancePaise:
+          _intOrNull(_pick(json, ['balancePaise', 'balance_paise'])) ??
           _int(_pick(json, ['totalPaise', 'total_paise'])) -
               _int(_pick(json, ['paidPaise', 'paid_paise'])),
       currency: _str(json['currency']) ?? 'INR',
@@ -490,8 +493,7 @@ class DeskBoard {
   final List<Reservation> inHouse;
   final DeskCounts counts;
 
-  bool get isEmpty =>
-      arrivals.isEmpty && departures.isEmpty && inHouse.isEmpty;
+  bool get isEmpty => arrivals.isEmpty && departures.isEmpty && inHouse.isEmpty;
 
   static List<Reservation> _rows(dynamic value) => value is List
       ? value.whereType<Map>().map(Reservation.fromJson).toList(growable: false)
@@ -867,7 +869,9 @@ class Folio {
   String get balanceLabel => formatPaise(balancePaise);
 
   factory Folio.fromJson(Map json) => Folio(
-    roomChargePaise: _int(_pick(json, ['roomChargePaise', 'room_charge_paise'])),
+    roomChargePaise: _int(
+      _pick(json, ['roomChargePaise', 'room_charge_paise']),
+    ),
     ancillaryPaise: _int(_pick(json, ['ancillaryPaise', 'ancillary_paise'])),
     chargesPaise: _int(_pick(json, ['chargesPaise', 'charges_paise'])),
     netPaidPaise: _int(_pick(json, ['netPaidPaise', 'net_paid_paise'])),

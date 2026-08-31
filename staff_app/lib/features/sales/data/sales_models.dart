@@ -71,7 +71,11 @@ enum LeadStage {
   List<LeadStage> get nextStages => switch (this) {
     LeadStage.lead => const [LeadStage.contacted, LeadStage.lost],
     LeadStage.contacted => const [LeadStage.proposal, LeadStage.lost],
-    LeadStage.proposal => const [LeadStage.negotiation, LeadStage.confirmed, LeadStage.lost],
+    LeadStage.proposal => const [
+      LeadStage.negotiation,
+      LeadStage.confirmed,
+      LeadStage.lost,
+    ],
     LeadStage.negotiation => const [LeadStage.confirmed, LeadStage.lost],
     LeadStage.confirmed => const [],
     LeadStage.lost => const [],
@@ -209,7 +213,9 @@ class SalesSummary {
     final raw = _pick(json, ['byStage']);
     if (raw is List) {
       for (final entry in raw.whereType<Map>()) {
-        byStage[LeadStage.fromWire(entry['stage']?.toString())] = _int(entry['count']);
+        byStage[LeadStage.fromWire(entry['stage']?.toString())] = _int(
+          entry['count'],
+        );
       }
     }
     return SalesSummary(

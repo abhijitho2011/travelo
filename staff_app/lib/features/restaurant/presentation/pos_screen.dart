@@ -65,17 +65,18 @@ class PosScreen extends ConsumerWidget {
         SectionHeader(title: 'Orders to close'),
         orders.when(
           loading: () => const ListSkeleton(rows: 3, height: 88),
-          error: (e, _) =>
-              ErrorState(error: e, onRetry: () => ref.invalidate(ordersProvider)),
+          error: (e, _) => ErrorState(
+            error: e,
+            onRetry: () => ref.invalidate(ordersProvider),
+          ),
           data: (list) {
-            final live = list
-                .where((o) => o.status.isOpen || o.status.isBilled)
-                .toList()
-              ..sort((a, b) {
-                // Billed (ready to settle) first, then open.
-                if (a.status == b.status) return 0;
-                return a.status.isBilled ? -1 : 1;
-              });
+            final live =
+                list.where((o) => o.status.isOpen || o.status.isBilled).toList()
+                  ..sort((a, b) {
+                    // Billed (ready to settle) first, then open.
+                    if (a.status == b.status) return 0;
+                    return a.status.isBilled ? -1 : 1;
+                  });
             if (live.isEmpty) {
               return const EmptyState(
                 title: 'Nothing to settle',
@@ -108,8 +109,11 @@ class _OrderRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
-    final canSettle = order.status.isBilled && ref.watch(canProvider(P.billSettle));
-    final amount = order.status.isBilled ? order.totalLabel : order.runningSubtotalLabel;
+    final canSettle =
+        order.status.isBilled && ref.watch(canProvider(P.billSettle));
+    final amount = order.status.isBilled
+        ? order.totalLabel
+        : order.runningSubtotalLabel;
 
     return SoftCard(
       onTap: ref.watch(canProvider(P.orderRead))
@@ -132,7 +136,11 @@ class _OrderRow extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(width: Sp.sm),
-                    StatusBadge(tone: order.status.tone, label: order.status.label, dense: true),
+                    StatusBadge(
+                      tone: order.status.tone,
+                      label: order.status.label,
+                      dense: true,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 2),

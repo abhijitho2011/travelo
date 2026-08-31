@@ -73,15 +73,23 @@ class InventoryScreen extends ConsumerWidget {
         gapSection,
         summary.when(
           loading: () => const KpiSkeleton(count: 4),
-          error: (e, _) => ErrorState(error: e, onRetry: () => ref.invalidate(inventorySummaryProvider)),
+          error: (e, _) => ErrorState(
+            error: e,
+            onRetry: () => ref.invalidate(inventorySummaryProvider),
+          ),
           data: (s) => KpiGrid(
             children: [
-              KpiCard(label: 'Stock value', value: formatPaise(s?.stockValuePaise ?? 0)),
+              KpiCard(
+                label: 'Stock value',
+                value: formatPaise(s?.stockValuePaise ?? 0),
+              ),
               KpiCard(label: 'Items', value: '${s?.itemCount ?? 0}'),
               KpiCard(
                 label: 'Low stock',
                 value: '${s?.lowStockCount ?? 0}',
-                tone: (s?.lowStockCount ?? 0) > 0 ? context.colors.warning : null,
+                tone: (s?.lowStockCount ?? 0) > 0
+                    ? context.colors.warning
+                    : null,
               ),
               KpiCard(label: 'Pending POs', value: '${s?.pendingPoCount ?? 0}'),
             ],

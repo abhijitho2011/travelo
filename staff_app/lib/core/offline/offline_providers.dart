@@ -35,28 +35,29 @@ final pendingSyncCountProvider = Provider<int>(
 
 /// Enqueue helper that stamps the current user and device automatically, so no
 /// caller has to remember the envelope fields.
-final enqueueMutationProvider = Provider<
-  Future<void> Function({
-    required String entityId,
-    required String operationType,
-    Map<String, dynamic> payload,
-  })
->((ref) {
-  return ({
-    required String entityId,
-    required String operationType,
-    Map<String, dynamic> payload = const {},
-  }) async {
-    final session = ref.read(sessionProvider);
-    final deviceId = await ref.read(tokenStoreProvider).deviceId();
-    await ref
-        .read(syncQueueProvider)
-        .enqueue(
-          entityId: entityId,
-          operationType: operationType,
-          userId: session?.user.id ?? 'unknown',
-          deviceId: deviceId,
-          payload: payload,
-        );
-  };
-});
+final enqueueMutationProvider =
+    Provider<
+      Future<void> Function({
+        required String entityId,
+        required String operationType,
+        Map<String, dynamic> payload,
+      })
+    >((ref) {
+      return ({
+        required String entityId,
+        required String operationType,
+        Map<String, dynamic> payload = const {},
+      }) async {
+        final session = ref.read(sessionProvider);
+        final deviceId = await ref.read(tokenStoreProvider).deviceId();
+        await ref
+            .read(syncQueueProvider)
+            .enqueue(
+              entityId: entityId,
+              operationType: operationType,
+              userId: session?.user.id ?? 'unknown',
+              deviceId: deviceId,
+              payload: payload,
+            );
+      };
+    });

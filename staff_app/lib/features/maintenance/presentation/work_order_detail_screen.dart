@@ -46,7 +46,9 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok)));
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -69,7 +71,9 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
     );
     if (result == null) return;
     await _run(
-      () => ref.read(workOrderActionsProvider).act(
+      () => ref
+          .read(workOrderActionsProvider)
+          .act(
             widget.id,
             WoAction.complete,
             resolution: result.resolution,
@@ -133,7 +137,8 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
           data: (wo) => wo == null
               ? const EmptyState(
                   title: 'Work order not found',
-                  hint: 'It may have been cancelled or belongs to another hotel.',
+                  hint:
+                      'It may have been cancelled or belongs to another hotel.',
                   icon: Icons.search_off_outlined,
                 )
               : Column(
@@ -164,7 +169,8 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
                           Text(
                             [
                               wo.number,
-                              if (wo.roomNumber != null) 'Room ${wo.roomNumber}',
+                              if (wo.roomNumber != null)
+                                'Room ${wo.roomNumber}',
                             ].join(' · '),
                             style: AppTypography.numeric(
                               size: 12.5,
@@ -263,7 +269,9 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
                                     label: const Text('Complete'),
                                   )
                                 : FilledButton.tonalIcon(
-                                    onPressed: _busy ? null : () => _act(action),
+                                    onPressed: _busy
+                                        ? null
+                                        : () => _act(action),
                                     icon: Icon(_iconFor(action), size: 19),
                                     label: Text(action.label),
                                   ),

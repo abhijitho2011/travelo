@@ -32,8 +32,14 @@ void main() {
 
     test('a value arrives however the server spelt it', () {
       expect(KotStatus.fromWire('preparing'), KotStatus.preparing);
-      expect(KotStatus.fromWire('ROOM-CHARGE'), KotStatus.newTicket); // unknown → NEW
-      expect(RestaurantTableStatus.fromWire('  occupied '), RestaurantTableStatus.occupied);
+      expect(
+        KotStatus.fromWire('ROOM-CHARGE'),
+        KotStatus.newTicket,
+      ); // unknown → NEW
+      expect(
+        RestaurantTableStatus.fromWire('  occupied '),
+        RestaurantTableStatus.occupied,
+      );
       expect(PaymentMethod.fromWire('room_charge'), PaymentMethod.roomCharge);
       expect(PaymentMethod.fromWire('UPI'), PaymentMethod.upi);
     });
@@ -123,9 +129,27 @@ void main() {
         'status': 'OPEN',
         'guestCount': 2,
         'items': [
-          {'id': 'a', 'name': 'A', 'pricePaise': 10000, 'qty': 2, 'kotStatus': 'SERVED'},
-          {'id': 'b', 'name': 'B', 'pricePaise': 5000, 'qty': 1, 'kotStatus': 'NEW'},
-          {'id': 'c', 'name': 'C', 'pricePaise': 99000, 'qty': 3, 'kotStatus': 'CANCELLED'},
+          {
+            'id': 'a',
+            'name': 'A',
+            'pricePaise': 10000,
+            'qty': 2,
+            'kotStatus': 'SERVED',
+          },
+          {
+            'id': 'b',
+            'name': 'B',
+            'pricePaise': 5000,
+            'qty': 1,
+            'kotStatus': 'NEW',
+          },
+          {
+            'id': 'c',
+            'name': 'C',
+            'pricePaise': 99000,
+            'qty': 3,
+            'kotStatus': 'CANCELLED',
+          },
         ],
       });
       // 20000 + 5000, cancelled line ignored.
@@ -149,10 +173,16 @@ void main() {
   group('kitchen ticket timing', () {
     test('a ticket is flagged late once it passes 15 minutes', () {
       final onTime = KitchenTicket.fromJson({
-        'orderId': 'o', 'orderNumber': 'ORD-1', 'elapsedSeconds': 600, 'items': const [],
+        'orderId': 'o',
+        'orderNumber': 'ORD-1',
+        'elapsedSeconds': 600,
+        'items': const [],
       });
       final late = KitchenTicket.fromJson({
-        'orderId': 'o', 'orderNumber': 'ORD-1', 'elapsedSeconds': 15 * 60, 'items': const [],
+        'orderId': 'o',
+        'orderNumber': 'ORD-1',
+        'elapsedSeconds': 15 * 60,
+        'items': const [],
       });
       expect(onTime.isLate, isFalse);
       expect(late.isLate, isTrue);
@@ -186,7 +216,10 @@ void main() {
       expect(RoleConfig.of(StaffRole.waiter).homeRoute, Routes.myTables);
       expect(RoleConfig.of(StaffRole.chef).homeRoute, Routes.kitchen);
       expect(RoleConfig.of(StaffRole.cashier).homeRoute, Routes.pos);
-      expect(RoleConfig.of(StaffRole.restaurantManager).homeRoute, Routes.restaurant);
+      expect(
+        RoleConfig.of(StaffRole.restaurantManager).homeRoute,
+        Routes.restaurant,
+      );
       for (final r in [
         StaffRole.waiter,
         StaffRole.chef,
@@ -198,7 +231,11 @@ void main() {
     });
 
     test('the roles that open an order may reach the order route', () {
-      for (final r in [StaffRole.waiter, StaffRole.cashier, StaffRole.restaurantManager]) {
+      for (final r in [
+        StaffRole.waiter,
+        StaffRole.cashier,
+        StaffRole.restaurantManager,
+      ]) {
         expect(
           RoleConfig.of(r).allowedRoutes,
           contains(Routes.restaurantOrders),
@@ -207,20 +244,30 @@ void main() {
       }
     });
 
-    test('an order detail path canonicalises to a route the waiter is allowed', () {
-      final canonical = GuardContext.canonicalise(Routes.restaurantOrder('abc-123'));
-      expect(canonical, Routes.restaurantOrders);
-      expect(
-        RoleConfig.of(StaffRole.waiter).allowedRoutes.contains(canonical),
-        isTrue,
-      );
-    });
+    test(
+      'an order detail path canonicalises to a route the waiter is allowed',
+      () {
+        final canonical = GuardContext.canonicalise(
+          Routes.restaurantOrder('abc-123'),
+        );
+        expect(canonical, Routes.restaurantOrders);
+        expect(
+          RoleConfig.of(StaffRole.waiter).allowedRoutes.contains(canonical),
+          isTrue,
+        );
+      },
+    );
 
     test('only the manager may reach menu and table management', () {
       final manager = RoleConfig.of(StaffRole.restaurantManager).allowedRoutes;
-      expect(manager, containsAll([Routes.restaurantMenu, Routes.restaurantTables]));
       expect(
-        RoleConfig.of(StaffRole.waiter).allowedRoutes.contains(Routes.restaurantMenu),
+        manager,
+        containsAll([Routes.restaurantMenu, Routes.restaurantTables]),
+      );
+      expect(
+        RoleConfig.of(
+          StaffRole.waiter,
+        ).allowedRoutes.contains(Routes.restaurantMenu),
         isFalse,
       );
     });
@@ -229,7 +276,11 @@ void main() {
   group('permission gating mirrors the server', () {
     test('the waiter requests a bill but never settles it', () {
       const waiter = PermissionSet({
-        'table.read', 'order.create', 'order.update', 'kot.update', 'bill.generate',
+        'table.read',
+        'order.create',
+        'order.update',
+        'kot.update',
+        'bill.generate',
       });
       expect(waiter.has(P.billGenerate), isTrue);
       expect(waiter.has(P.billSettle), isFalse);
@@ -237,7 +288,11 @@ void main() {
 
     test('the cashier settles but cannot void or manage the menu', () {
       const cashier = PermissionSet({
-        'restaurant.read', 'order.read', 'bill.read', 'bill.generate', 'bill.settle',
+        'restaurant.read',
+        'order.read',
+        'bill.read',
+        'bill.generate',
+        'bill.settle',
       });
       expect(cashier.has(P.billSettle), isTrue);
       expect(cashier.has(P.orderVoid), isFalse);

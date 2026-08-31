@@ -48,7 +48,8 @@ class PermissionGate extends ConsumerWidget {
     this.mode = GateMode.hide,
     this.fallback,
     this.deniedTooltip,
-  }) : _keys = const [], _single = permission;
+  }) : _keys = const [],
+       _single = permission;
 
   /// Convenience for an action needing several permissions at once.
   const PermissionGate.all({
@@ -81,10 +82,7 @@ class PermissionGate extends ConsumerWidget {
 
     return Tooltip(
       message: deniedTooltip ?? "Your role doesn't allow this action",
-      child: Opacity(
-        opacity: 0.45,
-        child: IgnorePointer(child: child),
-      ),
+      child: Opacity(opacity: 0.45, child: IgnorePointer(child: child)),
     );
   }
 }
@@ -108,9 +106,9 @@ class PermissionNote extends StatelessWidget {
         Expanded(
           child: Text(
             text,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: c.mutedForeground,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: c.mutedForeground),
           ),
         ),
       ],

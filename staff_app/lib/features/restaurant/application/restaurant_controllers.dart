@@ -35,9 +35,10 @@ final ordersProvider = FutureProvider.autoDispose<List<RestaurantOrder>>((ref) {
 });
 
 /// A single order, live. The order screen and the bill screen both watch it.
-final orderProvider = FutureProvider.autoDispose.family<RestaurantOrder?, String>(
-  (ref, id) => ref.watch(restaurantRepositoryProvider).order(id),
-);
+final orderProvider = FutureProvider.autoDispose
+    .family<RestaurantOrder?, String>(
+      (ref, id) => ref.watch(restaurantRepositoryProvider).order(id),
+    );
 
 /// The kitchen display. Polled every ~15s (no websockets yet — see KitchenScreen).
 final kitchenProvider = FutureProvider.autoDispose<List<KitchenTicket>>(
@@ -52,7 +53,8 @@ final summaryProvider = FutureProvider.autoDispose<RestaurantSummary?>(
 /// Checked-in guests for the ROOM_CHARGE picker, keyed on the search query.
 final inHouseGuestsProvider = FutureProvider.autoDispose
     .family<List<InHouseGuest>, String>(
-      (ref, query) => ref.watch(restaurantRepositoryProvider).inHouseGuests(query: query),
+      (ref, query) =>
+          ref.watch(restaurantRepositoryProvider).inHouseGuests(query: query),
     );
 
 @immutable
@@ -107,7 +109,10 @@ class RestaurantActions {
     return t;
   }
 
-  Future<RestaurantTable> updateTable(String id, Map<String, dynamic> changes) async {
+  Future<RestaurantTable> updateTable(
+    String id,
+    Map<String, dynamic> changes,
+  ) async {
     final t = await _repo.updateTable(id, changes);
     _invalidateBoards();
     return t;
@@ -157,7 +162,10 @@ class RestaurantActions {
 
   // --- orders ---
 
-  Future<RestaurantOrder> createOrder({String? tableId, required int guestCount}) async {
+  Future<RestaurantOrder> createOrder({
+    String? tableId,
+    required int guestCount,
+  }) async {
     final o = await _repo.createOrder(tableId: tableId, guestCount: guestCount);
     _invalidateBoards();
     return o;
@@ -169,7 +177,11 @@ class RestaurantActions {
     return o;
   }
 
-  Future<RestaurantOrder> setKot(String orderId, String itemId, KotStatus status) async {
+  Future<RestaurantOrder> setKot(
+    String orderId,
+    String itemId,
+    KotStatus status,
+  ) async {
     final o = await _repo.setKot(orderId, itemId, status);
     _refreshOrder(orderId);
     _ref.invalidate(kitchenProvider);

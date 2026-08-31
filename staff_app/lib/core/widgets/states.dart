@@ -34,7 +34,11 @@ class EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon ?? Icons.inbox_outlined, size: 26, color: c.mutedForeground),
+          Icon(
+            icon ?? Icons.inbox_outlined,
+            size: 26,
+            color: c.mutedForeground,
+          ),
           const SizedBox(height: Sp.md),
           Text(
             title,
@@ -184,11 +188,7 @@ class _ShimmerState extends State<Shimmer> with SingleTickerProviderStateMixin {
             gradient: LinearGradient(
               begin: Alignment(-1 - 2 * (1 - t), 0),
               end: Alignment(1 - 2 * (1 - t), 0),
-              colors: [
-                c.muted,
-                c.border.withValues(alpha: 0.65),
-                c.muted,
-              ],
+              colors: [c.muted, c.border.withValues(alpha: 0.65), c.muted],
             ),
           ),
         );
@@ -305,7 +305,10 @@ class AsyncSection<T> extends StatelessWidget {
 /// A minimal, transport-agnostic async triple. Repositories expose this so the
 /// widget layer never depends on a particular async primitive.
 class AsyncSnapshotLike<T> {
-  const AsyncSnapshotLike.loading() : value = null, error = null, isLoading = true;
+  const AsyncSnapshotLike.loading()
+    : value = null,
+      error = null,
+      isLoading = true;
 
   const AsyncSnapshotLike.data(this.value) : error = null, isLoading = false;
 

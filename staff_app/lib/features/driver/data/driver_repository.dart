@@ -15,9 +15,13 @@ class DriverRepository {
   Future<List<TransportRequest>> myTrips() async {
     try {
       final data = await _api.get('/driver/trips');
-      if (data is List) return data.whereType<Map>().map(TransportRequest.fromJson).toList();
+      if (data is List)
+        return data.whereType<Map>().map(TransportRequest.fromJson).toList();
       if (data is Map && data['items'] is List) {
-        return (data['items'] as List).whereType<Map>().map(TransportRequest.fromJson).toList();
+        return (data['items'] as List)
+            .whereType<Map>()
+            .map(TransportRequest.fromJson)
+            .toList();
       }
       return const [];
     } on ApiException catch (e) {
@@ -37,9 +41,15 @@ class DriverRepository {
   }
 
   Future<TransportRequest> step(String id, DriverStep step) async {
-    final data = await _api.post('/driver/trips/$id/step', body: {'step': step.wire});
+    final data = await _api.post(
+      '/driver/trips/$id/step',
+      body: {'step': step.wire},
+    );
     if (data is Map) return TransportRequest.fromJson(data);
-    throw const ApiException(code: 'ERROR', message: 'The trip did not come back updated.');
+    throw const ApiException(
+      code: 'ERROR',
+      message: 'The trip did not come back updated.',
+    );
   }
 }
 

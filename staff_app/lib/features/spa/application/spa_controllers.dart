@@ -21,17 +21,24 @@ final spaAppointmentsProvider = FutureProvider.autoDispose
     .family<List<SpaAppointment>, bool>(
       (ref, mine) => ref
           .watch(spaRepositoryProvider)
-          .appointments(status: ref.watch(spaAppointmentsFilterProvider), mine: mine),
+          .appointments(
+            status: ref.watch(spaAppointmentsFilterProvider),
+            mine: mine,
+          ),
     );
 
 final spaDashboardProvider = FutureProvider.autoDispose<SpaDashboard?>(
   (ref) => ref.watch(spaRepositoryProvider).dashboard(),
 );
 
-final spaBillsFilterProvider = StateProvider.autoDispose<SpaBillStatus?>((_) => null);
+final spaBillsFilterProvider = StateProvider.autoDispose<SpaBillStatus?>(
+  (_) => null,
+);
 
 final spaBillsProvider = FutureProvider.autoDispose<List<SpaBill>>(
-  (ref) => ref.watch(spaRepositoryProvider).bills(status: ref.watch(spaBillsFilterProvider)),
+  (ref) => ref
+      .watch(spaRepositoryProvider)
+      .bills(status: ref.watch(spaBillsFilterProvider)),
 );
 
 final spaRevenueProvider = FutureProvider.autoDispose<SpaRevenue?>(

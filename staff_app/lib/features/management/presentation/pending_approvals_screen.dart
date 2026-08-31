@@ -179,8 +179,7 @@ class _WaitingRow extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   switch (m.status) {
-                    AccountStatus.approved =>
-                      'Approved — activation pending',
+                    AccountStatus.approved => 'Approved — activation pending',
                     AccountStatus.invited => 'Invited, not yet completed',
                     _ => 'Waiting for a manager to approve',
                   },

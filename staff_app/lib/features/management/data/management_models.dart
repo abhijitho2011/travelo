@@ -137,7 +137,9 @@ class ApprovalItem {
 
   factory ApprovalItem.fromJson(Map json) => ApprovalItem(
     id: (json['id'] ?? '').toString(),
-    kind: ApprovalKind.fromWire(json['type'] as String? ?? json['kind'] as String?),
+    kind: ApprovalKind.fromWire(
+      json['type'] as String? ?? json['kind'] as String?,
+    ),
     title: (json['title'] as String?) ?? 'Approval request',
     subtitle: json['subtitle'] as String?,
     requestedBy: json['requestedBy'] as String?,

@@ -7,15 +7,19 @@ import '../data/task_models.dart';
 /// The supervisor's room board.
 class BoardController extends AsyncNotifier<HousekeepingBoard> {
   @override
-  Future<HousekeepingBoard> build() => ref.watch(boardRepositoryProvider).board();
+  Future<HousekeepingBoard> build() =>
+      ref.watch(boardRepositoryProvider).board();
 
   Future<void> refresh() async {
-    state = await AsyncValue.guard(() => ref.read(boardRepositoryProvider).board());
+    state = await AsyncValue.guard(
+      () => ref.read(boardRepositoryProvider).board(),
+    );
   }
 }
 
-final boardProvider =
-    AsyncNotifierProvider<BoardController, HousekeepingBoard>(BoardController.new);
+final boardProvider = AsyncNotifierProvider<BoardController, HousekeepingBoard>(
+  BoardController.new,
+);
 
 /// The filtered housekeeping task list. The family arg is the status filter, or
 /// null for all.
@@ -39,11 +43,12 @@ class HkTaskListController
   };
 }
 
-final hkTaskListProvider = AsyncNotifierProvider.family<
-  HkTaskListController,
-  List<StaffTask>,
-  HkTaskStatus?
->(HkTaskListController.new);
+final hkTaskListProvider =
+    AsyncNotifierProvider.family<
+      HkTaskListController,
+      List<StaffTask>,
+      HkTaskStatus?
+    >(HkTaskListController.new);
 
 /// The assignee picker options.
 final assignableStaffProvider = FutureProvider<List<HkAssignee>>(
@@ -61,8 +66,14 @@ class BoardActions {
     _refresh();
   }
 
-  Future<void> inspect(String taskId, {required bool pass, String? notes}) async {
-    await ref.read(boardRepositoryProvider).inspect(taskId, pass: pass, notes: notes);
+  Future<void> inspect(
+    String taskId, {
+    required bool pass,
+    String? notes,
+  }) async {
+    await ref
+        .read(boardRepositoryProvider)
+        .inspect(taskId, pass: pass, notes: notes);
     _refresh();
   }
 

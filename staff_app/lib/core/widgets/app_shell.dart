@@ -37,7 +37,8 @@ class AppShell extends ConsumerWidget {
     // Tablets get a side rail instead of a bottom bar: on a 10" screen a bottom
     // bar strands navigation far from the hands holding the device, and wastes
     // the horizontal space the rail uses well.
-    final isTablet = MediaQuery.sizeOf(context).shortestSide >= _tabletBreakpoint;
+    final isTablet =
+        MediaQuery.sizeOf(context).shortestSide >= _tabletBreakpoint;
 
     // "More" only exists because a bottom bar cannot hold a dozen destinations.
     // The rail can (it scrolls), so on a tablet every destination is listed
@@ -76,8 +77,14 @@ class AppShell extends ConsumerWidget {
     // On a phone, sitting on a More destination lights "More" rather than
     // leaving the first tab lit on a screen it does not serve. On a tablet the
     // destination is in the rail itself, so it matches directly.
-    final itemMatch = _selectedIndex(items.map((n) => n.route).toList(), location);
-    final moreMatch = _selectedIndex(more.map((n) => n.route).toList(), location);
+    final itemMatch = _selectedIndex(
+      items.map((n) => n.route).toList(),
+      location,
+    );
+    final moreMatch = _selectedIndex(
+      more.map((n) => n.route).toList(),
+      location,
+    );
     final index = itemMatch >= 0
         ? itemMatch
         : (showMore && moreMatch >= 0 ? moreIndex : 0);
@@ -118,7 +125,9 @@ class AppShell extends ConsumerWidget {
                 child: Align(
                   alignment: Alignment.topCenter,
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: _contentMaxWidth),
+                    constraints: const BoxConstraints(
+                      maxWidth: _contentMaxWidth,
+                    ),
                     child: child,
                   ),
                 ),
@@ -165,7 +174,8 @@ class AppShell extends ConsumerWidget {
       if (r.length <= bestLength) continue;
       if (location == r ||
           (location.startsWith(r) &&
-              (r == '/' || location.length > r.length && location[r.length] == '/'))) {
+              (r == '/' ||
+                  location.length > r.length && location[r.length] == '/'))) {
         best = i;
         bestLength = r.length;
       }
@@ -237,14 +247,11 @@ class _TopBar extends ConsumerWidget implements PreferredSizeWidget {
             ThemeMode.light => 'Theme: light',
             ThemeMode.dark => 'Theme: dark',
           },
-          icon: Icon(
-            switch (themeMode) {
-              ThemeMode.system => Icons.brightness_auto_outlined,
-              ThemeMode.light => Icons.light_mode_outlined,
-              ThemeMode.dark => Icons.dark_mode_outlined,
-            },
-            size: 20,
-          ),
+          icon: Icon(switch (themeMode) {
+            ThemeMode.system => Icons.brightness_auto_outlined,
+            ThemeMode.light => Icons.light_mode_outlined,
+            ThemeMode.dark => Icons.dark_mode_outlined,
+          }, size: 20),
         ),
         _BellButton(unread: unread),
         IconButton(
@@ -333,7 +340,9 @@ class _BellButton extends StatelessWidget {
       alignment: Alignment.center,
       children: [
         IconButton(
-          tooltip: unread == 0 ? 'Notifications' : '$unread unread notifications',
+          tooltip: unread == 0
+              ? 'Notifications'
+              : '$unread unread notifications',
           onPressed: () => context.go(Routes.notifications),
           icon: const Icon(Icons.notifications_none, size: 21),
         ),

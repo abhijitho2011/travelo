@@ -7,8 +7,9 @@ final accountsSummaryProvider = FutureProvider.autoDispose<AccountsSummary?>(
   (ref) => ref.watch(accountsRepositoryProvider).summary(),
 );
 
-final expenseStatusFilterProvider =
-    StateProvider.autoDispose<ExpenseStatus?>((_) => null);
+final expenseStatusFilterProvider = StateProvider.autoDispose<ExpenseStatus?>(
+  (_) => null,
+);
 
 final expensesProvider = FutureProvider.autoDispose<List<Expense>>((ref) {
   final status = ref.watch(expenseStatusFilterProvider);

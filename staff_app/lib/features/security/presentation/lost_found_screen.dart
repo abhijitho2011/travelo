@@ -64,15 +64,22 @@ class LostFoundScreen extends ConsumerWidget {
                       for (var i = 0; i < items.length; i++) ...[
                         if (i > 0) const RowDivider(),
                         DataRow2(
-                          leading: const Icon(Icons.inventory_2_outlined, size: 18),
+                          leading: const Icon(
+                            Icons.inventory_2_outlined,
+                            size: 18,
+                          ),
                           title: items[i].description,
                           subtitle: [
                             if (items[i].location != null) items[i].location!,
                             Fmt.dateTime(items[i].foundAt),
                           ].join(' · '),
                           onTap: ref.hasPermission(P.lostFoundUpdate)
-                              ? () => _changeStatus(context, ref, items[i].id,
-                                  items[i].status ?? 'STORED')
+                              ? () => _changeStatus(
+                                  context,
+                                  ref,
+                                  items[i].id,
+                                  items[i].status ?? 'STORED',
+                                )
                               : null,
                           badge: items[i].status == null
                               ? null
@@ -131,7 +138,9 @@ Future<void> _changeStatus(
     ref.invalidate(lostFoundProvider);
   } on ApiException catch (e) {
     messenger.showSnackBar(
-      SnackBar(content: Text(e.message.isEmpty ? 'Could not update.' : e.message)),
+      SnackBar(
+        content: Text(e.message.isEmpty ? 'Could not update.' : e.message),
+      ),
     );
   }
 }

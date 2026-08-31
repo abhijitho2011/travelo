@@ -35,7 +35,10 @@ class VehiclesScreen extends ConsumerWidget {
           gapSection,
           vehicles.when(
             loading: () => const ListSkeleton(rows: 4),
-            error: (e, _) => ErrorState(error: e, onRetry: () => ref.invalidate(vehiclesProvider)),
+            error: (e, _) => ErrorState(
+              error: e,
+              onRetry: () => ref.invalidate(vehiclesProvider),
+            ),
             data: (list) => list.isEmpty
                 ? const EmptyState(
                     title: 'No vehicles yet',
@@ -49,13 +52,18 @@ class VehiclesScreen extends ConsumerWidget {
                           padding: const EdgeInsets.only(bottom: Sp.md),
                           child: SoftCard(
                             onTap: ref.hasPermission(P.vehicleUpdate)
-                                ? () => _VehicleFormSheet.show(context, ref, existing: v)
+                                ? () => _VehicleFormSheet.show(
+                                    context,
+                                    ref,
+                                    existing: v,
+                                  )
                                 : null,
                             child: Row(
                               children: [
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         v.name,
@@ -76,7 +84,11 @@ class VehiclesScreen extends ConsumerWidget {
                                     ],
                                   ),
                                 ),
-                                StatusBadge(tone: v.status.tone, label: v.status.label, dense: true),
+                                StatusBadge(
+                                  tone: v.status.tone,
+                                  label: v.status.label,
+                                  dense: true,
+                                ),
                               ],
                             ),
                           ),
@@ -94,13 +106,16 @@ class _VehicleFormSheet extends ConsumerStatefulWidget {
   const _VehicleFormSheet({this.existing});
   final Vehicle? existing;
 
-  static Future<void> show(BuildContext context, WidgetRef ref, {Vehicle? existing}) =>
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        showDragHandle: true,
-        builder: (_) => _VehicleFormSheet(existing: existing),
-      );
+  static Future<void> show(
+    BuildContext context,
+    WidgetRef ref, {
+    Vehicle? existing,
+  }) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (_) => _VehicleFormSheet(existing: existing),
+  );
 
   @override
   ConsumerState<_VehicleFormSheet> createState() => _VehicleFormSheetState();
@@ -185,14 +200,16 @@ class _VehicleFormSheetState extends ConsumerState<_VehicleFormSheet> {
             TextFormField(
               controller: _name,
               decoration: const InputDecoration(labelText: 'Name'),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Required' : null,
             ),
             const SizedBox(height: Sp.md),
             TextFormField(
               controller: _plate,
               decoration: const InputDecoration(labelText: 'Plate'),
               textCapitalization: TextCapitalization.characters,
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Required' : null,
             ),
             const SizedBox(height: Sp.md),
             TextFormField(
@@ -212,13 +229,20 @@ class _VehicleFormSheetState extends ConsumerState<_VehicleFormSheet> {
             ),
             if (_error != null) ...[
               const SizedBox(height: Sp.md),
-              Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             ],
             const SizedBox(height: Sp.lg),
             FilledButton(
               onPressed: _busy ? null : _save,
               child: _busy
-                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                   : const Text('Save'),
             ),
           ],

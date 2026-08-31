@@ -33,7 +33,10 @@ class InventoryItemsScreen extends ConsumerWidget {
       body: PageBody(
         onRefresh: () async => ref.invalidate(itemsProvider),
         children: [
-          const PageHeader(title: 'Items', subtitle: 'Everything the store holds.'),
+          const PageHeader(
+            title: 'Items',
+            subtitle: 'Everything the store holds.',
+          ),
           gapMd,
           SectionHeader(
             title: 'Stock',
@@ -42,14 +45,18 @@ class InventoryItemsScreen extends ConsumerWidget {
                 const Text('Low only', style: TextStyle(fontSize: 12.5)),
                 Switch(
                   value: lowOnly,
-                  onChanged: (v) => ref.read(itemsLowStockFilterProvider.notifier).state = v,
+                  onChanged: (v) =>
+                      ref.read(itemsLowStockFilterProvider.notifier).state = v,
                 ),
               ],
             ),
           ),
           items.when(
             loading: () => const ListSkeleton(rows: 6),
-            error: (e, _) => ErrorState(error: e, onRetry: () => ref.invalidate(itemsProvider)),
+            error: (e, _) => ErrorState(
+              error: e,
+              onRetry: () => ref.invalidate(itemsProvider),
+            ),
             data: (list) => list.isEmpty
                 ? const EmptyState(
                     title: 'No items yet',
@@ -84,7 +91,11 @@ class _ItemRow extends ConsumerWidget {
                 Expanded(
                   child: Text(
                     i.name,
-                    style: AppTypography.body(size: 14, weight: FontWeight.w700, color: c.foreground),
+                    style: AppTypography.body(
+                      size: 14,
+                      weight: FontWeight.w700,
+                      color: c.foreground,
+                    ),
                   ),
                 ),
                 StatusBadge(
@@ -142,14 +153,19 @@ class ItemFormSheet extends ConsumerStatefulWidget {
   const ItemFormSheet({super.key, this.existing});
   final InventoryItem? existing;
 
-  static Future<void> show(BuildContext context, WidgetRef ref, {InventoryItem? existing}) =>
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        showDragHandle: true,
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.9),
-        builder: (_) => ItemFormSheet(existing: existing),
-      );
+  static Future<void> show(
+    BuildContext context,
+    WidgetRef ref, {
+    InventoryItem? existing,
+  }) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+    ),
+    builder: (_) => ItemFormSheet(existing: existing),
+  );
 
   @override
   ConsumerState<ItemFormSheet> createState() => _ItemFormSheetState();
@@ -250,18 +266,23 @@ class _ItemFormSheetState extends ConsumerState<ItemFormSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(_isEdit ? 'Edit item' : 'New item', style: Theme.of(context).textTheme.titleMedium),
+              Text(
+                _isEdit ? 'Edit item' : 'New item',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
               const SizedBox(height: Sp.md),
               TextFormField(
                 controller: _name,
                 decoration: const InputDecoration(labelText: 'Name'),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
               const SizedBox(height: Sp.md),
               TextFormField(
                 controller: _sku,
                 decoration: const InputDecoration(labelText: 'SKU'),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
               const SizedBox(height: Sp.md),
               Row(
@@ -276,7 +297,9 @@ class _ItemFormSheetState extends ConsumerState<ItemFormSheet> {
                   Expanded(
                     child: TextFormField(
                       controller: _reorder,
-                      decoration: const InputDecoration(labelText: 'Reorder level'),
+                      decoration: const InputDecoration(
+                        labelText: 'Reorder level',
+                      ),
                       keyboardType: TextInputType.number,
                     ),
                   ),
@@ -285,31 +308,45 @@ class _ItemFormSheetState extends ConsumerState<ItemFormSheet> {
               const SizedBox(height: Sp.md),
               TextFormField(
                 controller: _category,
-                decoration: const InputDecoration(labelText: 'Category (optional)'),
+                decoration: const InputDecoration(
+                  labelText: 'Category (optional)',
+                ),
               ),
               const SizedBox(height: Sp.md),
               TextFormField(
                 controller: _cost,
-                decoration: const InputDecoration(labelText: 'Unit cost (₹, optional)', prefixText: '₹ '),
+                decoration: const InputDecoration(
+                  labelText: 'Unit cost (₹, optional)',
+                  prefixText: '₹ ',
+                ),
                 keyboardType: TextInputType.number,
               ),
               if (!_isEdit) ...[
                 const SizedBox(height: Sp.md),
                 TextFormField(
                   controller: _opening,
-                  decoration: const InputDecoration(labelText: 'Opening quantity'),
+                  decoration: const InputDecoration(
+                    labelText: 'Opening quantity',
+                  ),
                   keyboardType: TextInputType.number,
                 ),
               ],
               if (_error != null) ...[
                 const SizedBox(height: Sp.md),
-                Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
               ],
               const SizedBox(height: Sp.lg),
               FilledButton(
                 onPressed: _busy ? null : _save,
                 child: _busy
-                    ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : Text(_isEdit ? 'Save changes' : 'Create item'),
               ),
             ],
@@ -325,13 +362,16 @@ class StockMovementSheet extends ConsumerStatefulWidget {
   const StockMovementSheet({super.key, required this.item});
   final InventoryItem item;
 
-  static Future<void> show(BuildContext context, WidgetRef ref, InventoryItem item) =>
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        showDragHandle: true,
-        builder: (_) => StockMovementSheet(item: item),
-      );
+  static Future<void> show(
+    BuildContext context,
+    WidgetRef ref,
+    InventoryItem item,
+  ) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (_) => StockMovementSheet(item: item),
+  );
 
   @override
   ConsumerState<StockMovementSheet> createState() => _StockMovementSheetState();
@@ -390,11 +430,17 @@ class _StockMovementSheetState extends ConsumerState<StockMovementSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Move stock — ${widget.item.name}', style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            'Move stock — ${widget.item.name}',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
           const SizedBox(height: 4),
           Text(
             'On hand: ${widget.item.currentQty} ${widget.item.unit}',
-            style: AppTypography.body(size: 12.5, color: context.colors.mutedForeground),
+            style: AppTypography.body(
+              size: 12.5,
+              color: context.colors.mutedForeground,
+            ),
           ),
           const SizedBox(height: Sp.md),
           DropdownButtonFormField<StockMovementType>(
@@ -424,13 +470,20 @@ class _StockMovementSheetState extends ConsumerState<StockMovementSheet> {
           ),
           if (_error != null) ...[
             const SizedBox(height: Sp.md),
-            Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            Text(
+              _error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
           ],
           const SizedBox(height: Sp.lg),
           FilledButton(
             onPressed: _busy ? null : _save,
             child: _busy
-                ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : const Text('Record movement'),
           ),
         ],

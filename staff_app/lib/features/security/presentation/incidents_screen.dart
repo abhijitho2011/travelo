@@ -30,9 +30,7 @@ class IncidentsScreen extends ConsumerWidget {
     final async = canRead ? ref.watch(incidentsProvider) : null;
 
     return PageBody(
-      onRefresh: canRead
-          ? () async => ref.invalidate(incidentsProvider)
-          : null,
+      onRefresh: canRead ? () async => ref.invalidate(incidentsProvider) : null,
       children: [
         const PageHeader(
           eyebrow: 'Security',
@@ -131,24 +129,32 @@ class _IncidentRowState extends ConsumerState<_IncidentRow> {
         Fmt.dateTime(inc.reportedAt),
         if (inc.resolution != null) 'Resolved: ${inc.resolution}',
       ].join(' · '),
-      badge: StatusBadge(tone: inc.status.tone, label: inc.status.label, dense: true),
+      badge: StatusBadge(
+        tone: inc.status.tone,
+        label: inc.status.label,
+        dense: true,
+      ),
       trailing: inc.status.isResolved
           ? null
           : _busy
-              ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-              : PermissionGate(
-                  permission: P.incidentUpdate,
-                  child: PopupMenuButton<String>(
-                    onSelected: (v) {
-                      if (v == 'assign') _assign(inc);
-                      if (v == 'resolve') _resolve(inc);
-                    },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'assign', child: Text('Assign')),
-                      PopupMenuItem(value: 'resolve', child: Text('Resolve')),
-                    ],
-                  ),
-                ),
+          ? const SizedBox(
+              height: 18,
+              width: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : PermissionGate(
+              permission: P.incidentUpdate,
+              child: PopupMenuButton<String>(
+                onSelected: (v) {
+                  if (v == 'assign') _assign(inc);
+                  if (v == 'resolve') _resolve(inc);
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'assign', child: Text('Assign')),
+                  PopupMenuItem(value: 'resolve', child: Text('Resolve')),
+                ],
+              ),
+            ),
     );
   }
 
@@ -163,7 +169,10 @@ class _IncidentRowState extends ConsumerState<_IncidentRow> {
           decoration: const InputDecoration(labelText: 'Guard staff id'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, controller.text.trim()),
             child: const Text('Assign'),
@@ -172,7 +181,9 @@ class _IncidentRowState extends ConsumerState<_IncidentRow> {
       ),
     );
     if (id != null && id.isNotEmpty) {
-      await _run(() => ref.read(securityRepositoryProvider).assignIncident(inc.id, id));
+      await _run(
+        () => ref.read(securityRepositoryProvider).assignIncident(inc.id, id),
+      );
     }
   }
 
@@ -187,7 +198,10 @@ class _IncidentRowState extends ConsumerState<_IncidentRow> {
           decoration: const InputDecoration(labelText: 'Resolution'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, controller.text.trim()),
             child: const Text('Resolve'),
@@ -196,7 +210,9 @@ class _IncidentRowState extends ConsumerState<_IncidentRow> {
       ),
     );
     if (res != null && res.isNotEmpty) {
-      await _run(() => ref.read(securityRepositoryProvider).resolveIncident(inc.id, res));
+      await _run(
+        () => ref.read(securityRepositoryProvider).resolveIncident(inc.id, res),
+      );
     }
   }
 }
@@ -287,8 +303,9 @@ class _ReportFormState extends ConsumerState<_ReportForm> {
                 labelText: 'What happened?',
                 hintText: 'Describe what you saw, in your own words',
               ),
-              validator: (v) =>
-                  (v ?? '').trim().isEmpty ? 'Please describe the incident' : null,
+              validator: (v) => (v ?? '').trim().isEmpty
+                  ? 'Please describe the incident'
+                  : null,
             ),
             gapMd,
             TextFormField(

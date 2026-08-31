@@ -160,7 +160,8 @@ class _ReservationFormScreenState extends ConsumerState<ReservationFormScreen> {
     }
     if (!datesInOrder(_checkIn, _checkOut)) {
       setState(
-        () => _submitError = 'Check-out has to be at least one day after '
+        () => _submitError =
+            'Check-out has to be at least one day after '
             'check-in.',
       );
       return;
@@ -210,7 +211,9 @@ class _ReservationFormScreenState extends ConsumerState<ReservationFormScreen> {
     final c = context.colors;
     final availability = ref.watch(availabilityProvider(_range));
     final options = availability.value ?? const <RoomTypeAvailability>[];
-    final chosen = options.where((o) => o.roomTypeId == _roomTypeId).firstOrNull;
+    final chosen = options
+        .where((o) => o.roomTypeId == _roomTypeId)
+        .firstOrNull;
     final rupees = int.tryParse(_rate.text.trim()) ?? 0;
 
     return PageBody(
@@ -374,10 +377,7 @@ class _ReservationFormScreenState extends ConsumerState<ReservationFormScreen> {
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       decoration: InputDecoration(
                         labelText: 'Rate per night (₹)',
-                        prefixIcon: const Icon(
-                          Icons.currency_rupee,
-                          size: 18,
-                        ),
+                        prefixIcon: const Icon(Icons.currency_rupee, size: 18),
                         helperText: chosen == null
                             ? 'Prefilled from the room type once you pick one.'
                             : 'Room type rate is '

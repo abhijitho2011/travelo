@@ -27,9 +27,15 @@ class PurchaseOrderDetailScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Purchase order')),
       body: po.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => ErrorState(error: e, onRetry: () => ref.invalidate(purchaseOrderProvider(poId))),
+        error: (e, _) => ErrorState(
+          error: e,
+          onRetry: () => ref.invalidate(purchaseOrderProvider(poId)),
+        ),
         data: (p) => p == null
-            ? const EmptyState(title: 'Purchase order not found', icon: Icons.help_outline)
+            ? const EmptyState(
+                title: 'Purchase order not found',
+                icon: Icons.help_outline,
+              )
             : _PoDetail(po: p),
       ),
     );
@@ -69,14 +75,20 @@ class _PoDetailState extends ConsumerState<_PoDetail> {
         Row(
           children: [
             Expanded(
-              child: Text(p.poNumber, style: AppTypography.display(size: 22, color: c.foreground)),
+              child: Text(
+                p.poNumber,
+                style: AppTypography.display(size: 22, color: c.foreground),
+              ),
             ),
             StatusBadge(tone: p.status.tone, label: p.status.label),
           ],
         ),
         if (p.supplierName != null) ...[
           const SizedBox(height: 4),
-          Text(p.supplierName!, style: AppTypography.body(size: 13.5, color: c.mutedForeground)),
+          Text(
+            p.supplierName!,
+            style: AppTypography.body(size: 13.5, color: c.mutedForeground),
+          ),
         ],
         gapMd,
         Panel(
@@ -91,12 +103,19 @@ class _PoDetailState extends ConsumerState<_PoDetail> {
                       Expanded(
                         child: Text(
                           '${line.nameSnapshot} · ${line.qty} ${line.unitSnapshot}',
-                          style: AppTypography.body(size: 13, color: c.foreground),
+                          style: AppTypography.body(
+                            size: 13,
+                            color: c.foreground,
+                          ),
                         ),
                       ),
                       Text(
                         formatPaise(line.lineTotalPaise),
-                        style: AppTypography.numeric(size: 13, weight: FontWeight.w600, color: c.foreground),
+                        style: AppTypography.numeric(
+                          size: 13,
+                          weight: FontWeight.w600,
+                          color: c.foreground,
+                        ),
                       ),
                     ],
                   ),
@@ -105,18 +124,37 @@ class _PoDetailState extends ConsumerState<_PoDetail> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Total', style: AppTypography.body(size: 14, weight: FontWeight.w700, color: c.foreground)),
-                  Text(p.totalLabel, style: AppTypography.numeric(size: 14, weight: FontWeight.w700, color: c.foreground)),
+                  Text(
+                    'Total',
+                    style: AppTypography.body(
+                      size: 14,
+                      weight: FontWeight.w700,
+                      color: c.foreground,
+                    ),
+                  ),
+                  Text(
+                    p.totalLabel,
+                    style: AppTypography.numeric(
+                      size: 14,
+                      weight: FontWeight.w700,
+                      color: c.foreground,
+                    ),
+                  ),
                 ],
               ),
             ],
           ),
         ),
         gapSection,
-        if (_busy) const Center(child: CircularProgressIndicator()) else ...[
-          if (p.status == PurchaseOrderStatus.draft && ref.hasPermission(P.poUpdate))
+        if (_busy)
+          const Center(child: CircularProgressIndicator())
+        else ...[
+          if (p.status == PurchaseOrderStatus.draft &&
+              ref.hasPermission(P.poUpdate))
             FilledButton.icon(
-              onPressed: () => _run(() => actions.setPoStatus(p.id, PurchaseOrderStatus.sent)),
+              onPressed: () => _run(
+                () => actions.setPoStatus(p.id, PurchaseOrderStatus.sent),
+              ),
               icon: const Icon(Icons.send_outlined),
               label: const Text('Send to supplier'),
             ),
@@ -128,11 +166,14 @@ class _PoDetailState extends ConsumerState<_PoDetail> {
               label: const Text('Receive into stock'),
             ),
           ],
-          if ((p.status == PurchaseOrderStatus.draft || p.status == PurchaseOrderStatus.sent) &&
+          if ((p.status == PurchaseOrderStatus.draft ||
+                  p.status == PurchaseOrderStatus.sent) &&
               ref.hasPermission(P.poUpdate)) ...[
             const SizedBox(height: Sp.sm),
             OutlinedButton.icon(
-              onPressed: () => _run(() => actions.setPoStatus(p.id, PurchaseOrderStatus.cancelled)),
+              onPressed: () => _run(
+                () => actions.setPoStatus(p.id, PurchaseOrderStatus.cancelled),
+              ),
               icon: Icon(Icons.cancel_outlined, color: c.critical),
               label: const Text('Cancel PO'),
             ),

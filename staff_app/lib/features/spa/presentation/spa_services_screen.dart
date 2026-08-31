@@ -41,8 +41,10 @@ class SpaServicesScreen extends ConsumerWidget {
         gapSection,
         async.when(
           loading: () => const ListSkeleton(rows: 4, height: 72),
-          error: (e, _) =>
-              ErrorState(error: e, onRetry: () => ref.invalidate(spaServicesAllProvider)),
+          error: (e, _) => ErrorState(
+            error: e,
+            onRetry: () => ref.invalidate(spaServicesAllProvider),
+          ),
           data: (services) {
             if (services.isEmpty) {
               return const EmptyState(
@@ -99,7 +101,11 @@ class _ServiceRow extends ConsumerWidget {
   }
 }
 
-Future<void> _openForm(BuildContext context, WidgetRef ref, {SpaService? service}) async {
+Future<void> _openForm(
+  BuildContext context,
+  WidgetRef ref, {
+  SpaService? service,
+}) async {
   final saved = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
@@ -126,10 +132,13 @@ class _ServiceForm extends ConsumerStatefulWidget {
 class _ServiceFormState extends ConsumerState<_ServiceForm> {
   final _formKey = GlobalKey<FormState>();
   late final _name = TextEditingController(text: widget.service?.name ?? '');
-  late final _duration =
-      TextEditingController(text: (widget.service?.durationMinutes ?? 60).toString());
+  late final _duration = TextEditingController(
+    text: (widget.service?.durationMinutes ?? 60).toString(),
+  );
   late final _rupees = TextEditingController(
-    text: widget.service != null ? (widget.service!.pricePaise ~/ 100).toString() : '',
+    text: widget.service != null
+        ? (widget.service!.pricePaise ~/ 100).toString()
+        : '',
   );
   bool _busy = false;
   String? _error;
@@ -201,12 +210,15 @@ class _ServiceFormState extends ConsumerState<_ServiceForm> {
                 controller: _name,
                 decoration: const InputDecoration(labelText: 'Name'),
                 textCapitalization: TextCapitalization.words,
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _duration,
-                decoration: const InputDecoration(labelText: 'Duration (minutes)'),
+                decoration: const InputDecoration(
+                  labelText: 'Duration (minutes)',
+                ),
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 validator: (v) =>
@@ -215,7 +227,10 @@ class _ServiceFormState extends ConsumerState<_ServiceForm> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _rupees,
-                decoration: const InputDecoration(labelText: 'Price (₹)', prefixText: '₹ '),
+                decoration: const InputDecoration(
+                  labelText: 'Price (₹)',
+                  prefixText: '₹ ',
+                ),
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 validator: (v) =>
@@ -223,7 +238,10 @@ class _ServiceFormState extends ConsumerState<_ServiceForm> {
               ),
               if (_error != null) ...[
                 const SizedBox(height: 12),
-                Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
               ],
               const SizedBox(height: 20),
               FilledButton(

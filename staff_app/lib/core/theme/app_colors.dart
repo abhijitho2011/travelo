@@ -132,29 +132,13 @@ class AppColors extends ThemeExtension<AppColors> {
     critical: Color(0xFFC8372D), // tv-danger
     elevation1: [
       // tv-shadow-raised
-      BoxShadow(
-        color: Color(0x0F141A18),
-        blurRadius: 2,
-        offset: Offset(0, 1),
-      ),
-      BoxShadow(
-        color: Color(0x0D141A18),
-        blurRadius: 6,
-        offset: Offset(0, 2),
-      ),
+      BoxShadow(color: Color(0x0F141A18), blurRadius: 2, offset: Offset(0, 1)),
+      BoxShadow(color: Color(0x0D141A18), blurRadius: 6, offset: Offset(0, 2)),
     ],
     elevation2: [
       // tv-shadow-overlay
-      BoxShadow(
-        color: Color(0x1A141A18),
-        blurRadius: 24,
-        offset: Offset(0, 8),
-      ),
-      BoxShadow(
-        color: Color(0x0F141A18),
-        blurRadius: 6,
-        offset: Offset(0, 2),
-      ),
+      BoxShadow(color: Color(0x1A141A18), blurRadius: 24, offset: Offset(0, 8)),
+      BoxShadow(color: Color(0x0F141A18), blurRadius: 6, offset: Offset(0, 2)),
     ],
   );
 
@@ -196,23 +180,11 @@ class AppColors extends ThemeExtension<AppColors> {
     warning: Color(0xFFF0A93E),
     critical: Color(0xFFE4655A),
     elevation1: [
-      BoxShadow(
-        color: Color(0x73000000),
-        blurRadius: 2,
-        offset: Offset(0, 1),
-      ),
-      BoxShadow(
-        color: Color(0x40000000),
-        blurRadius: 6,
-        offset: Offset(0, 2),
-      ),
+      BoxShadow(color: Color(0x73000000), blurRadius: 2, offset: Offset(0, 1)),
+      BoxShadow(color: Color(0x40000000), blurRadius: 6, offset: Offset(0, 2)),
     ],
     elevation2: [
-      BoxShadow(
-        color: Color(0x99000000),
-        blurRadius: 24,
-        offset: Offset(0, 8),
-      ),
+      BoxShadow(color: Color(0x99000000), blurRadius: 24, offset: Offset(0, 8)),
     ],
   );
 

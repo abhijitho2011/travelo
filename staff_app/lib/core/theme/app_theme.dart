@@ -49,11 +49,7 @@ class AppTheme {
         inversePrimary: c.primary,
       ),
       textTheme: textTheme,
-      dividerTheme: DividerThemeData(
-        color: c.border,
-        thickness: 1,
-        space: 1,
-      ),
+      dividerTheme: DividerThemeData(color: c.border, thickness: 1, space: 1),
       appBarTheme: AppBarTheme(
         backgroundColor: c.background,
         foregroundColor: c.foreground,
@@ -225,13 +221,21 @@ class AppTheme {
       ),
       listTileTheme: ListTileThemeData(
         iconColor: c.mutedForeground,
-        titleTextStyle: AppTypography.body(size: 14, weight: FontWeight.w600, color: c.foreground),
-        subtitleTextStyle: AppTypography.body(size: 12.5, color: c.mutedForeground),
+        titleTextStyle: AppTypography.body(
+          size: 14,
+          weight: FontWeight.w600,
+          color: c.foreground,
+        ),
+        subtitleTextStyle: AppTypography.body(
+          size: 12.5,
+          color: c.mutedForeground,
+        ),
         shape: const RoundedRectangleBorder(borderRadius: R.rMd),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(
-          (s) => s.contains(WidgetState.selected) ? c.primaryForeground : c.card,
+          (s) =>
+              s.contains(WidgetState.selected) ? c.primaryForeground : c.card,
         ),
         trackColor: WidgetStateProperty.resolveWith(
           (s) => s.contains(WidgetState.selected) ? c.primary : c.muted,
@@ -247,10 +251,7 @@ class AppTheme {
         unselectedLabelStyle: AppTypography.body(size: 13.5),
       ),
       tooltipTheme: TooltipThemeData(
-        decoration: BoxDecoration(
-          color: c.foreground,
-          borderRadius: R.rSm,
-        ),
+        decoration: BoxDecoration(color: c.foreground, borderRadius: R.rSm),
         textStyle: AppTypography.body(size: 12, color: c.background),
       ),
     );

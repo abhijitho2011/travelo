@@ -52,13 +52,22 @@ class SalesScreen extends ConsumerWidget {
           gapSection,
           summary.when(
             loading: () => const KpiSkeleton(count: 4),
-            error: (e, _) => ErrorState(error: e, onRetry: () => ref.invalidate(salesSummaryProvider)),
+            error: (e, _) => ErrorState(
+              error: e,
+              onRetry: () => ref.invalidate(salesSummaryProvider),
+            ),
             data: (s) => KpiGrid(
               children: [
                 KpiCard(label: 'Open leads', value: '${s?.openLeads ?? 0}'),
                 KpiCard(label: 'Won', value: '${s?.wonLeads ?? 0}'),
-                KpiCard(label: 'Conversion', value: '${s?.conversionPercent ?? 0}%'),
-                KpiCard(label: 'Open value', value: formatPaise(s?.openValuePaise ?? 0)),
+                KpiCard(
+                  label: 'Conversion',
+                  value: '${s?.conversionPercent ?? 0}%',
+                ),
+                KpiCard(
+                  label: 'Open value',
+                  value: formatPaise(s?.openValuePaise ?? 0),
+                ),
               ],
             ),
           ),
@@ -66,7 +75,10 @@ class SalesScreen extends ConsumerWidget {
           SectionHeader(title: 'Pipeline'),
           pipeline.when(
             loading: () => const ListSkeleton(rows: 3, height: 120),
-            error: (e, _) => ErrorState(error: e, onRetry: () => ref.invalidate(pipelineProvider)),
+            error: (e, _) => ErrorState(
+              error: e,
+              onRetry: () => ref.invalidate(pipelineProvider),
+            ),
             data: (columns) {
               final anyLeads = columns.any((c) => c.leads.isNotEmpty);
               if (!anyLeads) {
@@ -108,11 +120,19 @@ class _StageColumn extends StatelessWidget {
         children: [
           Row(
             children: [
-              StatusBadge(tone: column.stage.tone, label: column.stage.label, dense: true),
+              StatusBadge(
+                tone: column.stage.tone,
+                label: column.stage.label,
+                dense: true,
+              ),
               const Spacer(),
               Text(
                 '${column.leads.length}',
-                style: AppTypography.numeric(size: 12, weight: FontWeight.w700, color: c.mutedForeground),
+                style: AppTypography.numeric(
+                  size: 12,
+                  weight: FontWeight.w700,
+                  color: c.mutedForeground,
+                ),
               ),
             ],
           ),
@@ -126,17 +146,25 @@ class _StageColumn extends StatelessWidget {
             child: column.leads.isEmpty
                 ? Container(
                     decoration: BoxDecoration(
-                      border: Border.all(color: c.border, style: BorderStyle.solid),
+                      border: Border.all(
+                        color: c.border,
+                        style: BorderStyle.solid,
+                      ),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     alignment: Alignment.center,
                     child: Text(
                       'Empty',
-                      style: AppTypography.body(size: 12, color: c.mutedForeground),
+                      style: AppTypography.body(
+                        size: 12,
+                        color: c.mutedForeground,
+                      ),
                     ),
                   )
                 : ListView(
-                    children: [for (final l in column.leads) _LeadCard(lead: l)],
+                    children: [
+                      for (final l in column.leads) _LeadCard(lead: l),
+                    ],
                   ),
           ),
         ],
@@ -162,7 +190,11 @@ class _LeadCard extends StatelessWidget {
           children: [
             Text(
               lead.name,
-              style: AppTypography.body(size: 13.5, weight: FontWeight.w700, color: c.foreground),
+              style: AppTypography.body(
+                size: 13.5,
+                weight: FontWeight.w700,
+                color: c.foreground,
+              ),
             ),
             if (lead.company != null) ...[
               const SizedBox(height: 2),
@@ -174,7 +206,11 @@ class _LeadCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               lead.valueLabel,
-              style: AppTypography.numeric(size: 12.5, weight: FontWeight.w700, color: c.primary),
+              style: AppTypography.numeric(
+                size: 12.5,
+                weight: FontWeight.w700,
+                color: c.primary,
+              ),
             ),
           ],
         ),
@@ -186,13 +222,16 @@ class _LeadCard extends StatelessWidget {
 class _LeadFormSheet extends ConsumerStatefulWidget {
   const _LeadFormSheet();
 
-  static Future<void> show(BuildContext context, WidgetRef ref) => showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
-    constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.9),
-    builder: (_) => const _LeadFormSheet(),
-  );
+  static Future<void> show(BuildContext context, WidgetRef ref) =>
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+        ),
+        builder: (_) => const _LeadFormSheet(),
+      );
 
   @override
   ConsumerState<_LeadFormSheet> createState() => _LeadFormSheetState();
@@ -224,7 +263,8 @@ class _LeadFormSheetState extends ConsumerState<_LeadFormSheet> {
       _busy = true;
       _error = null;
     });
-    final valuePaise = ((double.tryParse(_value.text.trim()) ?? 0) * 100).round();
+    final valuePaise = ((double.tryParse(_value.text.trim()) ?? 0) * 100)
+        .round();
     final body = <String, dynamic>{
       'name': _name.text.trim(),
       if (_company.text.trim().isNotEmpty) 'company': _company.text.trim(),
@@ -266,38 +306,55 @@ class _LeadFormSheetState extends ConsumerState<_LeadFormSheet> {
                 controller: _name,
                 decoration: const InputDecoration(labelText: 'Name'),
                 textCapitalization: TextCapitalization.words,
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
               const SizedBox(height: Sp.md),
               TextFormField(
                 controller: _company,
-                decoration: const InputDecoration(labelText: 'Company (optional)'),
+                decoration: const InputDecoration(
+                  labelText: 'Company (optional)',
+                ),
               ),
               const SizedBox(height: Sp.md),
               TextFormField(
                 controller: _contact,
-                decoration: const InputDecoration(labelText: 'Contact (optional)'),
+                decoration: const InputDecoration(
+                  labelText: 'Contact (optional)',
+                ),
               ),
               const SizedBox(height: Sp.md),
               TextFormField(
                 controller: _source,
-                decoration: const InputDecoration(labelText: 'Source (optional)'),
+                decoration: const InputDecoration(
+                  labelText: 'Source (optional)',
+                ),
               ),
               const SizedBox(height: Sp.md),
               TextFormField(
                 controller: _value,
-                decoration: const InputDecoration(labelText: 'Est. value (₹, optional)', prefixText: '₹ '),
+                decoration: const InputDecoration(
+                  labelText: 'Est. value (₹, optional)',
+                  prefixText: '₹ ',
+                ),
                 keyboardType: TextInputType.number,
               ),
               if (_error != null) ...[
                 const SizedBox(height: Sp.md),
-                Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
               ],
               const SizedBox(height: Sp.lg),
               FilledButton(
                 onPressed: _busy ? null : _save,
                 child: _busy
-                    ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Text('Create lead'),
               ),
             ],

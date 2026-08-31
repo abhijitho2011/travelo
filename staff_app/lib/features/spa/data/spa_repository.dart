@@ -23,7 +23,10 @@ class SpaRepository {
 
   Future<List<SpaService>> services({bool all = false}) async {
     try {
-      final data = await _api.get('/spa/services', query: {if (all) 'all': 'true'});
+      final data = await _api.get(
+        '/spa/services',
+        query: {if (all) 'all': 'true'},
+      );
       return _listOf(data, SpaService.fromJson);
     } on ApiException catch (e) {
       if (e.isMissingEndpoint) return const [];
@@ -46,10 +49,13 @@ class SpaRepository {
     bool mine = false,
   }) async {
     try {
-      final data = await _api.get('/spa/appointments', query: {
-        if (status != null) 'status': status.wire,
-        if (mine) 'mine': 'true',
-      });
+      final data = await _api.get(
+        '/spa/appointments',
+        query: {
+          if (status != null) 'status': status.wire,
+          if (mine) 'mine': 'true',
+        },
+      );
       return _listOf(data, SpaAppointment.fromJson);
     } on ApiException catch (e) {
       if (e.isMissingEndpoint) return const [];
@@ -73,9 +79,10 @@ class SpaRepository {
 
   Future<List<SpaBill>> bills({SpaBillStatus? status}) async {
     try {
-      final data = await _api.get('/spa/bills', query: {
-        if (status != null) 'status': status.wire,
-      });
+      final data = await _api.get(
+        '/spa/bills',
+        query: {if (status != null) 'status': status.wire},
+      );
       return _listOf(data, SpaBill.fromJson);
     } on ApiException catch (e) {
       if (e.isMissingEndpoint) return const [];
@@ -86,11 +93,17 @@ class SpaRepository {
   Future<void> createBill(String appointmentId) =>
       _api.post('/spa/bills', body: {'appointmentId': appointmentId});
 
-  Future<void> settleBill(String id, SpaPaymentMethod method, {String? reservationId}) =>
-      _api.post('/spa/bills/$id/settle', body: {
-        'method': method.wire,
-        if (reservationId != null) 'reservationId': reservationId,
-      });
+  Future<void> settleBill(
+    String id,
+    SpaPaymentMethod method, {
+    String? reservationId,
+  }) => _api.post(
+    '/spa/bills/$id/settle',
+    body: {
+      'method': method.wire,
+      if (reservationId != null) 'reservationId': reservationId,
+    },
+  );
 
   Future<void> refundBill(String id, String reason) =>
       _api.post('/spa/bills/$id/refund', body: {'reason': reason});

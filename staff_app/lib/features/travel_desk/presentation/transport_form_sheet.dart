@@ -14,14 +14,19 @@ class TransportFormSheet extends ConsumerStatefulWidget {
 
   final TransportRequest? existing;
 
-  static Future<void> show(BuildContext context, WidgetRef ref, {TransportRequest? existing}) =>
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        showDragHandle: true,
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.92),
-        builder: (_) => TransportFormSheet(existing: existing),
-      );
+  static Future<void> show(
+    BuildContext context,
+    WidgetRef ref, {
+    TransportRequest? existing,
+  }) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.sizeOf(context).height * 0.92,
+    ),
+    builder: (_) => TransportFormSheet(existing: existing),
+  );
 
   @override
   ConsumerState<TransportFormSheet> createState() => _TransportFormSheetState();
@@ -46,7 +51,9 @@ class _TransportFormSheetState extends ConsumerState<TransportFormSheet> {
     _from = TextEditingController(text: e?.fromLocation ?? '');
     _to = TextEditingController(text: e?.toLocation ?? '');
     _fare = TextEditingController(
-      text: e?.farePaise == null ? '' : (e!.farePaise! / 100).toStringAsFixed(0),
+      text: e?.farePaise == null
+          ? ''
+          : (e!.farePaise! / 100).toStringAsFixed(0),
     );
     _type = e?.type ?? TransportType.pickup;
     _pickup = e?.pickupAt ?? DateTime.now().add(const Duration(hours: 1));
@@ -75,7 +82,13 @@ class _TransportFormSheetState extends ConsumerState<TransportFormSheet> {
     );
     if (time == null) return;
     setState(() {
-      _pickup = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+      _pickup = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
     });
   }
 
@@ -130,7 +143,9 @@ class _TransportFormSheetState extends ConsumerState<TransportFormSheet> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                widget.existing == null ? 'New transport request' : 'Edit request',
+                widget.existing == null
+                    ? 'New transport request'
+                    : 'Edit request',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: Sp.md),
@@ -138,7 +153,8 @@ class _TransportFormSheetState extends ConsumerState<TransportFormSheet> {
                 controller: _guest,
                 decoration: const InputDecoration(labelText: 'Guest name'),
                 textCapitalization: TextCapitalization.words,
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
               const SizedBox(height: Sp.md),
               DropdownButtonFormField<TransportType>(
@@ -179,15 +195,25 @@ class _TransportFormSheetState extends ConsumerState<TransportFormSheet> {
               ),
               if (_error != null) ...[
                 const SizedBox(height: Sp.md),
-                Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
               ],
               const SizedBox(height: Sp.lg),
               FilledButton(
                 onPressed: _busy ? null : _save,
                 child: _busy
                     ? const SizedBox(
-                        height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                    : Text(widget.existing == null ? 'Create request' : 'Save changes'),
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(
+                        widget.existing == null
+                            ? 'Create request'
+                            : 'Save changes',
+                      ),
               ),
             ],
           ),

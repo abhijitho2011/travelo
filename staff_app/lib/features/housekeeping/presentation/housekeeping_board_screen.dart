@@ -37,7 +37,8 @@ class HousekeepingBoardScreen extends ConsumerWidget {
           data: (b) => b.totalRooms == 0 && b.areaTasks.isEmpty
               ? const EmptyState(
                   title: 'No rooms yet',
-                  hint: 'Rooms added to this property will appear on the board.',
+                  hint:
+                      'Rooms added to this property will appear on the board.',
                   icon: Icons.meeting_room_outlined,
                 )
               : _Board(board: b),
@@ -71,8 +72,12 @@ class _Board extends StatelessWidget {
           for (final t in board.areaTasks)
             Padding(
               padding: const EdgeInsets.only(bottom: Sp.sm),
-              child: _AreaTaskTile(taskId: t.id, area: t.area ?? t.typeLabel,
-                  statusLabel: t.status.label, tone: t.status.tone),
+              child: _AreaTaskTile(
+                taskId: t.id,
+                area: t.area ?? t.typeLabel,
+                statusLabel: t.status.label,
+                tone: t.status.tone,
+              ),
             ),
         ],
       ],
@@ -101,7 +106,8 @@ class _CountsHeader extends StatelessWidget {
               for (final status in board.orderedStatuses)
                 StatusBadge(
                   tone: roomStatusTone(status),
-                  label: '${roomStatusLabel(status)} ${board.counts[status] ?? 0}',
+                  label:
+                      '${roomStatusLabel(status)} ${board.counts[status] ?? 0}',
                   dense: true,
                 ),
             ],
@@ -168,8 +174,12 @@ class _RoomChip extends ConsumerWidget {
       borderRadius: R.rMd,
       onTap: task == null
           ? null
-          : () => showTaskActionSheet(context, ref, task: task,
-              roomNumber: room.number),
+          : () => showTaskActionSheet(
+              context,
+              ref,
+              task: task,
+              roomNumber: room.number,
+            ),
       child: Container(
         width: 96,
         padding: const EdgeInsets.all(Sp.sm),

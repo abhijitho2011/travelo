@@ -73,22 +73,27 @@ int _compareRoomNumber(String a, String b) {
   return a.compareTo(b);
 }
 
-final reservationCalendarProvider = FutureProvider.autoDispose<CalendarData>((ref) async {
+final reservationCalendarProvider = FutureProvider.autoDispose<CalendarData>((
+  ref,
+) async {
   final start = ref.watch(calendarWindowStartProvider);
   final end = start.add(const Duration(days: kCalendarWindowDays));
 
   // Rooms drive the rows; reservations touching the window fill them. 200 is
   // the API's hard ceiling on BOTH pages (RoomFilterDto / ReservationFilterDto)
   // — asking for more is a 400, not a bigger page.
-  final rooms = await ref.watch(roomsRepositoryProvider).rooms(const RoomFilter(limit: 200));
+  final rooms = await ref
+      .watch(roomsRepositoryProvider)
+      .rooms(const RoomFilter(limit: 200));
   final reservations = await ref
       .watch(receptionRepositoryProvider)
       .reservations(ReservationFilter(from: start, to: end, limit: 200));
 
-  final sorted = [...rooms]..sort((a, b) {
-    final byType = a.roomTypeName.compareTo(b.roomTypeName);
-    return byType != 0 ? byType : _compareRoomNumber(a.number, b.number);
-  });
+  final sorted = [...rooms]
+    ..sort((a, b) {
+      final byType = a.roomTypeName.compareTo(b.roomTypeName);
+      return byType != 0 ? byType : _compareRoomNumber(a.number, b.number);
+    });
 
   final byRoom = <String, List<Reservation>>{};
   final unassigned = <Reservation>[];

@@ -29,7 +29,8 @@ class SupportScreen extends ConsumerWidget {
         const PageHeader(
           eyebrow: 'Support',
           title: 'Help & support',
-          subtitle: 'How this app decides what you can see, and who to ask '
+          subtitle:
+              'How this app decides what you can see, and who to ask '
               'when it is not what you expect.',
         ),
         gapSection,
@@ -91,7 +92,8 @@ class SupportScreen extends ConsumerWidget {
             children: [
               _Step(
                 n: '1',
-                title: 'Your manager at ${session?.hotel?.name ?? 'your hotel'}',
+                title:
+                    'Your manager at ${session?.hotel?.name ?? 'your hotel'}',
                 detail:
                     'Roles, permissions, mobile numbers and account status are '
                     'all set at the hotel. Almost every access question is '
@@ -131,15 +133,9 @@ class SupportScreen extends ConsumerWidget {
               const RowDivider(),
               _Fact(label: 'Signed in as', value: session?.role.label ?? '—'),
               const RowDivider(),
-              _Fact(
-                label: 'Hotel',
-                value: session?.hotel?.name ?? '—',
-              ),
+              _Fact(label: 'Hotel', value: session?.hotel?.name ?? '—'),
               const RowDivider(),
-              _Fact(
-                label: 'Permissions granted',
-                value: '$permissionCount',
-              ),
+              _Fact(label: 'Permissions granted', value: '$permissionCount'),
             ],
           ),
         ),
@@ -266,9 +262,9 @@ class _Step extends StatelessWidget {
               onPressed: () async {
                 await Clipboard.setData(ClipboardData(text: copyable!));
                 if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('$copyable copied')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('$copyable copied')));
               },
             ),
         ],

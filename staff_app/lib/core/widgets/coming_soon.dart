@@ -42,10 +42,7 @@ class ComingSoonScreen extends ConsumerWidget {
               Container(
                 width: 42,
                 height: 42,
-                decoration: BoxDecoration(
-                  color: c.accent,
-                  borderRadius: R.rMd,
-                ),
+                decoration: BoxDecoration(color: c.accent, borderRadius: R.rMd),
                 alignment: Alignment.center,
                 child: Icon(
                   Icons.construction_outlined,

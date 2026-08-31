@@ -48,10 +48,7 @@ class _ReservationDetailScreenState
   /// Runs one action, reporting its outcome where the user is looking. Errors
   /// stay ON the screen rather than in a snackbar that vanishes: a refused
   /// check-in is something the clerk has to read and act on.
-  Future<void> _run(
-    Future<void> Function() action,
-    String success,
-  ) async {
+  Future<void> _run(Future<void> Function() action, String success) async {
     setState(() {
       _busy = true;
       _error = null;
@@ -97,8 +94,7 @@ class _ReservationDetailScreenState
             if (r == null) {
               return const EmptyState(
                 title: 'Booking not found',
-                hint:
-                    'It may have been removed since this screen was opened.',
+                hint: 'It may have been removed since this screen was opened.',
                 icon: Icons.search_off_outlined,
               );
             }
@@ -112,8 +108,9 @@ class _ReservationDetailScreenState
                   statusLabel: r.status.label,
                   statusTone: r.tone,
                   roomLabel: r.roomLabel,
-                  balanceLabel:
-                      r.balancePaise > 0 ? '${r.balanceLabel} due' : null,
+                  balanceLabel: r.balancePaise > 0
+                      ? '${r.balanceLabel} due'
+                      : null,
                 ),
                 const SizedBox(height: 6),
                 FieldNote(text: r.status.hint),
@@ -124,10 +121,7 @@ class _ReservationDetailScreenState
                   padBody: false,
                   child: Column(
                     children: [
-                      _Fact(
-                        label: 'Check-in',
-                        value: Fmt.dayMonth(r.checkIn),
-                      ),
+                      _Fact(label: 'Check-in', value: Fmt.dayMonth(r.checkIn)),
                       const RowDivider(),
                       _Fact(
                         label: 'Check-out',
@@ -218,10 +212,7 @@ class _ReservationDetailScreenState
                   ),
                 ],
 
-                if (_error != null) ...[
-                  gapMd,
-                  FormErrorNote(message: _error!),
-                ],
+                if (_error != null) ...[gapMd, FormErrorNote(message: _error!)],
 
                 gapSection,
                 _Actions(reservation: r, busy: _busy, run: _run),
@@ -246,7 +237,12 @@ class _FolioPanel extends ConsumerWidget {
 
   final Reservation reservation;
 
-  Future<void> _take(BuildContext context, WidgetRef ref, bool isRefund, int? suggested) async {
+  Future<void> _take(
+    BuildContext context,
+    WidgetRef ref,
+    bool isRefund,
+    int? suggested,
+  ) async {
     final ok = await FolioPaymentSheet.show(
       context,
       reservationId: reservation.id,
@@ -277,7 +273,10 @@ class _FolioPanel extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Fact(label: 'Room', value: formatPaiseOf(folio?.roomChargePaise ?? r.totalPaise)),
+          _Fact(
+            label: 'Room',
+            value: formatPaiseOf(folio?.roomChargePaise ?? r.totalPaise),
+          ),
           if (folio != null)
             for (final item in folio.lineItems) ...[
               const RowDivider(),
@@ -437,9 +436,7 @@ class _Actions extends ConsumerWidget {
                         );
                       },
                 icon: const Icon(Icons.meeting_room_outlined, size: 17),
-                label: Text(
-                  r.roomAssigned ? 'Change room' : 'Assign a room',
-                ),
+                label: Text(r.roomAssigned ? 'Change room' : 'Assign a room'),
               ),
             ),
           ),
@@ -476,7 +473,8 @@ class _Actions extends ConsumerWidget {
         // A no-show is a judgement about a guest who never came, so it is only
         // offered once the arrival date is behind us — the server refuses it
         // before that, and offering it earlier would invite the refusal.
-        if (r.status.canNoShow && r.checkIn != null &&
+        if (r.status.canNoShow &&
+            r.checkIn != null &&
             dateOnly(DateTime.now()).isAfter(dateOnly(r.checkIn!)))
           PermissionGate(
             permission: P.reservationCancel,

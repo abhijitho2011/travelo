@@ -6,13 +6,13 @@ import '../data/travel_desk_repository.dart';
 
 // ------------------------------------------------------------------ reads --
 
-final transportSummaryProvider =
-    FutureProvider.autoDispose<TransportSummary?>(
-      (ref) => ref.watch(travelDeskRepositoryProvider).summary(),
-    );
+final transportSummaryProvider = FutureProvider.autoDispose<TransportSummary?>(
+  (ref) => ref.watch(travelDeskRepositoryProvider).summary(),
+);
 
-final transportFilterProvider =
-    StateProvider.autoDispose<TransportFilter>((_) => const TransportFilter());
+final transportFilterProvider = StateProvider.autoDispose<TransportFilter>(
+  (_) => const TransportFilter(),
+);
 
 final transportRequestsProvider =
     FutureProvider.autoDispose<List<TransportRequest>>((ref) {
@@ -75,7 +75,10 @@ class TravelDeskActions {
     return r;
   }
 
-  Future<TransportRequest> update(String id, Map<String, dynamic> changes) async {
+  Future<TransportRequest> update(
+    String id,
+    Map<String, dynamic> changes,
+  ) async {
     final r = await _repo.update(id, changes);
     _invalidate();
     _ref.invalidate(transportRequestProvider(id));
@@ -87,7 +90,11 @@ class TravelDeskActions {
     required String driverStaffId,
     String? vehicleId,
   }) async {
-    final r = await _repo.assign(id, driverStaffId: driverStaffId, vehicleId: vehicleId);
+    final r = await _repo.assign(
+      id,
+      driverStaffId: driverStaffId,
+      vehicleId: vehicleId,
+    );
     _invalidate();
     _ref.invalidate(transportRequestProvider(id));
     return r;

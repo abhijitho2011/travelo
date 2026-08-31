@@ -213,9 +213,8 @@ class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
                             decoration: const InputDecoration(
                               labelText: 'First name',
                             ),
-                            validator: (v) => (v ?? '').trim().isEmpty
-                                ? 'Required'
-                                : null,
+                            validator: (v) =>
+                                (v ?? '').trim().isEmpty ? 'Required' : null,
                           ),
                         ),
                         const SizedBox(width: Sp.md),
@@ -226,9 +225,8 @@ class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
                             decoration: const InputDecoration(
                               labelText: 'Last name',
                             ),
-                            validator: (v) => (v ?? '').trim().isEmpty
-                                ? 'Required'
-                                : null,
+                            validator: (v) =>
+                                (v ?? '').trim().isEmpty ? 'Required' : null,
                           ),
                         ),
                       ],
@@ -396,11 +394,7 @@ class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
                   ),
                   child: Row(
                     children: [
-                      Icon(
-                        Icons.error_outline,
-                        size: 16,
-                        color: c.destructive,
-                      ),
+                      Icon(Icons.error_outline, size: 16, color: c.destructive),
                       const SizedBox(width: Sp.sm),
                       Expanded(
                         child: Text(

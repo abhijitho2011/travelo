@@ -22,7 +22,10 @@ class SplashScreen extends StatelessWidget {
             SizedBox(
               width: 22,
               height: 22,
-              child: CircularProgressIndicator(strokeWidth: 2, color: c.primary),
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: c.primary,
+              ),
             ),
           ],
         ),

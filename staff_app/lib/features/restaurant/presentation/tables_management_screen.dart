@@ -106,10 +106,17 @@ class _TableRow extends ConsumerWidget {
                   children: [
                     Text(
                       '${table.seats} seats',
-                      style: AppTypography.body(size: 12, color: c.mutedForeground),
+                      style: AppTypography.body(
+                        size: 12,
+                        color: c.mutedForeground,
+                      ),
                     ),
                     const SizedBox(width: 8),
-                    StatusBadge(tone: table.status.tone, label: table.status.label, dense: true),
+                    StatusBadge(
+                      tone: table.status.tone,
+                      label: table.status.label,
+                      dense: true,
+                    ),
                   ],
                 ),
               ],
@@ -143,11 +150,13 @@ class _TableRow extends ConsumerWidget {
         : RestaurantTableStatus.blocked;
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await ref
-          .read(restaurantActionsProvider)
-          .updateTable(table.id, {'status': next.wire});
+      await ref.read(restaurantActionsProvider).updateTable(table.id, {
+        'status': next.wire,
+      });
     } on ApiException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(RestaurantErrors.friendly(e))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(RestaurantErrors.friendly(e))),
+      );
     }
   }
 
@@ -156,7 +165,9 @@ class _TableRow extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Delete ${table.name}?'),
-        content: const Text('It disappears from the floor. This cannot be undone from the app.'),
+        content: const Text(
+          'It disappears from the floor. This cannot be undone from the app.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -164,7 +175,9 @@ class _TableRow extends ConsumerWidget {
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: context.colors.destructive),
+            style: FilledButton.styleFrom(
+              backgroundColor: context.colors.destructive,
+            ),
             child: const Text('Delete'),
           ),
         ],
@@ -175,7 +188,9 @@ class _TableRow extends ConsumerWidget {
     try {
       await ref.read(restaurantActionsProvider).deleteTable(table.id);
     } on ApiException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(RestaurantErrors.friendly(e))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(RestaurantErrors.friendly(e))),
+      );
     }
   }
 }
@@ -199,7 +214,10 @@ Future<void> _editTable(
             controller: nameCtrl,
             autofocus: existing == null,
             textCapitalization: TextCapitalization.characters,
-            decoration: const InputDecoration(labelText: 'Name', hintText: 'T1'),
+            decoration: const InputDecoration(
+              labelText: 'Name',
+              hintText: 'T1',
+            ),
           ),
           const SizedBox(height: Sp.sm),
           TextField(
@@ -238,6 +256,8 @@ Future<void> _editTable(
       await actions.updateTable(existing.id, {'name': name, 'seats': seats});
     }
   } on ApiException catch (e) {
-    messenger.showSnackBar(SnackBar(content: Text(RestaurantErrors.friendly(e))));
+    messenger.showSnackBar(
+      SnackBar(content: Text(RestaurantErrors.friendly(e))),
+    );
   }
 }

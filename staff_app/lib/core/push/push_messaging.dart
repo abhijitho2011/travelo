@@ -68,7 +68,10 @@ class PushMessaging {
   }
 
   Future<void> _register(String token) async {
-    await _api.post('/device-tokens', body: {'token': token, 'platform': _platform});
+    await _api.post(
+      '/device-tokens',
+      body: {'token': token, 'platform': _platform},
+    );
   }
 
   /// The in-app route a tapped notification should open, from its data payload.

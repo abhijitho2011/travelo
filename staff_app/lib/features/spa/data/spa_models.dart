@@ -202,7 +202,8 @@ class SpaAppointment {
   factory SpaAppointment.fromJson(Map json) => SpaAppointment(
     id: (json['id'] ?? '').toString(),
     guestName: _str(json['guestName']) ?? 'Guest',
-    serviceName: _str(_pick(json, ['serviceName', 'serviceNameSnapshot'])) ?? 'Service',
+    serviceName:
+        _str(_pick(json, ['serviceName', 'serviceNameSnapshot'])) ?? 'Service',
     pricePaise: _int(_pick(json, ['pricePaise', 'pricePaiseSnapshot'])),
     status: SpaAppointmentStatus.fromWire(json['status'] as String?),
     startAt: _date(json['startAt']),

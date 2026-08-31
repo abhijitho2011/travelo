@@ -47,11 +47,15 @@ class AccountsScreen extends ConsumerWidget {
         gapSection,
         summary.when(
           loading: () => const KpiSkeleton(count: 4),
-          error: (e, _) => ErrorState(error: e, onRetry: () => ref.invalidate(accountsSummaryProvider)),
+          error: (e, _) => ErrorState(
+            error: e,
+            onRetry: () => ref.invalidate(accountsSummaryProvider),
+          ),
           data: (s) => s == null
               ? const EmptyState(
                   title: 'No figures yet',
-                  hint: 'Revenue appears as guests check in and outlets settle.',
+                  hint:
+                      'Revenue appears as guests check in and outlets settle.',
                   icon: Icons.query_stats_outlined,
                 )
               : _Dashboard(summary: s),
@@ -73,8 +77,14 @@ class _Dashboard extends StatelessWidget {
       children: [
         KpiGrid(
           children: [
-            KpiCard(label: "Today's revenue", value: formatPaise(s.totalRevenuePaise)),
-            KpiCard(label: 'Expenses today', value: formatPaise(s.expensesTodayPaise)),
+            KpiCard(
+              label: "Today's revenue",
+              value: formatPaise(s.totalRevenuePaise),
+            ),
+            KpiCard(
+              label: 'Expenses today',
+              value: formatPaise(s.expensesTodayPaise),
+            ),
             KpiCard(
               label: 'Receivables',
               value: '${s.receivablesCount}',
@@ -105,7 +115,12 @@ class _Dashboard extends StatelessWidget {
     );
   }
 
-  Widget _sourceRow(BuildContext context, String label, int paise, {bool bold = false}) {
+  Widget _sourceRow(
+    BuildContext context,
+    String label,
+    int paise, {
+    bool bold = false,
+  }) {
     final c = context.colors;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,

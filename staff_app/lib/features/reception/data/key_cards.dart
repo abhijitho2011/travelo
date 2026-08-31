@@ -68,7 +68,9 @@ class KeyCard {
     guestName: json['guestName']?.toString(),
     roomNumber: json['roomNumber']?.toString(),
     issuedAt: DateTime.tryParse((json['issuedAt'] ?? '').toString())?.toLocal(),
-    expiresAt: DateTime.tryParse((json['expiresAt'] ?? '').toString())?.toLocal(),
+    expiresAt: DateTime.tryParse(
+      (json['expiresAt'] ?? '').toString(),
+    )?.toLocal(),
   );
 }
 
@@ -89,7 +91,10 @@ class KeyCardsRepository {
   }
 
   Future<KeyCard> issue(String reservationId) async {
-    final data = await _api.post('/key-cards', body: {'reservationId': reservationId});
+    final data = await _api.post(
+      '/key-cards',
+      body: {'reservationId': reservationId},
+    );
     return KeyCard.fromJson(data as Map);
   }
 
@@ -100,7 +105,10 @@ class KeyCardsRepository {
   }
 
   Future<KeyCard> deactivate(String id, {bool lost = false}) async {
-    final data = await _api.post('/key-cards/$id/deactivate', body: {'lost': lost});
+    final data = await _api.post(
+      '/key-cards/$id/deactivate',
+      body: {'lost': lost},
+    );
     return KeyCard.fromJson(data as Map);
   }
 }

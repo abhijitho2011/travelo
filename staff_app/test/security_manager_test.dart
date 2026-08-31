@@ -15,18 +15,21 @@ void main() {
       expect(IncidentStatus.resolved.isResolved, isTrue);
     });
 
-    test('an incident carries status, assignee and resolution when present', () {
-      final inc = Incident.fromJson({
-        'id': 'i1',
-        'summary': 'Broken window',
-        'severity': 'HIGH',
-        'status': 'ASSIGNED',
-        'assignedTo': 'guard-2',
-      });
-      expect(inc.status, IncidentStatus.assigned);
-      expect(inc.assignedTo, 'guard-2');
-      expect(inc.severity, IncidentSeverity.high);
-    });
+    test(
+      'an incident carries status, assignee and resolution when present',
+      () {
+        final inc = Incident.fromJson({
+          'id': 'i1',
+          'summary': 'Broken window',
+          'severity': 'HIGH',
+          'status': 'ASSIGNED',
+          'assignedTo': 'guard-2',
+        });
+        expect(inc.status, IncidentStatus.assigned);
+        expect(inc.assignedTo, 'guard-2');
+        expect(inc.severity, IncidentSeverity.high);
+      },
+    );
   });
 
   group('shift status', () {
@@ -34,7 +37,10 @@ void main() {
       for (final s in SecurityShiftStatus.values) {
         expect(SecurityShiftStatus.fromWire(s.wire), s, reason: s.wire);
       }
-      expect(SecurityShiftStatus.fromWire('active'), SecurityShiftStatus.active);
+      expect(
+        SecurityShiftStatus.fromWire('active'),
+        SecurityShiftStatus.active,
+      );
     });
   });
 

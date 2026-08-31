@@ -63,10 +63,7 @@ class RoomPickerSheet extends ConsumerWidget {
                 roomTypeName == null
                     ? 'Clean and ready rooms only.'
                     : 'Clean and ready ${roomTypeName!} rooms only.',
-                style: AppTypography.body(
-                  size: 12.5,
-                  color: c.mutedForeground,
-                ),
+                style: AppTypography.body(size: 12.5, color: c.mutedForeground),
               ),
               const SizedBox(height: Sp.lg),
 
@@ -92,8 +89,7 @@ class RoomPickerSheet extends ConsumerWidget {
                           for (final room in list)
                             _RoomOption(
                               room: room,
-                              onTap: () =>
-                                  Navigator.of(context).pop(room.id),
+                              onTap: () => Navigator.of(context).pop(room.id),
                             ),
                         ],
                       ),

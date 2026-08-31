@@ -43,15 +43,19 @@ class RestaurantOrdersScreen extends ConsumerWidget {
               ChoiceChip(
                 label: Text(s.label),
                 selected: filter.status == s,
-                onSelected: (_) => ref.read(ordersFilterProvider.notifier).state =
-                    filter.copyWith(status: s),
+                onSelected: (_) =>
+                    ref.read(ordersFilterProvider.notifier).state = filter
+                        .copyWith(status: s),
               ),
           ],
         ),
         gapSection,
         async.when(
           loading: () => const ListSkeleton(rows: 4, height: 64),
-          error: (e, _) => ErrorState(error: e, onRetry: () => ref.invalidate(ordersProvider)),
+          error: (e, _) => ErrorState(
+            error: e,
+            onRetry: () => ref.invalidate(ordersProvider),
+          ),
           data: (orders) => orders.isEmpty
               ? const EmptyState(
                   title: 'No orders',
@@ -70,7 +74,8 @@ class RestaurantOrdersScreen extends ConsumerWidget {
                           leading: const Icon(Icons.receipt_outlined, size: 18),
                           title: orders[i].orderNumber,
                           subtitle: [
-                            if (orders[i].tableName != null) orders[i].tableName!,
+                            if (orders[i].tableName != null)
+                              orders[i].tableName!,
                             '${orders[i].guestCount} guests',
                           ].join(' · '),
                           badge: StatusBadge(
@@ -79,7 +84,8 @@ class RestaurantOrdersScreen extends ConsumerWidget {
                             dense: true,
                           ),
                           trailing: Text(formatPaise(orders[i].totalPaise)),
-                          onTap: () => context.go(Routes.restaurantOrder(orders[i].id)),
+                          onTap: () =>
+                              context.go(Routes.restaurantOrder(orders[i].id)),
                         ),
                       ],
                     ],

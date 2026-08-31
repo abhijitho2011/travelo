@@ -40,11 +40,15 @@ class SuppliersScreen extends ConsumerWidget {
         gapSection,
         async.when(
           loading: () => const ListSkeleton(rows: 3, height: 64),
-          error: (e, _) => ErrorState(error: e, onRetry: () => ref.invalidate(suppliersProvider)),
+          error: (e, _) => ErrorState(
+            error: e,
+            onRetry: () => ref.invalidate(suppliersProvider),
+          ),
           data: (suppliers) => suppliers.isEmpty
               ? const EmptyState(
                   title: 'No suppliers yet',
-                  hint: 'Add the vendors you buy from so purchase orders can name them.',
+                  hint:
+                      'Add the vendors you buy from so purchase orders can name them.',
                   icon: Icons.local_shipping_outlined,
                 )
               : Panel(
@@ -56,10 +60,14 @@ class SuppliersScreen extends ConsumerWidget {
                       for (var i = 0; i < suppliers.length; i++) ...[
                         if (i > 0) const RowDivider(),
                         DataRow2(
-                          leading: const Icon(Icons.storefront_outlined, size: 18),
+                          leading: const Icon(
+                            Icons.storefront_outlined,
+                            size: 18,
+                          ),
                           title: suppliers[i].name,
                           subtitle: [
-                            if (suppliers[i].contact != null) suppliers[i].contact!,
+                            if (suppliers[i].contact != null)
+                              suppliers[i].contact!,
                             if (suppliers[i].phone != null) suppliers[i].phone!,
                           ].join(' · '),
                           onTap: ref.hasPermission(P.supplierUpdate)
@@ -76,7 +84,11 @@ class SuppliersScreen extends ConsumerWidget {
   }
 }
 
-Future<void> _edit(BuildContext context, WidgetRef ref, Supplier? existing) async {
+Future<void> _edit(
+  BuildContext context,
+  WidgetRef ref,
+  Supplier? existing,
+) async {
   final saved = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
@@ -98,7 +110,9 @@ class _SupplierSheet extends ConsumerStatefulWidget {
 
 class _SupplierSheetState extends ConsumerState<_SupplierSheet> {
   late final _name = TextEditingController(text: widget.existing?.name ?? '');
-  late final _contact = TextEditingController(text: widget.existing?.contact ?? '');
+  late final _contact = TextEditingController(
+    text: widget.existing?.contact ?? '',
+  );
   late final _phone = TextEditingController(text: widget.existing?.phone ?? '');
   late final _email = TextEditingController(text: widget.existing?.email ?? '');
   bool _busy = false;
@@ -137,7 +151,9 @@ class _SupplierSheetState extends ConsumerState<_SupplierSheet> {
       }
       if (mounted) Navigator.of(context).pop(true);
     } on ApiException catch (e) {
-      setState(() => _error = e.message.isEmpty ? 'Could not save.' : e.message);
+      setState(
+        () => _error = e.message.isEmpty ? 'Could not save.' : e.message,
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -157,22 +173,45 @@ class _SupplierSheetState extends ConsumerState<_SupplierSheet> {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: Sp.md),
-            TextField(controller: _name, decoration: const InputDecoration(labelText: 'Name')),
+            TextField(
+              controller: _name,
+              decoration: const InputDecoration(labelText: 'Name'),
+            ),
             const SizedBox(height: Sp.sm),
-            TextField(controller: _contact, decoration: const InputDecoration(labelText: 'Contact person (optional)')),
+            TextField(
+              controller: _contact,
+              decoration: const InputDecoration(
+                labelText: 'Contact person (optional)',
+              ),
+            ),
             const SizedBox(height: Sp.sm),
-            TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone (optional)')),
+            TextField(
+              controller: _phone,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(labelText: 'Phone (optional)'),
+            ),
             const SizedBox(height: Sp.sm),
-            TextField(controller: _email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email (optional)')),
+            TextField(
+              controller: _email,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(labelText: 'Email (optional)'),
+            ),
             if (_error != null) ...[
               const SizedBox(height: Sp.sm),
-              Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             ],
             const SizedBox(height: Sp.lg),
             FilledButton(
               onPressed: _busy ? null : _save,
               child: _busy
-                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2.2))
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2.2),
+                    )
                   : const Text('Save'),
             ),
           ],

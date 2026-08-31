@@ -92,7 +92,8 @@ class RecordSheetState extends ConsumerState<RecordSheet> {
   }
 
   Map<String, String> get _values => {
-    for (final entry in _controllers.entries) entry.key: entry.value.text.trim(),
+    for (final entry in _controllers.entries)
+      entry.key: entry.value.text.trim(),
   };
 
   Future<void> _submit() async {

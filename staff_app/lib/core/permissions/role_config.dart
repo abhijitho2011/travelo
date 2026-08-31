@@ -107,8 +107,9 @@ enum StaffRole {
   }
 
   /// Every real role, for filter dropdowns.
-  static List<StaffRole> get all =>
-      StaffRole.values.where((r) => r != StaffRole.unknown).toList(growable: false);
+  static List<StaffRole> get all => StaffRole.values
+      .where((r) => r != StaffRole.unknown)
+      .toList(growable: false);
 }
 
 /// One entry in the bottom navigation or the "More" sheet.
@@ -170,8 +171,9 @@ class RoleConfig {
   /// screen still gates its own actions with a PermissionGate.
   final Set<String> extraRoutes;
 
-  List<NavItem> visibleNav(PermissionSet permissions) =>
-      bottomNav.where((i) => i.isVisibleTo(permissions)).toList(growable: false);
+  List<NavItem> visibleNav(PermissionSet permissions) => bottomNav
+      .where((i) => i.isVisibleTo(permissions))
+      .toList(growable: false);
 
   List<NavItem> visibleMore(PermissionSet permissions) =>
       moreMenu.where((i) => i.isVisibleTo(permissions)).toList(growable: false);
@@ -275,6 +277,7 @@ class RoleConfig {
     route: Routes.reservations,
     requires: [P.reservationRead],
   );
+
   /// The room inventory. Every role the server grants `room.read` carries this
   /// entry; the gate on the item, not a role list, is what decides who sees it.
   static const _roomsMore = NavItem(
@@ -820,7 +823,12 @@ class RoleConfig {
           requires: [P.spaServiceRead],
         ),
       ],
-      moreMenu: const [_spaBillingMore, _myTasksMore, _inventoryMore, ..._commonMore],
+      moreMenu: const [
+        _spaBillingMore,
+        _myTasksMore,
+        _inventoryMore,
+        ..._commonMore,
+      ],
     ),
     StaffRole.spaAccounts: _simple(
       StaffRole.spaAccounts,

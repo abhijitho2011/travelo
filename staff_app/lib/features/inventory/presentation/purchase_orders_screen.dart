@@ -33,11 +33,17 @@ class PurchaseOrdersScreen extends ConsumerWidget {
       body: PageBody(
         onRefresh: () async => ref.invalidate(purchaseOrdersProvider),
         children: [
-          const PageHeader(title: 'Purchase orders', subtitle: 'Raise, send and receive stock orders.'),
+          const PageHeader(
+            title: 'Purchase orders',
+            subtitle: 'Raise, send and receive stock orders.',
+          ),
           gapSection,
           pos.when(
             loading: () => const ListSkeleton(rows: 5),
-            error: (e, _) => ErrorState(error: e, onRetry: () => ref.invalidate(purchaseOrdersProvider)),
+            error: (e, _) => ErrorState(
+              error: e,
+              onRetry: () => ref.invalidate(purchaseOrdersProvider),
+            ),
             data: (list) => list.isEmpty
                 ? const EmptyState(
                     title: 'No purchase orders',
@@ -66,7 +72,11 @@ class PurchaseOrdersScreen extends ConsumerWidget {
                                         ),
                                       ),
                                     ),
-                                    StatusBadge(tone: p.status.tone, label: p.status.label, dense: true),
+                                    StatusBadge(
+                                      tone: p.status.tone,
+                                      label: p.status.label,
+                                      dense: true,
+                                    ),
                                   ],
                                 ),
                                 const SizedBox(height: 4),
@@ -100,13 +110,16 @@ class _PoLineDraft {
 class _PoFormSheet extends ConsumerStatefulWidget {
   const _PoFormSheet();
 
-  static Future<void> show(BuildContext context, WidgetRef ref) => showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
-    constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.92),
-    builder: (_) => const _PoFormSheet(),
-  );
+  static Future<void> show(BuildContext context, WidgetRef ref) =>
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.92,
+        ),
+        builder: (_) => const _PoFormSheet(),
+      );
 
   @override
   ConsumerState<_PoFormSheet> createState() => _PoFormSheetState();
@@ -139,7 +152,8 @@ class _PoFormSheetState extends ConsumerState<_PoFormSheet> {
       _error = null;
     });
     final body = <String, dynamic>{
-      if (_supplier.text.trim().isNotEmpty) 'supplierName': _supplier.text.trim(),
+      if (_supplier.text.trim().isNotEmpty)
+        'supplierName': _supplier.text.trim(),
       'lines': [
         for (final l in ready)
           {
@@ -176,16 +190,23 @@ class _PoFormSheetState extends ConsumerState<_PoFormSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('New purchase order', style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              'New purchase order',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: Sp.md),
             TextField(
               controller: _supplier,
-              decoration: const InputDecoration(labelText: 'Supplier (optional)'),
+              decoration: const InputDecoration(
+                labelText: 'Supplier (optional)',
+              ),
             ),
             const SizedBox(height: Sp.md),
             items.when(
               loading: () => const ListSkeleton(rows: 1, height: 48),
-              error: (e, _) => Text('Could not load items: ${e is ApiException ? e.message : e}'),
+              error: (e, _) => Text(
+                'Could not load items: ${e is ApiException ? e.message : e}',
+              ),
               data: (available) {
                 if (available.isEmpty) {
                   return const EmptyState(
@@ -201,7 +222,8 @@ class _PoFormSheetState extends ConsumerState<_PoFormSheet> {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: TextButton.icon(
-                        onPressed: () => setState(() => _lines.add(_PoLineDraft())),
+                        onPressed: () =>
+                            setState(() => _lines.add(_PoLineDraft())),
                         icon: const Icon(Icons.add, size: 16),
                         label: const Text('Add line'),
                       ),
@@ -214,19 +236,40 @@ class _PoFormSheetState extends ConsumerState<_PoFormSheet> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Total', style: AppTypography.body(size: 14, weight: FontWeight.w700, color: context.colors.foreground)),
-                Text(formatPaise(_totalPaise), style: AppTypography.numeric(size: 14, weight: FontWeight.w700, color: context.colors.foreground)),
+                Text(
+                  'Total',
+                  style: AppTypography.body(
+                    size: 14,
+                    weight: FontWeight.w700,
+                    color: context.colors.foreground,
+                  ),
+                ),
+                Text(
+                  formatPaise(_totalPaise),
+                  style: AppTypography.numeric(
+                    size: 14,
+                    weight: FontWeight.w700,
+                    color: context.colors.foreground,
+                  ),
+                ),
               ],
             ),
             if (_error != null) ...[
               const SizedBox(height: Sp.md),
-              Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             ],
             const SizedBox(height: Sp.lg),
             FilledButton(
               onPressed: _busy ? null : _save,
               child: _busy
-                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                   : const Text('Create as draft'),
             ),
           ],
@@ -235,7 +278,11 @@ class _PoFormSheetState extends ConsumerState<_PoFormSheet> {
     );
   }
 
-  Widget _lineRow(BuildContext context, int index, List<InventoryItem> available) {
+  Widget _lineRow(
+    BuildContext context,
+    int index,
+    List<InventoryItem> available,
+  ) {
     final l = _lines[index];
     return Padding(
       padding: const EdgeInsets.only(bottom: Sp.sm),
@@ -247,11 +294,18 @@ class _PoFormSheetState extends ConsumerState<_PoFormSheet> {
             decoration: const InputDecoration(labelText: 'Item'),
             items: [
               for (final it in available)
-                DropdownMenuItem(value: it, child: Text('${it.name} (${it.sku})', overflow: TextOverflow.ellipsis)),
+                DropdownMenuItem(
+                  value: it,
+                  child: Text(
+                    '${it.name} (${it.sku})',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
             ],
             onChanged: (v) => setState(() {
               l.item = v;
-              if (v != null && l.priceRupees == 0) l.priceRupees = v.unitCostPaise / 100;
+              if (v != null && l.priceRupees == 0)
+                l.priceRupees = v.unitCostPaise / 100;
             }),
           ),
           const SizedBox(height: Sp.sm),
@@ -262,16 +316,23 @@ class _PoFormSheetState extends ConsumerState<_PoFormSheet> {
                   initialValue: l.qty.toString(),
                   decoration: const InputDecoration(labelText: 'Qty'),
                   keyboardType: TextInputType.number,
-                  onChanged: (v) => setState(() => l.qty = int.tryParse(v) ?? 0),
+                  onChanged: (v) =>
+                      setState(() => l.qty = int.tryParse(v) ?? 0),
                 ),
               ),
               const SizedBox(width: Sp.md),
               Expanded(
                 child: TextFormField(
-                  initialValue: l.priceRupees == 0 ? '' : l.priceRupees.toStringAsFixed(0),
-                  decoration: const InputDecoration(labelText: 'Unit ₹', prefixText: '₹ '),
+                  initialValue: l.priceRupees == 0
+                      ? ''
+                      : l.priceRupees.toStringAsFixed(0),
+                  decoration: const InputDecoration(
+                    labelText: 'Unit ₹',
+                    prefixText: '₹ ',
+                  ),
                   keyboardType: TextInputType.number,
-                  onChanged: (v) => setState(() => l.priceRupees = double.tryParse(v) ?? 0),
+                  onChanged: (v) =>
+                      setState(() => l.priceRupees = double.tryParse(v) ?? 0),
                 ),
               ),
               if (_lines.length > 1)

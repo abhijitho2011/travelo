@@ -39,11 +39,11 @@ class PageHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (eyebrow != null) ...[
-          LabelXs(eyebrow!),
-          const SizedBox(height: 2),
-        ],
-        Text(title, style: AppTypography.display(size: 22, color: c.foreground)),
+        if (eyebrow != null) ...[LabelXs(eyebrow!), const SizedBox(height: 2)],
+        Text(
+          title,
+          style: AppTypography.display(size: 22, color: c.foreground),
+        ),
         if (subtitle != null) ...[
           const SizedBox(height: 4),
           Text(
@@ -138,10 +138,7 @@ class Panel extends StatelessWidget {
               ],
             ),
           ),
-          Padding(
-            padding: padBody ? Sp.card : EdgeInsets.zero,
-            child: child,
-          ),
+          Padding(padding: padBody ? Sp.card : EdgeInsets.zero, child: child),
         ],
       ),
     );
@@ -206,11 +203,7 @@ class SoftCard extends StatelessWidget {
     if (onTap == null) return content;
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: R.rLg,
-        child: content,
-      ),
+      child: InkWell(onTap: onTap, borderRadius: R.rLg, child: content),
     );
   }
 }
@@ -262,12 +255,18 @@ class KpiCard extends StatelessWidget {
                   value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTypography.kpi(size: 24, color: tone ?? c.foreground),
+                  style: AppTypography.kpi(
+                    size: 24,
+                    color: tone ?? c.foreground,
+                  ),
                 ),
               ),
               if (delta != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: deltaColor.withValues(alpha: 0.12),
                     borderRadius: R.rPill,
@@ -320,7 +319,10 @@ class KpiGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = (constraints.maxWidth / minTileWidth).floor().clamp(2, 6);
+        final columns = (constraints.maxWidth / minTileWidth).floor().clamp(
+          2,
+          6,
+        );
         return GridView.count(
           crossAxisCount: columns,
           crossAxisSpacing: Sp.md,
@@ -368,7 +370,10 @@ class Segmented<T> extends StatelessWidget {
               onTap: () => onChanged(o),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 160),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
                 decoration: BoxDecoration(
                   color: o == value ? c.card : Colors.transparent,
                   borderRadius: R.rSm,
