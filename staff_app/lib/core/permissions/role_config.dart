@@ -197,7 +197,6 @@ class RoleConfig {
     // room.read role reaches them), and `/room-types` is granted to GM/AGM via
     // extraRoutes — keeping every rooms_test surface boundary intact.
     Routes.settings,
-    Routes.roomSettings,
     Routes.accessDenied,
     Routes.welcome,
   };

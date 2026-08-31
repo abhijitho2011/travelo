@@ -126,9 +126,9 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                       ? PermissionGate(
                           permission: P.roomCreate,
                           child: FilledButton.icon(
-                            onPressed: () => context.go(Routes.roomSettings),
-                            icon: const Icon(Icons.settings_outlined, size: 16),
-                            label: const Text('Room settings'),
+                            onPressed: () => context.go(Routes.roomNew),
+                            icon: const Icon(Icons.add, size: 16),
+                            label: const Text('Add room'),
                           ),
                         )
                       : null,

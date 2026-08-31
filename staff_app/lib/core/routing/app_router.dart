@@ -54,7 +54,6 @@ import '../../features/restaurant/presentation/menu_management_screen.dart';
 import '../../features/restaurant/presentation/tables_management_screen.dart';
 import '../../features/rooms/presentation/bulk_rooms_screen.dart';
 import '../../features/rooms/presentation/room_type_workspace_screen.dart';
-import '../../features/rooms/presentation/room_settings_screen.dart';
 import '../../features/rooms/presentation/units_screen.dart';
 import '../../features/rooms/presentation/rooms_screen.dart';
 import '../../features/sales/presentation/sales_screen.dart';
@@ -291,10 +290,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: Routes.settings,
             builder: (_, _) => const SettingsScreen(),
-          ),
-          GoRoute(
-            path: Routes.roomSettings,
-            builder: (_, _) => const RoomSettingsScreen(),
           ),
 
           // ------------------- operations domains ---------------------------

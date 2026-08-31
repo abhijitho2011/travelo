@@ -280,6 +280,23 @@ export class CreateRoomDto {
 
   @IsString() @Length(1, 32) @Matches(ROOM_NUMBER) number!: string;
 
+  /**
+   * Several rooms that are IDENTICAL — same specifications, same photos.
+   *
+   * When present with more than one number, one shared room type is minted and
+   * every number becomes a room under it, so the spec sheet and its images are
+   * entered once. A single number (or none) is the ordinary room-first case,
+   * where the room is unique and gets a private type of its own. `number` is
+   * still required as the first/only room, so an older client keeps working.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAX_BULK_ROOMS)
+  @IsString({ each: true })
+  @Length(1, 32, { each: true })
+  @Matches(ROOM_NUMBER, { each: true })
+  numbers?: string[];
+
   @IsOptional() @IsString() @Length(1, 16) floor?: string;
 
   @IsOptional() @IsIn(roomStatusValues) status?: (typeof roomStatusValues)[number];

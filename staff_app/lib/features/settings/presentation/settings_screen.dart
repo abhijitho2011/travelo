@@ -16,7 +16,7 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
-    final canReadRooms = ref.watch(canProvider(P.roomRead));
+    final canAddRooms = ref.watch(canProvider(P.roomCreate));
 
     return PageBody(
       children: [
@@ -47,17 +47,17 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 onTap: () => context.go(Routes.support),
               ),
-              if (canReadRooms) ...[
+              if (canAddRooms) ...[
                 const RowDivider(),
                 ListTile(
-                  leading: const Icon(Icons.meeting_room_outlined, size: 20),
-                  title: const Text('Room settings'),
+                  leading: const Icon(Icons.add, size: 20),
+                  title: const Text('Add room'),
                   trailing: Icon(
                     Icons.chevron_right,
                     size: 18,
                     color: c.mutedForeground,
                   ),
-                  onTap: () => context.go(Routes.roomSettings),
+                  onTap: () => context.go(Routes.roomNew),
                 ),
               ],
             ],

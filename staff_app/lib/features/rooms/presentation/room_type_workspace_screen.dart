@@ -222,6 +222,14 @@ class _RoomTypeWorkspaceScreenState
   /// Room identity — the fields that belong to the physical room rather than
   /// to its specifications.
   String _number = '';
+
+  /// The number field split into individual room numbers. Several identical
+  /// rooms are entered as "201, 202, 203" — comma or space separated.
+  List<String> get _roomNumbers => _number
+      .split(RegExp(r'[,\s]+'))
+      .map((n) => n.trim())
+      .where((n) => n.isNotEmpty)
+      .toList();
   String _floor = '';
   String _roomNotes = '';
   RoomStatus _roomStatus = RoomStatus.available;
@@ -265,7 +273,7 @@ class _RoomTypeWorkspaceScreenState
   String? _validate() {
     final d = _draft;
     if (_isRoomMode) {
-      if (_number.trim().isEmpty) return 'Give this room a number.';
+      if (_roomNumbers.isEmpty) return 'Give this room a number.';
     } else if (d.name.trim().isEmpty) {
       return 'Give this room type a name.';
     }
@@ -374,9 +382,11 @@ class _RoomTypeWorkspaceScreenState
       return;
     }
 
+    final numbers = _roomNumbers;
     final created = await actions.create(
       NewRoom(
-        number: number,
+        number: numbers.first,
+        numbers: numbers,
         specs: _draft.toPayload(),
         floor: int.tryParse(_floor.trim()),
         status: _roomStatus,
@@ -386,6 +396,22 @@ class _RoomTypeWorkspaceScreenState
     );
     if (!mounted) return;
     setState(() => _dirty = false);
+
+    if (numbers.length > 1) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '${numbers.length} rooms created — add the shared photos once.',
+          ),
+        ),
+      );
+      // Several identical rooms share ONE type, and their photos belong to that
+      // type so every room shows them. So we open the shared type, where the
+      // photo gallery uploads once for all of them.
+      router.go(Routes.roomType(created.roomTypeId));
+      return;
+    }
+
     messenger.showSnackBar(
       SnackBar(content: Text('Room ${created.number} created successfully.')),
     );
@@ -615,15 +641,41 @@ class _RoomTypeWorkspaceScreenState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _Field(
-          label: 'Room number',
+          // A room already saved has one number; only a NEW room may describe
+          // several identical rooms at once.
+          label: widget.roomId == null ? 'Room number(s)' : 'Room number',
           required: true,
           child: TextFormField(
             initialValue: _number,
             textCapitalization: TextCapitalization.characters,
-            decoration: const InputDecoration(hintText: '201, 3A, G-12'),
+            decoration: InputDecoration(
+              hintText: widget.roomId == null
+                  ? '201  or  201, 202, 203'
+                  : '201',
+            ),
             onChanged: (v) => _touch(() => _number = v),
           ),
         ),
+        if (widget.roomId == null) ...[
+          const SizedBox(height: Sp.xs),
+          Builder(
+            builder: (context) {
+              final n = _roomNumbers.length;
+              final c = context.colors;
+              return Text(
+                n > 1
+                    ? '$n identical rooms — one spec sheet and one set of photos, '
+                          'shared by all of them.'
+                    : 'One number for a unique room. Several (201, 202, 203) if '
+                          'they are identical.',
+                style: AppTypography.body(
+                  size: 11,
+                  color: n > 1 ? c.primary : c.mutedForeground,
+                ),
+              );
+            },
+          ),
+        ],
         gapMd,
         _Field(
           label: 'Floor',

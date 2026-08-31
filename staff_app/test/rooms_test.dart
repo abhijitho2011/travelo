@@ -659,7 +659,8 @@ void main() {
       ]) {
         final config = RoleConfig.of(role);
         // The board is still a More destination; the catalogue has moved into
-        // the Room settings hub, so it reaches the role through extraRoutes
+        // the room-type workspace (reachable by deep link), so it reaches
+        // the role through extraRoutes
         // rather than a More entry — but it must stay in allowedRoutes so the
         // hub can link to it and the guard admits it.
         expect(moreRoutesOf(role), contains(Routes.rooms), reason: role.wire);

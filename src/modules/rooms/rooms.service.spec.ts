@@ -387,6 +387,33 @@ describe('room-first inventory', () => {
     expect(written?.values).toMatchObject({ name: 'Room 301' });
   });
 
+  it('several identical numbers mint ONE shared type and a room for each', async () => {
+    const db = mockDb({
+      select: {
+        rooms: [[], [{ count: 3 }]],
+        room_types: [[typeRow], [typeRow]],
+        amenities: [[]],
+      },
+      insert: {
+        room_types: [typeRow],
+        rooms: [roomRow({ number: '201' }), roomRow({ number: '202' })],
+      },
+      update: { properties: [] },
+    });
+    const res = await svc(db).create(MY_PROPERTY, {
+      number: '201',
+      numbers: ['201', '202'],
+      specs,
+    } as never);
+    // A shared type, NOT private — several rooms genuinely share it, and its
+    // photos then serve as every room's cover.
+    const type = db.inserts.find((i) => i.table === 'room_types');
+    expect(type?.values).toMatchObject({ isPrivate: false });
+    const roomInsert = db.inserts.find((i) => i.table === 'rooms');
+    expect((roomInsert?.values as unknown as unknown[]).length).toBe(2);
+    expect(res.created).toBe(2);
+  });
+
   it('refuses a room that is both grouped and unique, and one that is neither', async () => {
     await expect(
       svc(mockDb({})).create(MY_PROPERTY, { number: '301', roomTypeId: TYPE_ID, specs } as never),

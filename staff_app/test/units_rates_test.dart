@@ -318,6 +318,23 @@ void main() {
       expect(json.containsKey('specs'), isFalse);
     });
 
+    test(
+      'one number is a unique room; several are shared and sent as a batch',
+      () {
+        final one = const NewRoom(number: '201').toJson();
+        expect(one.containsKey('numbers'), isFalse);
+
+        final many = const NewRoom(
+          number: '201',
+          numbers: ['201', '202', '203'],
+        ).toJson();
+        // The batch numbers ride along only when there is genuinely more than one
+        // — the server reads that as "mint one shared type, a room for each".
+        expect(many['numbers'], ['201', '202', '203']);
+        expect(many['number'], '201');
+      },
+    );
+
     test('a room parses its own specification sheet and cover photo', () {
       final room = Room.fromJson({
         'id': 'r1',

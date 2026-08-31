@@ -7,6 +7,7 @@ import {
   roomAmenities,
   rooms,
   roomTypes,
+  roomTypePhotos,
   roomPhotos,
   type Amenity,
   type Room,
@@ -151,7 +152,7 @@ export class RoomsService {
 
     const typeAmenities = await this.roomTypesService.amenitiesByType(typeIds);
     const extras = await this.extrasByRoom(rows.map((r) => r.id));
-    const covers = await this.coverPhotoUrls(rows.map((r) => r.id));
+    const covers = await this.coverPhotoUrls(rows);
 
     return rows.map((r) => {
       const type = typeById.get(r.roomTypeId);
@@ -175,22 +176,41 @@ export class RoomsService {
    * One presigned URL per room that has a primary photo. A single query for the
    * page — the list screen must not sign URLs room by room.
    */
-  private async coverPhotoUrls(roomIds: string[]): Promise<Map<string, string>> {
-    if (roomIds.length === 0) return new Map();
-    const rows = await this.db
-      .select({ roomId: roomPhotos.roomId, storageKey: roomPhotos.storageKey })
-      .from(roomPhotos)
-      .where(and(inArray(roomPhotos.roomId, roomIds), eq(roomPhotos.isPrimary, true)));
+  private async coverPhotoUrls(roomRows: Room[]): Promise<Map<string, string>> {
+    if (roomRows.length === 0) return new Map();
+    const roomIds = roomRows.map((r) => r.id);
+    const typeIds = [...new Set(roomRows.map((r) => r.roomTypeId))];
+
+    // A room's own primary photo wins; a room with none inherits its type's —
+    // which is how several identical rooms created together share one image
+    // without copying the bytes onto each row.
+    const [ownRows, typeRows] = await Promise.all([
+      this.db
+        .select({ roomId: roomPhotos.roomId, storageKey: roomPhotos.storageKey })
+        .from(roomPhotos)
+        .where(and(inArray(roomPhotos.roomId, roomIds), eq(roomPhotos.isPrimary, true))),
+      this.db
+        .select({ roomTypeId: roomTypePhotos.roomTypeId, storageKey: roomTypePhotos.storageKey })
+        .from(roomTypePhotos)
+        .where(
+          and(inArray(roomTypePhotos.roomTypeId, typeIds), eq(roomTypePhotos.isPrimary, true)),
+        ),
+    ]);
+
+    const ownKey = new Map(ownRows.map((r) => [r.roomId, r.storageKey]));
+    const typeKey = new Map(typeRows.map((r) => [r.roomTypeId, r.storageKey]));
 
     const out = new Map<string, string>();
     await Promise.all(
-      rows.map(async (r) => {
+      roomRows.map(async (room) => {
+        const key = ownKey.get(room.id) ?? typeKey.get(room.roomTypeId);
+        if (!key) return;
         // A signing failure must not take the whole room list down with it; the
         // room simply renders without a cover, exactly as one with no photo.
         const url = await this.storage
-          .getSignedUrl(r.storageKey, ROOM_TYPE_PHOTO_URL_TTL_SECONDS)
+          .getSignedUrl(key, ROOM_TYPE_PHOTO_URL_TTL_SECONDS)
           .catch(() => null);
-        if (url) out.set(r.roomId, url);
+        if (url) out.set(room.id, url);
       }),
     );
     return out;
@@ -253,7 +273,45 @@ export class RoomsService {
     if (taken) throw RoomErrors.roomNumberTaken(number);
   }
 
-  private async resolveTypeForNewRoom(propertyId: string, dto: CreateRoomDto): Promise<string> {
+  /** The same check for a whole set, reporting the FIRST clash by number. */
+  private async assertRoomNumbersFree(propertyId: string, numbers: string[]): Promise<void> {
+    const clash = await this.db
+      .select({ number: rooms.number })
+      .from(rooms)
+      .where(
+        and(
+          eq(rooms.propertyId, propertyId),
+          isNull(rooms.deletedAt),
+          inArray(rooms.number, numbers),
+        ),
+      )
+      .limit(1);
+    if (clash.length) throw RoomErrors.roomNumberTaken(clash[0].number);
+  }
+
+  /**
+   * The rooms this request asks to create: `numbers` when it carries several
+   * identical rooms, otherwise the single `number`. De-duplicated — "201, 201"
+   * is one room, and the unique index would trip on it otherwise.
+   */
+  private static roomNumbersOf(dto: CreateRoomDto): string[] {
+    const list = dto.numbers?.length ? dto.numbers : [dto.number];
+    return [...new Set(list.map((n) => n.trim()).filter(Boolean))];
+  }
+
+  /**
+   * Resolve the type these rooms sit under.
+   *
+   * Room-first is the normal path: the request describes the rooms, and a type
+   * is minted for them. That type is PRIVATE only when it belongs to exactly
+   * one room — several rooms sharing one spec is a genuinely shared type, so it
+   * is not marked private (its photos then serve as every room's cover).
+   */
+  private async resolveTypeForNewRooms(
+    propertyId: string,
+    dto: CreateRoomDto,
+    numbers: string[],
+  ): Promise<string> {
     if (dto.roomTypeId && dto.specs) throw RoomErrors.roomSpecsAmbiguous();
     if (!dto.roomTypeId && !dto.specs) throw RoomErrors.roomSpecsMissing();
 
@@ -262,57 +320,73 @@ export class RoomsService {
       return dto.roomTypeId;
     }
 
-    // A private type is named after the room it belongs to when the request
-    // does not name it, so the rows stay readable to anyone reading the table
-    // directly. It is never offered as a type to file other rooms under.
     const specs = dto.specs!;
+    const shared = numbers.length > 1;
     const created = await this.roomTypesService.create(
       propertyId,
-      { ...specs, name: specs.name?.trim() || `Room ${dto.number}` },
-      { isPrivate: true },
+      {
+        ...specs,
+        name:
+          specs.name?.trim() ||
+          (shared ? `Rooms ${numbers[0]}–${numbers[numbers.length - 1]}` : `Room ${numbers[0]}`),
+      },
+      { isPrivate: !shared },
     );
     return created.id;
   }
 
   async create(propertyId: string, dto: CreateRoomDto) {
-    // The number is checked BEFORE a private type is minted: finding out the
-    // room number was taken afterwards would leave an orphan type behind.
-    await this.assertRoomNumberFree(propertyId, dto.number);
-    const roomTypeId = await this.resolveTypeForNewRoom(propertyId, dto);
+    const numbers = RoomsService.roomNumbersOf(dto);
+    if (numbers.length === 0) throw RoomErrors.roomSpecsMissing();
+
+    // Numbers are checked BEFORE a type is minted: finding out a number was
+    // taken afterwards would leave an orphan type behind.
+    await this.assertRoomNumbersFree(propertyId, numbers);
+    const roomTypeId = await this.resolveTypeForNewRooms(propertyId, dto, numbers);
     const extras = await this.amenityCatalogue.resolveForScope(dto.amenityIds ?? [], 'ROOM');
 
-    const { row, roomCount } = await this.db.transaction(async (tx) => {
-      let created: Room;
+    const { rows, roomCount } = await this.db.transaction(async (tx) => {
+      let inserted: Room[];
       try {
-        [created] = await tx
+        inserted = await tx
           .insert(rooms)
-          .values({
-            propertyId,
-            roomTypeId,
-            number: dto.number,
-            floor: dto.floor ?? null,
-            status: dto.status ?? 'AVAILABLE',
-            notes: dto.notes ?? null,
-          })
+          .values(
+            numbers.map((number) => ({
+              propertyId,
+              roomTypeId,
+              number,
+              floor: dto.floor ?? null,
+              status: dto.status ?? ('AVAILABLE' as RoomStatus),
+              notes: dto.notes ?? null,
+            })),
+          )
           .returning();
       } catch (err) {
         if ((err as { code?: string }).code === '23505') {
-          throw RoomErrors.roomNumberTaken(dto.number);
+          throw RoomErrors.roomNumberTaken(numbers[0]);
         }
         throw err;
       }
       if (extras.length) {
+        // The same per-room extras on every room of the batch — they are
+        // identical rooms, which is the whole reason they were created together.
         await tx
           .insert(roomAmenities)
-          .values(extras.map((a) => ({ roomId: created.id, amenityId: a.id })));
+          .values(inserted.flatMap((r) => extras.map((a) => ({ roomId: r.id, amenityId: a.id }))));
       }
-      // Same transaction as the insert — the count and the room commit together.
       const count = await RoomsService.recountRooms(tx as unknown as Tx, propertyId);
-      return { row: created, roomCount: count };
+      return { rows: inserted, roomCount: count };
     });
 
-    const [created] = await this.hydrate([row]);
-    return { ...created, propertyRoomCount: roomCount };
+    const hydrated = await this.hydrate(rows);
+    // The first room keeps the original single-room return shape, so existing
+    // callers are unchanged; the batch fields describe the rest.
+    return {
+      ...hydrated[0],
+      propertyRoomCount: roomCount,
+      created: hydrated.length,
+      items: hydrated,
+    };
   }
 
   /**

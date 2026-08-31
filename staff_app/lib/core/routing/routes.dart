@@ -57,7 +57,6 @@ class Routes {
   // inherits `/room-types` — the two never collide because `/room-types` does
   // not start with `/rooms`.
   static const rooms = '/rooms';
-  static const roomSettings = '/room-settings';
   static const roomNew = '/rooms/new';
   static const roomBulk = '/rooms/bulk';
   static const roomPattern = '/rooms/:id';

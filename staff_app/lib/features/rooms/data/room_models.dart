@@ -900,6 +900,7 @@ class NewRoom {
   const NewRoom({
     this.roomTypeId,
     required this.number,
+    this.numbers = const <String>[],
     this.specs,
     this.floor,
     this.status,
@@ -915,6 +916,11 @@ class NewRoom {
   /// This room's own specifications — occupancy, beds, size, rate, policies.
   final Map<String, dynamic>? specs;
 
+  /// Several identical rooms to create at once — same specs, same photos. When
+  /// it holds more than one number the server mints one SHARED type and a room
+  /// for each; a single number is the ordinary unique-room case.
+  final List<String> numbers;
+
   final String number;
   final int? floor;
   final RoomStatus? status;
@@ -926,6 +932,7 @@ class NewRoom {
   Map<String, dynamic> toJson() => {
     if (roomTypeId != null) 'roomTypeId': roomTypeId,
     if (specs != null) 'specs': specs,
+    if (numbers.length > 1) 'numbers': numbers,
     'number': number,
     if (floor != null) 'floor': floor,
     if (status != null) 'status': status!.wire,
