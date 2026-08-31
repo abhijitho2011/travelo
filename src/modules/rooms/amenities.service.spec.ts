@@ -1,5 +1,6 @@
 import { mockDb, sqlText, type MockDb } from '../owner-auth/testing/db.mock';
 import { AmenitiesService } from './amenities.service';
+import { StorageService } from '../storage/storage.service';
 import { RoomsService } from './rooms.service';
 import { RoomTypesService } from './room-types.service';
 import { effectiveAmenities } from './effective-amenities';
@@ -137,7 +138,11 @@ describe('archiving an amenity does not break rooms already using it', () => {
       },
     });
     const amenities = new AmenitiesService(db as unknown as Database);
-    const roomTypes = new RoomTypesService(db as unknown as Database, amenities);
+    const roomTypes = new RoomTypesService(
+      db as unknown as Database,
+      amenities,
+      new StorageService({}),
+    );
     const rooms = new RoomsService(db as unknown as Database, roomTypes, amenities);
 
     const dto = await rooms.get('p1', 'room-1');

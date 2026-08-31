@@ -7,10 +7,13 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
   VERSION_NEUTRAL,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { StaffJwtGuard } from '../staff-auth/staff-jwt.guard';
 import {
   RequireStaffPermissions,
@@ -22,14 +25,21 @@ import { AmenitiesService } from './amenities.service';
 import { RoomTypesService } from './room-types.service';
 import { RoomsService } from './rooms.service';
 import {
+  MAX_PHOTO_BYTES,
+  RoomTypePhotosService,
+  type UploadedRoomTypePhoto,
+} from './room-type-photos.service';
+import {
   BulkCreateRoomsDto,
   CreateRoomDto,
+  ReorderRoomTypePhotosDto,
   RoomFilterDto,
   RoomTypeFilterDto,
   RoomTypeInputDto,
   SetRoomStatusDto,
   UpdateRoomDto,
   UpdateRoomTypeDto,
+  UploadRoomTypePhotoDto,
 } from './dto';
 
 /**
@@ -46,6 +56,7 @@ import {
 export class StaffRoomTypesController {
   constructor(
     private readonly roomTypes: RoomTypesService,
+    private readonly photos: RoomTypePhotosService,
     private readonly audit: AuditService,
   ) {}
 
@@ -112,6 +123,113 @@ export class StaffRoomTypesController {
       actorRole: me.role,
     });
     return { id: res.id, deleted: res.deleted };
+  }
+
+  // ---------- Photos ----------
+  //
+  // Reading the gallery is `roomtype.read`, like every other read on this
+  // controller; ADDING, REORDERING, RE-POINTING and DELETING a photo are all
+  // `roomtype.update`, because each of them changes what the hotel advertises.
+  // There is no separate photo permission: a manager who may edit the type may
+  // edit its pictures, and nobody else may do either.
+
+  @Get(':id/photos')
+  @RequireStaffPermissions('roomtype.read')
+  listPhotos(@CurrentStaff() me: AuthenticatedStaff, @Param('id') id: string) {
+    return this.photos.list(me.propertyId, id);
+  }
+
+  /**
+   * Multipart: `file` plus an optional `category`. Multer's own `fileSize`
+   * limit is the first line of defence — it stops the bytes at the socket — and
+   * the service re-checks mime and size before writing anything, so a caller
+   * that bypasses the interceptor gets the same refusal.
+   */
+  @Post(':id/photos')
+  @RequireStaffPermissions('roomtype.update')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_PHOTO_BYTES, files: 1 } }))
+  async addPhoto(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @UploadedFile() file: UploadedRoomTypePhoto | undefined,
+    @Body() dto: UploadRoomTypePhotoDto,
+  ) {
+    const photo = await this.photos.upload(me.propertyId, id, file, dto?.category);
+    await this.audit.record({
+      action: 'staff.roomtype.photo_added',
+      entity: 'room_type',
+      entityId: id,
+      after: { photoId: photo.id, category: photo.category, sizeBytes: photo.sizeBytes },
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return photo;
+  }
+
+  /**
+   * Declared BEFORE the `:photoId` routes so "order" is never read as a photo
+   * id — the same rule /rooms/bulk follows.
+   */
+  @Patch(':id/photos/order')
+  @RequireStaffPermissions('roomtype.update')
+  async reorderPhotos(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @Body() dto: ReorderRoomTypePhotosDto,
+  ) {
+    const photos = await this.photos.reorder(me.propertyId, id, dto.ids);
+    await this.audit.record({
+      action: 'staff.roomtype.photos_reordered',
+      entity: 'room_type',
+      entityId: id,
+      after: { ids: dto.ids },
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return photos;
+  }
+
+  @Post(':id/photos/:photoId/primary')
+  @RequireStaffPermissions('roomtype.update')
+  async setPrimaryPhoto(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @Param('photoId') photoId: string,
+  ) {
+    const photo = await this.photos.setPrimary(me.propertyId, id, photoId);
+    await this.audit.record({
+      action: 'staff.roomtype.photo_primary_set',
+      entity: 'room_type',
+      entityId: id,
+      after: { photoId },
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return photo;
+  }
+
+  @Delete(':id/photos/:photoId')
+  @RequireStaffPermissions('roomtype.update')
+  async removePhoto(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @Param('photoId') photoId: string,
+  ) {
+    const res = await this.photos.remove(me.propertyId, id, photoId);
+    await this.audit.record({
+      action: 'staff.roomtype.photo_deleted',
+      entity: 'room_type',
+      entityId: id,
+      before: { photoId },
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return res;
   }
 }
 

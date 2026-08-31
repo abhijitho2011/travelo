@@ -13,13 +13,18 @@ import {
   Matches,
   Max,
   Min,
+  ArrayMinSize,
+  ValidateNested,
 } from 'class-validator';
 import {
   amenityScopeValues,
   amenityStatusValues,
   bedTypeValues,
   roomStatusValues,
+  roomTypePhotoCategoryValues,
   roomTypeStatusValues,
+  sizeUnitValues,
+  smokingPolicyValues,
   unitKindValues,
 } from '../../database/schema';
 
@@ -68,7 +73,67 @@ export class AmenityFilterDto {
 
 // ---------- Room types ----------
 
-export class RoomTypeInputDto {
+/**
+ * One row of the sleeping arrangement. Sent as an ordered array; the FIRST
+ * entry is the primary bed and is what `room_types.bed_type` / `bed_count` get
+ * synced from, so existing readers of that pair keep working.
+ */
+export class RoomTypeBedDto {
+  @IsIn(bedTypeValues) bedType!: (typeof bedTypeValues)[number];
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(20) quantity?: number;
+}
+
+/**
+ * Everything the room-type form collects beyond name/rate. EVERY field is
+ * optional on both create and update: the villa fields and the original
+ * required set keep working untouched, and a client that knows nothing about
+ * these columns keeps sending exactly what it sent before.
+ */
+class RoomTypeDetailFieldsDto {
+  /** Internal code ("DLX-KING"). Unique per hotel when set. */
+  @IsOptional() @IsString() @Length(1, 32) code?: string;
+
+  @IsOptional() @IsString() @Length(1, 64) floorLabel?: string;
+
+  @IsOptional() @IsIn(smokingPolicyValues) smokingPolicy?: (typeof smokingPolicyValues)[number];
+
+  @IsOptional() @IsBoolean() accessible?: boolean;
+
+  /** Size AS TYPED. The server converts to `sizeSqft`, which stays canonical. */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(1_000_000) sizeValue?: number;
+
+  @IsOptional() @IsIn(sizeUnitValues) sizeUnit?: (typeof sizeUnitValues)[number];
+
+  /** Guests included in the base rate. Must be <= maxOccupancy. */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(50) baseOccupancy?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(50) maxInfants?: number;
+
+  @IsOptional() @IsBoolean() extraBedAvailable?: boolean;
+
+  @IsOptional() @IsIn(bedTypeValues) extraBedType?: (typeof bedTypeValues)[number];
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(20) extraBedCapacity?: number;
+
+  /** Paise. 0 means "free extra bed", not "unpriced". */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(100_000_000) extraBedPricePaise?: number;
+
+  @IsOptional() @IsBoolean() dynamicPricingEnabled?: boolean;
+
+  @IsOptional() @IsBoolean() pricesIncludeTax?: boolean;
+
+  /** Present = REPLACE the whole arrangement. Absent = leave it untouched. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(12)
+  @ValidateNested({ each: true })
+  @Type(() => RoomTypeBedDto)
+  beds?: RoomTypeBedDto[];
+}
+
+export class RoomTypeInputDto extends RoomTypeDetailFieldsDto {
   @IsString() @Length(1, 128) name!: string;
 
   @IsOptional() @IsString() @Length(0, 2000) description?: string;
@@ -114,7 +179,7 @@ export class RoomTypeInputDto {
   amenityIds?: string[];
 }
 
-export class UpdateRoomTypeDto {
+export class UpdateRoomTypeDto extends RoomTypeDetailFieldsDto {
   @IsOptional() @IsString() @Length(1, 128) name?: string;
 
   @IsOptional() @IsString() @Length(0, 2000) description?: string;
@@ -151,6 +216,24 @@ export class UpdateRoomTypeDto {
   @ArrayMaxSize(100)
   @IsUUID('4', { each: true })
   amenityIds?: string[];
+}
+
+// ---------- Room type photos ----------
+
+/** Multipart field alongside `file`; defaults to ROOM when omitted. */
+export class UploadRoomTypePhotoDto {
+  @IsOptional()
+  @IsIn(roomTypePhotoCategoryValues)
+  category?: (typeof roomTypePhotoCategoryValues)[number];
+}
+
+/** The complete desired order — `sort_order` becomes the index in this array. */
+export class ReorderRoomTypePhotosDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(50)
+  @IsUUID('4', { each: true })
+  ids!: string[];
 }
 
 export class RoomTypeFilterDto {

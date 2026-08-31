@@ -3,6 +3,7 @@ import { mockDb, sqlText, type MockDb } from '../owner-auth/testing/db.mock';
 import { RoomsService } from './rooms.service';
 import { RoomTypesService } from './room-types.service';
 import { AmenitiesService } from './amenities.service';
+import { StorageService } from '../storage/storage.service';
 import type { Database } from '../../database/database.module';
 
 const MY_PROPERTY = 'prop-mine';
@@ -11,7 +12,11 @@ const TYPE_ID = '11111111-1111-4111-8111-111111111111';
 
 function svc(db: MockDb) {
   const amenities = new AmenitiesService(db as unknown as Database);
-  const roomTypes = new RoomTypesService(db as unknown as Database, amenities);
+  const roomTypes = new RoomTypesService(
+    db as unknown as Database,
+    amenities,
+    new StorageService({}),
+  );
   return new RoomsService(db as unknown as Database, roomTypes, amenities);
 }
 

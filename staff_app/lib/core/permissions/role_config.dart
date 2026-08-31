@@ -284,6 +284,16 @@ class RoleConfig {
     requires: [P.roomRead],
   );
 
+  /// The accommodation inventory: room types, their physical units, and the
+  /// rate plans they are sold on. Gated on roomtype.read, which only the GM and
+  /// the AGM hold.
+  static const _unitsMore = NavItem(
+    label: 'Units / Rooms & Rates',
+    icon: Icons.meeting_room_outlined,
+    route: Routes.roomTypes,
+    requires: [P.roomTypeRead],
+  );
+
   static const _myTasksMore = NavItem(
     label: 'My tasks',
     icon: Icons.checklist_outlined,
@@ -385,6 +395,7 @@ class RoleConfig {
         ),
       ],
       moreMenu: const [
+        _unitsMore,
         _roomsMore,
         NavItem(
           label: 'Housekeeping',
@@ -481,6 +492,7 @@ class RoleConfig {
         ),
       ],
       moreMenu: const [
+        _unitsMore,
         _roomsMore,
         NavItem(
           label: 'Housekeeping',

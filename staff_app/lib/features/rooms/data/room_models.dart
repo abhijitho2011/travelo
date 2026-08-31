@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/utils/formatting.dart';
 import '../../../core/widgets/status_badge.dart';
+import 'unit_models.dart';
 
 // ---------------------------------------------------------------- parsing --
 //
@@ -131,7 +132,13 @@ enum BedType {
   doubleBed('DOUBLE', 'Double'),
   queen('QUEEN', 'Queen'),
   king('KING', 'King'),
-  bunk('BUNK', 'Bunk');
+  // 'BUNK' is the wire value this app has always sent; the sleeping-arrangement
+  // rows below extend the list rather than renaming it, so old rows keep reading.
+  bunk('BUNK', 'Bunk bed'),
+  sofaBed('SOFA_BED', 'Sofa bed'),
+  extraBed('EXTRA_BED', 'Extra bed'),
+  crib('CRIB', 'Crib'),
+  other('OTHER', 'Other');
 
   const BedType(this.wire, this.label);
 
@@ -237,6 +244,35 @@ enum UnitKind {
       _wire(value) == UnitKind.villa.wire ? UnitKind.villa : UnitKind.room;
 }
 
+/// One row of the sleeping arrangement: "King × 1", "Single × 2".
+@immutable
+class BedRow {
+  const BedRow({required this.bedType, this.quantity = 1, this.id});
+
+  final String? id;
+  final BedType bedType;
+  final int quantity;
+
+  BedRow copyWith({BedType? bedType, int? quantity}) => BedRow(
+    id: id,
+    bedType: bedType ?? this.bedType,
+    quantity: quantity ?? this.quantity,
+  );
+
+  factory BedRow.fromJson(Map json) => BedRow(
+    id: _str(json['id']),
+    bedType: BedType.fromWire(_str(_pick(json, ['bedType', 'bed_type']))),
+    quantity: _int(json['quantity'], 1),
+  );
+
+  Map<String, dynamic> toJson() => {
+    'bedType': bedType.wire,
+    'quantity': quantity,
+  };
+
+  String get label => '${bedType.label} × $quantity';
+}
+
 /// A row from `GET /room-types` — one sellable category of room.
 @immutable
 class RoomType {
@@ -262,6 +298,24 @@ class RoomType {
     this.roomCount = 0,
     this.createdAt,
     this.updatedAt,
+    this.code,
+    this.floorLabel,
+    this.accommodationType = AccommodationType.room,
+    this.smokingPolicy = SmokingPolicy.nonSmoking,
+    this.accessible = false,
+    this.sizeValue,
+    this.sizeUnit = SizeUnit.sqft,
+    this.baseOccupancy = 2,
+    this.maxInfants = 0,
+    this.extraBedAvailable = false,
+    this.extraBedType,
+    this.extraBedCapacity,
+    this.extraBedPricePaise,
+    this.dynamicPricingEnabled = false,
+    this.pricesIncludeTax = false,
+    this.beds = const <BedRow>[],
+    this.primaryPhotoUrl,
+    this.unitCount,
   });
 
   final String id;
@@ -300,6 +354,68 @@ class RoomType {
   final int roomCount;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+
+  /// The hotel's own reference for this type, e.g. DLX-KING. Optional, and
+  /// unique within the property when set.
+  final String? code;
+
+  /// Free text — "2nd floor, sea wing". Not the same as a room's own floor.
+  final String? floorLabel;
+
+  /// What the type is sold as. [unitKind] stays the narrower ROOM|VILLA flag
+  /// the pricing and occupancy maths key off; this is the guest-facing shape.
+  final AccommodationType accommodationType;
+  final SmokingPolicy smokingPolicy;
+  final bool accessible;
+
+  /// Floor size in [sizeUnit]. The server also keeps [sizeSqft] in step, so
+  /// screens that only know square feet keep working.
+  final int? sizeValue;
+  final SizeUnit sizeUnit;
+
+  /// Guests included in the base rate, as opposed to [maxOccupancy], which is
+  /// the most the room may ever hold.
+  final int baseOccupancy;
+  final int maxInfants;
+
+  final bool extraBedAvailable;
+  final BedType? extraBedType;
+  final int? extraBedCapacity;
+
+  /// Paise, charged on top of the room rate — never folded into it.
+  final int? extraBedPricePaise;
+
+  final bool dynamicPricingEnabled;
+
+  /// Whether the quoted rate already contains taxes and fees.
+  final bool pricesIncludeTax;
+
+  /// The full sleeping arrangement. [bedType]/[bedCount] mirror the first row
+  /// so older screens and the rooms board keep reading one bed.
+  final List<BedRow> beds;
+
+  /// Presigned thumbnail for the list, when the type has a primary photo.
+  final String? primaryPhotoUrl;
+
+  /// Live unit count from the server. Falls back to [roomCount] when an older
+  /// API has not sent it.
+  final int? unitCount;
+
+  int get units => unitCount ?? roomCount;
+
+  /// "King Bed • 32 m²" — the line under the name on the list.
+  String get subtitleLine => [
+    beds.isNotEmpty ? beds.first.label : bedLabel,
+    if (sizeValue != null) '$sizeValue ${sizeUnit.label}',
+  ].join(' • ');
+
+  /// "2 adults + 2 children", the occupancy column.
+  String get occupancyMix => [
+    '$maxAdults ${maxAdults == 1 ? 'adult' : 'adults'}',
+    if (maxChildren > 0)
+      '$maxChildren ${maxChildren == 1 ? 'child' : 'children'}',
+    if (maxInfants > 0) '$maxInfants ${maxInfants == 1 ? 'infant' : 'infants'}',
+  ].join(' + ');
 
   bool get isArchived => status == RoomTypeStatus.archived;
 
@@ -356,6 +472,48 @@ class RoomType {
     roomCount: _int(_pick(json, ['roomCount', 'room_count'])),
     createdAt: _date(_pick(json, ['createdAt', 'created_at'])),
     updatedAt: _date(_pick(json, ['updatedAt', 'updated_at'])),
+    code: _str(json['code']),
+    floorLabel: _str(_pick(json, ['floorLabel', 'floor_label'])),
+    accommodationType: AccommodationType.fromWire(
+      _pick(json, ['accommodationType', 'accommodation_type', 'unitKind', 'unit_kind']),
+    ),
+    smokingPolicy: SmokingPolicy.fromWire(
+      _pick(json, ['smokingPolicy', 'smoking_policy']),
+    ),
+    accessible: _bool(json['accessible']),
+    sizeValue: _intOrNull(_pick(json, ['sizeValue', 'size_value'])) ??
+        _intOrNull(_pick(json, ['sizeSqft', 'size_sqft'])),
+    sizeUnit: SizeUnit.fromWire(_pick(json, ['sizeUnit', 'size_unit'])),
+    baseOccupancy: _int(_pick(json, ['baseOccupancy', 'base_occupancy']), 2),
+    maxInfants: _int(_pick(json, ['maxInfants', 'max_infants'])),
+    extraBedAvailable: _bool(
+      _pick(json, ['extraBedAvailable', 'extra_bed_available']),
+    ),
+    extraBedType: _pick(json, ['extraBedType', 'extra_bed_type']) == null
+        ? null
+        : BedType.fromWire(
+            _str(_pick(json, ['extraBedType', 'extra_bed_type'])),
+          ),
+    extraBedCapacity: _intOrNull(
+      _pick(json, ['extraBedCapacity', 'extra_bed_capacity']),
+    ),
+    extraBedPricePaise: _intOrNull(
+      _pick(json, ['extraBedPricePaise', 'extra_bed_price_paise']),
+    ),
+    dynamicPricingEnabled: _bool(
+      _pick(json, ['dynamicPricingEnabled', 'dynamic_pricing_enabled']),
+    ),
+    pricesIncludeTax: _bool(
+      _pick(json, ['pricesIncludeTax', 'prices_include_tax']),
+    ),
+    beds: json['beds'] is List
+        ? (json['beds'] as List)
+              .whereType<Map>()
+              .map(BedRow.fromJson)
+              .toList(growable: false)
+        : const <BedRow>[],
+    primaryPhotoUrl: _str(_pick(json, ['primaryPhotoUrl', 'primary_photo_url'])),
+    unitCount: _intOrNull(_pick(json, ['unitCount', 'unit_count'])),
   );
 
   Map<String, dynamic> toJson() => {
@@ -659,6 +817,7 @@ class NewRoomType {
     this.currency,
     this.sizeSqft,
     this.amenityIds = const <String>[],
+    this.extra = const <String, dynamic>{},
   });
 
   final String name;
@@ -679,6 +838,11 @@ class NewRoomType {
   final int? sizeSqft;
   final List<String> amenityIds;
 
+  /// Extra fields the extended room-type API accepts (code, occupancy detail,
+  /// beds, policies, pricing flags). Merged over the base payload on the way
+  /// out, so this class stays the stable core and the workspace can grow.
+  final Map<String, dynamic> extra;
+
   Map<String, dynamic> toJson() => {
     'name': name,
     if (description != null && description!.isNotEmpty)
@@ -696,6 +860,9 @@ class NewRoomType {
     if (currency != null && currency!.isNotEmpty) 'currency': currency,
     if (sizeSqft != null) 'sizeSqft': sizeSqft,
     if (amenityIds.isNotEmpty) 'amenityIds': amenityIds,
+    // Last, so the workspace's richer values win over the defaults above when
+    // it sends both.
+    ...extra,
   };
 }
 

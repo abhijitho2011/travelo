@@ -14,6 +14,7 @@ import {
 import { OwnerRoomsController } from './owner-rooms.controller';
 import { AmenitiesService } from './amenities.service';
 import { RoomTypesService } from './room-types.service';
+import { RoomTypePhotosService } from './room-type-photos.service';
 import { RoomsService } from './rooms.service';
 import { OwnerRoomsService } from './owner-rooms.service';
 
@@ -41,12 +42,13 @@ import { OwnerRoomsService } from './owner-rooms.service';
   providers: [
     AmenitiesService,
     RoomTypesService,
+    RoomTypePhotosService,
     RoomsService,
     OwnerRoomsService,
     StaffJwtGuard,
     StaffPermissionsGuard,
     OwnerJwtGuard,
   ],
-  exports: [AmenitiesService, RoomTypesService, RoomsService],
+  exports: [AmenitiesService, RoomTypesService, RoomTypePhotosService, RoomsService],
 })
 export class RoomsModule {}

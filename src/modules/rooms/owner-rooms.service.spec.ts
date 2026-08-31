@@ -1,6 +1,7 @@
 import { mockDb, sqlText, type MockDb } from '../owner-auth/testing/db.mock';
 import { OwnerRoomsService } from './owner-rooms.service';
 import { AmenitiesService } from './amenities.service';
+import { StorageService } from '../storage/storage.service';
 import { RoomTypesService } from './room-types.service';
 import { RoomsService } from './rooms.service';
 import type { Database } from '../../database/database.module';
@@ -12,7 +13,7 @@ const POOL = '44444444-4444-4444-8444-444444444444';
 function svc(db: MockDb) {
   const d = db as unknown as Database;
   const amenities = new AmenitiesService(d);
-  const roomTypes = new RoomTypesService(d, amenities);
+  const roomTypes = new RoomTypesService(d, amenities, new StorageService({}));
   // OwnerRoomsService recomputes the listing score after amenity changes; the
   // amenity tests don't assert on scoring, so a no-op stub suffices.
   const propertiesService = { recomputeCompleteness: async () => 0 } as never;

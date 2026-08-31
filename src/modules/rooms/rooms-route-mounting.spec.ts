@@ -17,6 +17,7 @@ import {
 import { OwnerRoomsController } from './owner-rooms.controller';
 import { AmenitiesService } from './amenities.service';
 import { RoomTypesService } from './room-types.service';
+import { RoomTypePhotosService } from './room-type-photos.service';
 import { RoomsService } from './rooms.service';
 import { OwnerRoomsService } from './owner-rooms.service';
 
@@ -45,6 +46,7 @@ describe('rooms surface route mounting', () => {
         OwnerJwtGuard,
         { provide: AmenitiesService, useValue: {} },
         { provide: RoomTypesService, useValue: {} },
+        { provide: RoomTypePhotosService, useValue: {} },
         { provide: RoomsService, useValue: {} },
         { provide: OwnerRoomsService, useValue: {} },
         { provide: AuditService, useValue: { record: async () => undefined } },
@@ -100,6 +102,24 @@ describe('rooms surface route mounting', () => {
     expect(has('GET', '/api/v1/staff/room-types/:id')).toBe(true);
     expect(has('PATCH', '/api/v1/staff/room-types/:id')).toBe(true);
     expect(has('DELETE', '/api/v1/staff/room-types/:id')).toBe(true);
+  });
+
+  it('mounts the room-type photo URLs under the same literal prefix', () => {
+    expect(has('GET', '/api/v1/staff/room-types/:id/photos')).toBe(true);
+    expect(has('POST', '/api/v1/staff/room-types/:id/photos')).toBe(true);
+    expect(has('PATCH', '/api/v1/staff/room-types/:id/photos/order')).toBe(true);
+    expect(has('POST', '/api/v1/staff/room-types/:id/photos/:photoId/primary')).toBe(true);
+    expect(has('DELETE', '/api/v1/staff/room-types/:id/photos/:photoId')).toBe(true);
+  });
+
+  // "order" must be registered before anything that would read it as an id.
+  it('declares /photos/order BEFORE any /photos/:photoId route', () => {
+    const order = routes.findIndex(
+      (r) => r.method === 'PATCH' && r.path === '/api/v1/staff/room-types/:id/photos/order',
+    );
+    const byId = routes.findIndex((r) => r.path.includes('/photos/:photoId'));
+    expect(order).toBeGreaterThanOrEqual(0);
+    expect(order).toBeLessThan(byId);
   });
 
   it('mounts the staff room URLs, including bulk and the narrow status route', () => {

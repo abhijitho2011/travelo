@@ -26,6 +26,7 @@ import { ManagementModule } from './modules/management/management.module';
 import { GuestsModule } from './modules/guests/guests.module';
 import { StaffExportModule } from './modules/staff-export/staff-export.module';
 import { RatesModule } from './modules/rates/rates.module';
+import { RatePlansModule } from './modules/rate-plans/rate-plans.module';
 import { GroupsModule } from './modules/groups/groups.module';
 import { HousekeepingModule } from './modules/housekeeping/housekeeping.module';
 import { RestaurantModule } from './modules/restaurant/restaurant.module';
@@ -131,6 +132,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     GuestsModule,
     StaffExportModule,
     RatesModule,
+    RatePlansModule,
     GroupsModule,
     HousekeepingModule,
     RestaurantModule,

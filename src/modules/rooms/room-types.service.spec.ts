@@ -1,6 +1,7 @@
 import { mockDb, sqlText, type MockDb } from '../owner-auth/testing/db.mock';
 import { RoomTypesService } from './room-types.service';
 import { AmenitiesService } from './amenities.service';
+import { StorageService } from '../storage/storage.service';
 import type { Database } from '../../database/database.module';
 
 const MY_PROPERTY = 'prop-mine';
@@ -11,6 +12,9 @@ function svc(db: MockDb) {
   return new RoomTypesService(
     db as unknown as Database,
     new AmenitiesService(db as unknown as Database),
+    // The local driver signs nothing and touches no network — presigned URLs
+    // come back as `local://<key>`, which is all these tests need.
+    new StorageService({}),
   );
 }
 
@@ -25,12 +29,26 @@ const typeRow = (over: Record<string, unknown> = {}) => ({
   bedType: 'KING',
   bedCount: 1,
   maxOccupancy: 2,
+  baseOccupancy: 2,
   maxAdults: 2,
   maxChildren: 1,
+  maxInfants: 0,
+  code: null,
+  floorLabel: null,
+  smokingPolicy: 'NON_SMOKING',
+  accessible: false,
+  extraBedAvailable: false,
+  extraBedType: null,
+  extraBedCapacity: null,
+  extraBedPricePaise: null,
+  dynamicPricingEnabled: false,
+  pricesIncludeTax: false,
   airConditioned: true,
   baseRate: 450000,
   currency: 'INR',
   sizeSqft: 320,
+  sizeValue: 320,
+  sizeUnit: 'SQFT',
   status: 'ACTIVE',
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -186,7 +204,10 @@ describe('RoomTypesService — villa unit kinds', () => {
 
   it('resets the room count when a villa is converted back to a plain room', async () => {
     const db = mockDb({
-      select: { room_types: [[typeRow({ unitKind: 'VILLA', unitRoomCount: 3 })]], room_type_amenities: [[]] },
+      select: {
+        room_types: [[typeRow({ unitKind: 'VILLA', unitRoomCount: 3 })]],
+        room_type_amenities: [[]],
+      },
       update: { room_types: [typeRow()] },
     });
     await svc(db).update(MY_PROPERTY, TYPE_ID, { unitKind: 'ROOM' });
@@ -285,5 +306,252 @@ describe('RoomTypesService — deletion protects live rooms', () => {
     const db = mockDb({ select: { room_types: [[typeRow()]], rooms: [[{ count: 0 }]] } });
     await svc(db).remove(MY_PROPERTY, TYPE_ID);
     expect(sqlText(db.wheresFor('rooms')[0])).toContain('deleted_at');
+  });
+});
+
+describe('RoomTypesService — occupancy is validated against the MERGED row', () => {
+  it('refuses a maximum occupancy below the base occupancy', async () => {
+    const db = mockDb({ insert: { room_types: [typeRow()] } });
+    await expect(
+      svc(db).create(MY_PROPERTY, { ...input, maxOccupancy: 2, baseOccupancy: 4 }),
+    ).rejects.toMatchObject({ status: 400, response: { error: 'OCCUPANCY_INVALID' } });
+    expect(db.inserts).toEqual([]);
+  });
+
+  it('refuses a maximum occupancy that cannot fit the adults it admits', async () => {
+    const db = mockDb({ insert: { room_types: [typeRow()] } });
+    await expect(
+      svc(db).create(MY_PROPERTY, { ...input, maxOccupancy: 2, maxAdults: 4, baseOccupancy: 2 }),
+    ).rejects.toMatchObject({ response: { error: 'OCCUPANCY_INVALID' } });
+    expect(db.inserts).toEqual([]);
+  });
+
+  // The headline: a two-step edit must not walk past the rule. Lowering
+  // maxOccupancy alone is weighed against the baseOccupancy already stored.
+  it('weighs a lone maxOccupancy edit against the STORED base occupancy', async () => {
+    const db = mockDb({
+      select: { room_types: [[typeRow({ baseOccupancy: 4, maxOccupancy: 6, maxAdults: 4 })]] },
+      update: { room_types: [typeRow()] },
+    });
+    await expect(svc(db).update(MY_PROPERTY, TYPE_ID, { maxOccupancy: 2 })).rejects.toMatchObject({
+      response: { error: 'OCCUPANCY_INVALID' },
+    });
+    expect(db.updates).toEqual([]);
+  });
+
+  it('rejects a negative extra-bed price as RATE_INVALID', async () => {
+    const db = mockDb({ insert: { room_types: [typeRow()] } });
+    await expect(
+      svc(db).create(MY_PROPERTY, { ...input, extraBedPricePaise: -1 }),
+    ).rejects.toMatchObject({ status: 400, response: { error: 'RATE_INVALID' } });
+  });
+
+  it('accepts a well-formed occupancy split and persists every part of it', async () => {
+    const db = mockDb({ insert: { room_types: [typeRow()] } });
+    await svc(db).create(MY_PROPERTY, {
+      ...input,
+      maxOccupancy: 4,
+      baseOccupancy: 2,
+      maxAdults: 3,
+      maxChildren: 2,
+      maxInfants: 1,
+      extraBedAvailable: true,
+      extraBedType: 'EXTRA_BED' as const,
+      extraBedCapacity: 1,
+      extraBedPricePaise: 90000,
+    });
+    expect(db.inserts.find((i) => i.table === 'room_types')?.values).toMatchObject({
+      maxOccupancy: 4,
+      baseOccupancy: 2,
+      maxAdults: 3,
+      maxChildren: 2,
+      maxInfants: 1,
+      extraBedAvailable: true,
+      extraBedType: 'EXTRA_BED',
+      extraBedCapacity: 1,
+      extraBedPricePaise: 90000,
+    });
+  });
+});
+
+describe('RoomTypesService — size_sqft stays canonical', () => {
+  it('converts square metres to square feet so existing readers keep working', async () => {
+    const db = mockDb({ insert: { room_types: [typeRow()] } });
+    await svc(db).create(MY_PROPERTY, { ...input, sizeValue: 30, sizeUnit: 'SQM' as const });
+    expect(db.inserts.find((i) => i.table === 'room_types')?.values).toMatchObject({
+      sizeValue: 30,
+      sizeUnit: 'SQM',
+      // round(30 * 10.7639)
+      sizeSqft: 323,
+    });
+  });
+
+  it('stores square feet unchanged', async () => {
+    const db = mockDb({ insert: { room_types: [typeRow()] } });
+    await svc(db).create(MY_PROPERTY, { ...input, sizeValue: 420, sizeUnit: 'SQFT' as const });
+    expect(db.inserts.find((i) => i.table === 'room_types')?.values).toMatchObject({
+      sizeValue: 420,
+      sizeUnit: 'SQFT',
+      sizeSqft: 420,
+    });
+  });
+
+  it('fills value/unit in for a legacy caller that sends only sizeSqft', async () => {
+    const db = mockDb({ insert: { room_types: [typeRow()] } });
+    await svc(db).create(MY_PROPERTY, { ...input, sizeSqft: 500 });
+    expect(db.inserts.find((i) => i.table === 'room_types')?.values).toMatchObject({
+      sizeSqft: 500,
+      sizeValue: 500,
+      sizeUnit: 'SQFT',
+    });
+  });
+
+  it('re-converts on update when only the unit changes', async () => {
+    const db = mockDb({
+      select: { room_types: [[typeRow({ sizeValue: 30, sizeUnit: 'SQFT', sizeSqft: 30 })]] },
+      update: { room_types: [typeRow()] },
+    });
+    await svc(db).update(MY_PROPERTY, TYPE_ID, { sizeUnit: 'SQM' });
+    expect(db.updates.find((u) => u.table === 'room_types')?.values).toMatchObject({
+      sizeValue: 30,
+      sizeUnit: 'SQM',
+      sizeSqft: 323,
+    });
+  });
+});
+
+describe('RoomTypesService — sleeping arrangement', () => {
+  const beds = [
+    { bedType: 'KING' as const, quantity: 1 },
+    { bedType: 'SOFA_BED' as const, quantity: 2 },
+  ];
+
+  it('writes one row per bed group, in the order sent', async () => {
+    const db = mockDb({ insert: { room_types: [typeRow()], room_type_beds: [] } });
+    await svc(db).create(MY_PROPERTY, { ...input, beds });
+    expect(db.inserts.find((i) => i.table === 'room_type_beds')?.values).toEqual([
+      { roomTypeId: TYPE_ID, bedType: 'KING', quantity: 1, sortOrder: 0 },
+      { roomTypeId: TYPE_ID, bedType: 'SOFA_BED', quantity: 2, sortOrder: 1 },
+    ]);
+  });
+
+  // The denormalised pair is what the rooms board and reservations read; it
+  // must follow the FIRST bed row or the two views contradict each other.
+  it('syncs room_types.bedType/bedCount from the FIRST bed row on create', async () => {
+    const db = mockDb({ insert: { room_types: [typeRow()] } });
+    await svc(db).create(MY_PROPERTY, {
+      ...input,
+      bedType: 'DOUBLE' as const,
+      bedCount: 9,
+      beds,
+    });
+    expect(db.inserts.find((i) => i.table === 'room_types')?.values).toMatchObject({
+      bedType: 'KING',
+      bedCount: 1,
+    });
+  });
+
+  it('replaces the whole set on update, and re-syncs the pair', async () => {
+    const db = mockDb({
+      select: { room_types: [[typeRow()]], room_type_beds: [[]], room_type_amenities: [[]] },
+      update: { room_types: [typeRow()] },
+    });
+    await svc(db).update(MY_PROPERTY, TYPE_ID, {
+      beds: [{ bedType: 'TWIN', quantity: 2 }],
+    });
+    expect(db.deletes.some((d) => d.table === 'room_type_beds')).toBe(true);
+    expect(db.inserts.some((i) => i.table === 'room_type_beds')).toBe(true);
+    expect(db.updates.find((u) => u.table === 'room_types')?.values).toMatchObject({
+      bedType: 'TWIN',
+      bedCount: 2,
+    });
+  });
+
+  it('leaves the arrangement alone when beds is absent', async () => {
+    const db = mockDb({
+      select: { room_types: [[typeRow()]], room_type_amenities: [[]], room_type_beds: [[]] },
+      update: { room_types: [typeRow({ baseRate: 500000 })] },
+    });
+    await svc(db).update(MY_PROPERTY, TYPE_ID, { baseRate: 500000 });
+    expect(db.deletes.filter((d) => d.table === 'room_type_beds')).toEqual([]);
+  });
+
+  it('returns the arrangement on get, alongside photos', async () => {
+    const db = mockDb({
+      select: {
+        room_types: [[typeRow()]],
+        room_type_amenities: [[]],
+        rooms: [[]],
+        room_type_beds: [
+          [{ id: 'bed-1', roomTypeId: TYPE_ID, bedType: 'KING', quantity: 1, sortOrder: 0 }],
+        ],
+        room_type_photos: [
+          [
+            {
+              id: 'photo-1',
+              roomTypeId: TYPE_ID,
+              storageKey: 'room-types/t/a.jpg',
+              contentType: 'image/jpeg',
+              sizeBytes: 10,
+              category: 'ROOM',
+              isPrimary: true,
+              sortOrder: 0,
+              createdAt: new Date(),
+            },
+          ],
+        ],
+      },
+    });
+    const dto = await svc(db).get(MY_PROPERTY, TYPE_ID);
+    expect(dto.beds).toEqual([{ id: 'bed-1', bedType: 'KING', quantity: 1, sortOrder: 0 }]);
+    expect(dto.photos).toMatchObject([{ id: 'photo-1', isPrimary: true, category: 'ROOM' }]);
+    expect(dto.primaryPhotoUrl).toBe('local://room-types/t/a.jpg');
+  });
+});
+
+describe('RoomTypesService — list carries the thumbnail and the unit count', () => {
+  it('reports unitCount from LIVE rooms and a presigned primaryPhotoUrl', async () => {
+    const db = mockDb({
+      select: {
+        room_types: [[typeRow()], [{ count: 1 }]],
+        room_type_amenities: [[]],
+        rooms: [[{ roomTypeId: TYPE_ID, n: 7 }]],
+        room_type_photos: [[{ roomTypeId: TYPE_ID, storageKey: 'room-types/t/cover.jpg' }]],
+      },
+    });
+    const res = await svc(db).list(MY_PROPERTY, {});
+    expect(res.items[0]).toMatchObject({
+      unitCount: 7,
+      roomCount: 7,
+      primaryPhotoUrl: 'local://room-types/t/cover.jpg',
+    });
+  });
+
+  it('reports a null thumbnail when the type has no primary photo', async () => {
+    const db = mockDb({
+      select: {
+        room_types: [[typeRow()], [{ count: 1 }]],
+        room_type_amenities: [[]],
+        rooms: [[]],
+        room_type_photos: [[]],
+      },
+    });
+    const res = await svc(db).list(MY_PROPERTY, {});
+    expect(res.items[0]).toMatchObject({ unitCount: 0, primaryPhotoUrl: null });
+  });
+
+  // One grouped query each — the list screen must never fan out per row.
+  it('fetches counts and thumbnails in ONE query each, not one per row', async () => {
+    const db = mockDb({
+      select: {
+        room_types: [[typeRow(), typeRow({ id: 'other' })], [{ count: 2 }]],
+        room_type_amenities: [[]],
+        rooms: [[]],
+        room_type_photos: [[]],
+      },
+    });
+    await svc(db).list(MY_PROPERTY, {});
+    expect(db.selects.filter((s) => s.table === 'rooms')).toHaveLength(1);
+    expect(db.selects.filter((s) => s.table === 'room_type_photos')).toHaveLength(1);
   });
 });

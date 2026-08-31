@@ -91,4 +91,50 @@ export const RoomErrors = {
 
   nothingToUpdate: () =>
     roomError('NOTHING_TO_UPDATE', 'No fields to update', HttpStatus.BAD_REQUEST),
+
+  /**
+   * The occupancy numbers contradict each other — a base occupancy above the
+   * maximum, a maximum that cannot even fit the adults it claims to allow, or a
+   * count below zero. One code for the whole family, with the specific reason in
+   * the message, so a client branches once and shows what the server said.
+   */
+  occupancyInvalid: (message: string) =>
+    roomError('OCCUPANCY_INVALID', message, HttpStatus.BAD_REQUEST),
+
+  /** A negative amount of money. Zero is legal; below zero never is. */
+  rateInvalid: (message: string) => roomError('RATE_INVALID', message, HttpStatus.BAD_REQUEST),
+
+  /** The code column's partial unique (property_id, code), typed. */
+  roomTypeCodeTaken: () =>
+    roomError(
+      'ROOM_TYPE_CODE_TAKEN',
+      'Another room type at this hotel already uses that code',
+      HttpStatus.CONFLICT,
+    ),
+
+  photoNotFound: () =>
+    roomError('ROOM_TYPE_PHOTO_NOT_FOUND', 'Photo not found', HttpStatus.NOT_FOUND),
+
+  noFile: () => roomError('NO_FILE', 'No file sent', HttpStatus.BAD_REQUEST),
+
+  unsupportedMediaType: () =>
+    roomError('UNSUPPORTED_MEDIA_TYPE', 'Photos must be JPEG, PNG or WebP', HttpStatus.BAD_REQUEST),
+
+  fileTooLarge: () =>
+    roomError('FILE_TOO_LARGE', 'Each photo must be 5 MB or smaller', HttpStatus.BAD_REQUEST),
+
+  photoLimitReached: (max: number) =>
+    roomError(
+      'PHOTO_LIMIT_REACHED',
+      `A room type can have at most ${max} photos`,
+      HttpStatus.BAD_REQUEST,
+    ),
+
+  /** A reorder that does not name exactly the photos the type actually has. */
+  photoOrderMismatch: () =>
+    roomError(
+      'PHOTO_ORDER_MISMATCH',
+      'The id list must name photos that belong to this room type',
+      HttpStatus.BAD_REQUEST,
+    ),
 };

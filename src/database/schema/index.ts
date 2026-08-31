@@ -6,6 +6,7 @@ export * from './audit';
 export * from './phase2';
 export * from './owner';
 export * from './rooms';
+export * from './rate-plans';
 export * from './reservations';
 export * from './housekeeping';
 export * from './restaurant';

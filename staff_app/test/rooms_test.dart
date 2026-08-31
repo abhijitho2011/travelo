@@ -61,10 +61,23 @@ void main() {
       }
     });
 
-    test('the six the API documents are all present', () {
+    test('every bed the sleeping-arrangement rows offer is present', () {
       expect(
         BedType.values.map((b) => b.wire).toList(),
-        ['SINGLE', 'TWIN', 'DOUBLE', 'QUEEN', 'KING', 'BUNK'],
+        // The original six, then the four the multi-row arrangement adds.
+        // 'BUNK' keeps its original wire value so existing rows still read.
+        [
+          'SINGLE',
+          'TWIN',
+          'DOUBLE',
+          'QUEEN',
+          'KING',
+          'BUNK',
+          'SOFA_BED',
+          'EXTRA_BED',
+          'CRIB',
+          'OTHER',
+        ],
       );
     });
 
@@ -744,10 +757,9 @@ void main() {
     test('each destination declares the permission the guard must check', () {
       final gm = RoleConfig.of(StaffRole.generalManager);
       expect(gm.requirementsFor(Routes.rooms), [P.roomRead]);
-      // Room types is no longer a nav item (it lives in the Room settings hub),
-      // so it carries no route-level requirement — the RoomTypesScreen and its
-      // API gate the catalogue on roomtype.read directly.
-      expect(gm.requirementsFor(Routes.roomTypes), isNull);
+      // Units / Rooms & Rates is a nav destination again, so the guard checks
+      // its permission at the route rather than leaving it to the screen.
+      expect(gm.requirementsFor(Routes.roomTypes), [P.roomTypeRead]);
       expect(
         RoleConfig.of(StaffRole.receptionist).requirementsFor(Routes.rooms),
         [P.roomRead],

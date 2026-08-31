@@ -70,8 +70,34 @@ export const amenities = pgTable(
 
 // ---------- Room types ----------
 
-export const bedTypeValues = ['SINGLE', 'TWIN', 'DOUBLE', 'QUEEN', 'KING', 'BUNK'] as const;
+/**
+ * Every bed kind a room type may list. EXTENDED, never forked: `BUNK` is the
+ * original spelling and stays so existing rows keep validating, with `BUNK_BED`
+ * alongside it as the name the room-type form now offers. The column is a
+ * varchar, so widening this union needs no DDL.
+ */
+export const bedTypeValues = [
+  'SINGLE',
+  'TWIN',
+  'DOUBLE',
+  'QUEEN',
+  'KING',
+  'BUNK',
+  'SOFA_BED',
+  'BUNK_BED',
+  'EXTRA_BED',
+  'CRIB',
+  'OTHER',
+] as const;
 export type BedType = (typeof bedTypeValues)[number];
+
+/** NON_SMOKING is the default because a NULL would read as "we allow it". */
+export const smokingPolicyValues = ['NON_SMOKING', 'SMOKING', 'BOTH'] as const;
+export type SmokingPolicy = (typeof smokingPolicyValues)[number];
+
+/** What `sizeValue` was TYPED in. `sizeSqft` stays the canonical unit. */
+export const sizeUnitValues = ['SQM', 'SQFT'] as const;
+export type SizeUnit = (typeof sizeUnitValues)[number];
 
 /**
  * What one bookable unit of this type physically is. A ROOM is a single
@@ -111,11 +137,41 @@ export const roomTypes = pgTable(
      * A boolean on the type states exactly what every unit of the type has.
      */
     privatePool: boolean('private_pool').notNull().default(false),
+    /** Internal code the hotel already uses ("DLX-KING"). Unique per property. */
+    code: varchar('code', { length: 32 }),
+    /** Free text — "Ground", "LG", "2nd — garden wing" are all real answers. */
+    floorLabel: varchar('floor_label', { length: 64 }),
+    smokingPolicy: varchar('smoking_policy', { length: 16 })
+      .notNull()
+      .default('NON_SMOKING')
+      .$type<SmokingPolicy>(),
+    /** Step-free / wheelchair-accessible units of this type. */
+    accessible: boolean('accessible').notNull().default(false),
+    /**
+     * The PRIMARY bed, denormalised. The full arrangement lives in
+     * `roomTypeBeds`; this pair is written from the FIRST bed row on every
+     * write so the rooms board and every existing reader keep working.
+     */
     bedType: varchar('bed_type', { length: 16 }).notNull().default('DOUBLE').$type<BedType>(),
     bedCount: integer('bed_count').notNull().default(1),
     maxOccupancy: integer('max_occupancy').notNull().default(2),
+    /**
+     * Guests INCLUDED in the base rate. The gap up to `maxOccupancy` is what
+     * extra-person charges are computed over, so the two are different numbers.
+     */
+    baseOccupancy: integer('base_occupancy').notNull().default(2),
     maxAdults: integer('max_adults').notNull().default(2),
     maxChildren: integer('max_children').notNull().default(0),
+    /** Counted apart from children: usually free, and they consume no bed. */
+    maxInfants: integer('max_infants').notNull().default(0),
+    extraBedAvailable: boolean('extra_bed_available').notNull().default(false),
+    extraBedType: varchar('extra_bed_type', { length: 16 }).$type<BedType>(),
+    extraBedCapacity: integer('extra_bed_capacity'),
+    /** Paise, like every other money column in this schema. */
+    extraBedPricePaise: integer('extra_bed_price_paise'),
+    dynamicPricingEnabled: boolean('dynamic_pricing_enabled').notNull().default(false),
+    /** Whether the rates entered here already include tax. */
+    pricesIncludeTax: boolean('prices_include_tax').notNull().default(false),
     /**
      * Air conditioning is a PROPERTY OF THE ROOM TYPE, not an amenity.
      *
@@ -128,7 +184,16 @@ export const roomTypes = pgTable(
     /** Paise, like every other money column in this schema. */
     baseRate: integer('base_rate').notNull().default(0),
     currency: varchar('currency', { length: 8 }).notNull().default('INR'),
+    /**
+     * CANONICAL size, always square feet. Kept in sync by the service from
+     * `sizeValue`/`sizeUnit` (SQM → round(v * 10.7639)) so a hotel that thinks
+     * in square metres never converts and no reader has to know which unit was
+     * typed.
+     */
     sizeSqft: integer('size_sqft'),
+    /** What was typed, in `sizeUnit`. Display only — `sizeSqft` is the truth. */
+    sizeValue: integer('size_value'),
+    sizeUnit: varchar('size_unit', { length: 8 }).notNull().default('SQFT').$type<SizeUnit>(),
     status: varchar('status', { length: 16 }).notNull().default('ACTIVE').$type<RoomTypeStatus>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -141,6 +206,89 @@ export const roomTypes = pgTable(
     nameUnique: uniqueIndex('room_types_property_name_unique')
       .on(t.propertyId, t.name)
       .where(sql`deleted_at IS NULL`),
+    // Partial on BOTH counts: NULL codes never collide, and a soft-deleted type
+    // frees its code, exactly as it frees its name.
+    codeUnique: uniqueIndex('room_types_property_code_unique')
+      .on(t.propertyId, t.code)
+      .where(sql`code IS NOT NULL AND deleted_at IS NULL`),
+  }),
+);
+
+/**
+ * The full sleeping arrangement — "1 king + 1 sofa bed" — which no pair of
+ * scalar columns can hold.
+ *
+ * `roomTypes.bedType` / `roomTypes.bedCount` stay as the denormalised PRIMARY
+ * bed and are rewritten from the FIRST row here (lowest `sortOrder`) on every
+ * write. That keeps the rooms board, reservations and every existing screen
+ * working unchanged while the room-type form edits the real list.
+ */
+export const roomTypeBeds = pgTable(
+  'room_type_beds',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    roomTypeId: uuid('room_type_id')
+      .notNull()
+      .references(() => roomTypes.id, { onDelete: 'cascade' }),
+    bedType: varchar('bed_type', { length: 16 }).notNull().$type<BedType>(),
+    quantity: integer('quantity').notNull().default(1),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    roomTypeIdx: index('room_type_beds_room_type_idx').on(t.roomTypeId),
+  }),
+);
+
+export const roomTypePhotoCategoryValues = [
+  'ROOM',
+  'BATHROOM',
+  'EXTERIOR',
+  'VIEW',
+  'AMENITIES',
+  'OTHER',
+] as const;
+export type RoomTypePhotoCategory = (typeof roomTypePhotoCategoryValues)[number];
+
+/**
+ * Room-type photos, mirroring `propertyPhotos`: Postgres holds the object KEY,
+ * the bytes live in the object store, and clients receive short-lived presigned
+ * URLs — so the API never proxies image bytes and there is no listable
+ * directory. `propertyId` is denormalised so a tenant-scoped read never has to
+ * join back through room_types.
+ */
+export const roomTypePhotos = pgTable(
+  'room_type_photos',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    propertyId: uuid('property_id')
+      .notNull()
+      .references(() => properties.id, { onDelete: 'cascade' }),
+    roomTypeId: uuid('room_type_id')
+      .notNull()
+      .references(() => roomTypes.id, { onDelete: 'cascade' }),
+    storageKey: varchar('storage_key', { length: 512 }).notNull(),
+    contentType: varchar('content_type', { length: 128 }).notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    category: varchar('category', { length: 24 })
+      .notNull()
+      .default('ROOM')
+      .$type<RoomTypePhotoCategory>(),
+    isPrimary: boolean('is_primary').notNull().default(false),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    roomTypeIdx: index('room_type_photos_room_type_idx').on(t.roomTypeId),
+    // Exactly ONE primary per type, enforced by the database rather than by
+    // hoping every write path remembers to clear the old one.
+    primaryUnique: uniqueIndex('room_type_photos_primary_unique')
+      .on(t.roomTypeId)
+      .where(sql`is_primary`),
   }),
 );
 
@@ -256,6 +404,8 @@ export const propertyAmenities = pgTable(
 
 export type Amenity = typeof amenities.$inferSelect;
 export type RoomType = typeof roomTypes.$inferSelect;
+export type RoomTypeBed = typeof roomTypeBeds.$inferSelect;
+export type RoomTypePhoto = typeof roomTypePhotos.$inferSelect;
 export type Room = typeof rooms.$inferSelect;
 
 /**

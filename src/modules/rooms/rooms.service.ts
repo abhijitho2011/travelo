@@ -101,7 +101,15 @@ export class RoomsService {
   static toDto(
     r: Room,
     type:
-      | { id: string; name: string; bedType: string; airConditioned: boolean; unitKind: string; unitRoomCount: number; privatePool: boolean }
+      | {
+          id: string;
+          name: string;
+          bedType: string;
+          airConditioned: boolean;
+          unitKind: string;
+          unitRoomCount: number;
+          privatePool: boolean;
+        }
       | undefined,
     amenityList: AmenityRef[],
   ) {

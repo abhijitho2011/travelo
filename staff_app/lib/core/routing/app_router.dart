@@ -53,9 +53,9 @@ import '../../features/restaurant/presentation/menu_management_screen.dart';
 import '../../features/restaurant/presentation/tables_management_screen.dart';
 import '../../features/rooms/presentation/bulk_rooms_screen.dart';
 import '../../features/rooms/presentation/room_form_screen.dart';
-import '../../features/rooms/presentation/room_type_form_screen.dart';
+import '../../features/rooms/presentation/room_type_workspace_screen.dart';
 import '../../features/rooms/presentation/room_settings_screen.dart';
-import '../../features/rooms/presentation/room_types_screen.dart';
+import '../../features/rooms/presentation/units_screen.dart';
 import '../../features/rooms/presentation/rooms_screen.dart';
 import '../../features/sales/presentation/sales_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
@@ -222,16 +222,20 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: Routes.roomTypes,
-            builder: (_, _) => const RoomTypesScreen(),
+            builder: (_, _) => const UnitsScreen(),
           ),
           GoRoute(
             path: Routes.roomTypeNew,
-            builder: (_, _) => const RoomTypeFormScreen(),
+            // `duplicateOf` seeds the form from an existing type; the copy is
+            // still saved as a brand-new record.
+            builder: (_, state) => RoomTypeWorkspaceScreen(
+              duplicateOfId: state.uri.queryParameters['duplicateOf'],
+            ),
           ),
           GoRoute(
             path: Routes.roomTypePattern,
             builder: (_, state) =>
-                RoomTypeFormScreen(roomTypeId: state.pathParameters['id']),
+                RoomTypeWorkspaceScreen(roomTypeId: state.pathParameters['id']),
           ),
 
           // Room attendant / cleaning staff (built)
