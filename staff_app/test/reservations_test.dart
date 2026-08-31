@@ -804,16 +804,17 @@ void main() {
     test('the front desk reaches the desk board, the book and check-in', () {
       final config = RoleConfig.of(StaffRole.receptionist);
       expect(routesOf(StaffRole.receptionist), contains(Routes.reception));
-      expect(routesOf(StaffRole.receptionist), contains(Routes.reservations));
       expect(routesOf(StaffRole.receptionist), contains(Routes.checkIn));
       expect(config.allowedRoutes, contains(Routes.reservations));
+      // The dedupe: Bookings is no longer its own nav item — the Front desk
+      // button reaches it — but the guard must still admit the route.
       expect(
         config.visibleNav(receptionistPermissions).map((i) => i.route),
-        contains(Routes.reservations),
+        isNot(contains(Routes.reservations)),
       );
     });
 
-    test('a GM and an AGM see the book too', () {
+    test('a GM and an AGM reach the book, though not from their nav', () {
       for (final role in [
         StaffRole.generalManager,
         StaffRole.assistantGeneralManager,
@@ -824,20 +825,36 @@ void main() {
           contains(Routes.reservations),
           reason: role.wire,
         );
+        expect(
+          config.allowedRoutes,
+          contains(Routes.checkIn),
+          reason: role.wire,
+        );
+        // Not a nav destination any more (the dedupe): Front desk carries it.
         final visible = [
           ...config.visibleNav(managementPermissions),
           ...config.visibleMore(managementPermissions),
         ].map((i) => i.route);
-        expect(visible, contains(Routes.reservations), reason: role.wire);
+        expect(visible, isNot(contains(Routes.reservations)), reason: role.wire);
       }
     });
 
-    test('the book is gated on reservation.read wherever it appears', () {
+    test('the book stays permission-gated where it is still a nav item', () {
+      // Front-desk roles reach it via extraRoutes (requirementsFor is null;
+      // the screens' data calls are server-gated) — the roomTypes precedent.
       for (final role in [
         StaffRole.generalManager,
         StaffRole.assistantGeneralManager,
         StaffRole.receptionist,
       ]) {
+        expect(
+          RoleConfig.of(role).requirementsFor(Routes.reservations),
+          isNull,
+          reason: role.wire,
+        );
+      }
+      // Roles whose ONLY path is the nav item keep the explicit gate.
+      for (final role in [StaffRole.accounts, StaffRole.salesManager]) {
         expect(
           RoleConfig.of(role).requirementsFor(Routes.reservations),
           [P.reservationRead],

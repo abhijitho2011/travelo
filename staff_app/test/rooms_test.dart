@@ -536,6 +536,9 @@ void main() {
       );
       expect(input.toJson(), {
         'name': 'Twin',
+        'unitKind': 'ROOM',
+        'unitRoomCount': 1,
+        'privatePool': false,
         'bedType': 'TWIN',
         'bedCount': 2,
         'maxOccupancy': 2,

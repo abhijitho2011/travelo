@@ -350,7 +350,14 @@ class RoleConfig {
       homeRoute: Routes.management,
       homeModuleLabel: 'Management Dashboard',
       built: true,
-      extraRoutes: const {Routes.roomTypes},
+      extraRoutes: const {
+        Routes.roomTypes,
+        // Bookings and check-in are reached from the Front desk button, not
+        // a nav item of their own (the dedupe) — but the RoleGuard admits
+        // only allowedRoutes, so they must stay listed here.
+        Routes.reservations,
+        Routes.checkIn,
+      },
       bottomNav: const [
         NavItem(
           label: 'Dashboard',
@@ -439,7 +446,14 @@ class RoleConfig {
       homeRoute: Routes.management,
       homeModuleLabel: 'Management Dashboard',
       built: true,
-      extraRoutes: const {Routes.roomTypes},
+      extraRoutes: const {
+        Routes.roomTypes,
+        // Bookings and check-in are reached from the Front desk button, not
+        // a nav item of their own (the dedupe) — but the RoleGuard admits
+        // only allowedRoutes, so they must stay listed here.
+        Routes.reservations,
+        Routes.checkIn,
+      },
       bottomNav: const [
         NavItem(
           label: 'Dashboard',
@@ -553,6 +567,9 @@ class RoleConfig {
       homeRoute: Routes.reception,
       homeModuleLabel: 'Reception',
       built: true,
+      // Bookings lost its own nav item in the dedupe (Front desk reaches it),
+      // but the guard admits only allowedRoutes — so it rides here.
+      extraRoutes: const {Routes.reservations},
       bottomNav: const [
         NavItem(
           label: 'Front desk',

@@ -191,7 +191,7 @@ void main() {
 
     await tester.tap(find.text('More'));
     await tester.pumpAndSettle();
-    expect(find.text(gm.moreMenu.first.label), findsOneWidget);
+    expect(find.text(gm.visibleMore(gmPermissions).first.label), findsOneWidget);
   });
 
   testWidgets('HR gets Team, Submitted, Profile and a More sheet on a phone', (
