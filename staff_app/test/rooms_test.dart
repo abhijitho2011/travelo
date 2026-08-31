@@ -763,9 +763,11 @@ void main() {
     test('each destination declares the permission the guard must check', () {
       final gm = RoleConfig.of(StaffRole.generalManager);
       expect(gm.requirementsFor(Routes.rooms), [P.roomRead]);
-      // Units / Rooms & Rates is a nav destination again, so the guard checks
-      // its permission at the route rather than leaving it to the screen.
-      expect(gm.requirementsFor(Routes.roomTypes), [P.roomTypeRead]);
+      // Room types are no longer a menu destination — a room carries its own
+      // specifications, so Rooms is the only way in. The room-type workspace
+      // stays reachable by deep link (the shared-type note links to it) via
+      // extraRoutes, which carry no route-level requirement; it gates itself.
+      expect(gm.requirementsFor(Routes.roomTypes), isNull);
       expect(
         RoleConfig.of(StaffRole.receptionist).requirementsFor(Routes.rooms),
         [P.roomRead],
