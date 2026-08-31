@@ -5,13 +5,12 @@ import '../data/rooms_repository.dart' show roomsRepositoryProvider;
 import '../data/unit_models.dart';
 import '../data/units_repository.dart';
 
-/// The photo gallery for one room type. Presigned URLs expire, so this is
-/// autoDispose — reopening the workspace re-fetches fresh links rather than
-/// rendering a set of dead ones from a cache.
-final roomTypePhotosProvider = FutureProvider.autoDispose
-    .family<List<RoomTypePhoto>, String>(
-      (ref, roomTypeId) =>
-          ref.watch(unitsRepositoryProvider).photos(roomTypeId),
+/// The photo gallery for one room or one room type. Presigned URLs expire, so
+/// this is autoDispose — reopening the workspace re-fetches fresh links rather
+/// than rendering a set of dead ones from a cache.
+final photosProvider = FutureProvider.autoDispose
+    .family<List<RoomTypePhoto>, PhotoOwner>(
+      (ref, owner) => ref.watch(unitsRepositoryProvider).photos(owner),
     );
 
 final ratePlansProvider = FutureProvider.autoDispose
@@ -102,34 +101,34 @@ class UnitsActions {
   // -- photos --
 
   Future<RoomTypePhoto> uploadPhoto(
-    String roomTypeId, {
+    PhotoOwner owner, {
     required List<int> bytes,
     required String filename,
     PhotoCategory category = PhotoCategory.room,
   }) async {
     final photo = await _repo.uploadPhoto(
-      roomTypeId,
+      owner,
       bytes: bytes,
       filename: filename,
       category: category,
     );
-    _ref.invalidate(roomTypePhotosProvider(roomTypeId));
+    _ref.invalidate(photosProvider(owner));
     return photo;
   }
 
-  Future<void> setPrimaryPhoto(String roomTypeId, String photoId) async {
-    await _repo.setPrimaryPhoto(roomTypeId, photoId);
-    _ref.invalidate(roomTypePhotosProvider(roomTypeId));
+  Future<void> setPrimaryPhoto(PhotoOwner owner, String photoId) async {
+    await _repo.setPrimaryPhoto(owner, photoId);
+    _ref.invalidate(photosProvider(owner));
   }
 
-  Future<void> reorderPhotos(String roomTypeId, List<String> orderedIds) async {
-    await _repo.reorderPhotos(roomTypeId, orderedIds);
-    _ref.invalidate(roomTypePhotosProvider(roomTypeId));
+  Future<void> reorderPhotos(PhotoOwner owner, List<String> orderedIds) async {
+    await _repo.reorderPhotos(owner, orderedIds);
+    _ref.invalidate(photosProvider(owner));
   }
 
-  Future<void> deletePhoto(String roomTypeId, String photoId) async {
-    await _repo.deletePhoto(roomTypeId, photoId);
-    _ref.invalidate(roomTypePhotosProvider(roomTypeId));
+  Future<void> deletePhoto(PhotoOwner owner, String photoId) async {
+    await _repo.deletePhoto(owner, photoId);
+    _ref.invalidate(photosProvider(owner));
   }
 
   // -- rate plans --

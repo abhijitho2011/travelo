@@ -5,7 +5,7 @@ import '../../../core/networking/api_client.dart';
 import '../../../core/providers.dart';
 import 'unit_models.dart';
 
-/// Everything the Units / Rooms & Rates page reads and writes that is not
+/// Everything the room and room-type workspaces read and write that is not
 /// already covered by [RoomsRepository]: the room type's photo gallery, its
 /// rate plans, its taxes and fees, and its dynamic-pricing rules.
 ///
@@ -26,15 +26,15 @@ class UnitsRepository {
 
   // ------------------------------------------------------------- photos --
 
-  Future<List<RoomTypePhoto>> photos(String roomTypeId) async {
-    final data = await _api.get('/room-types/$roomTypeId/photos');
+  Future<List<RoomTypePhoto>> photos(PhotoOwner owner) async {
+    final data = await _api.get(owner.path);
     return _listOf(data, RoomTypePhoto.fromJson);
   }
 
   /// Uploads one image. [bytes] rather than a path so the same call works on
   /// web (where there is no file system) and on a tablet.
   Future<RoomTypePhoto> uploadPhoto(
-    String roomTypeId, {
+    PhotoOwner owner, {
     required List<int> bytes,
     required String filename,
     PhotoCategory category = PhotoCategory.room,
@@ -43,21 +43,18 @@ class UnitsRepository {
       'file': MultipartFile.fromBytes(bytes, filename: filename),
       'category': category.wire,
     });
-    final data = await _api.postMultipart(
-      '/room-types/$roomTypeId/photos',
-      form,
-    );
+    final data = await _api.postMultipart(owner.path, form);
     return RoomTypePhoto.fromJson(data as Map);
   }
 
-  Future<void> setPrimaryPhoto(String roomTypeId, String photoId) =>
-      _api.post('/room-types/$roomTypeId/photos/$photoId/primary');
+  Future<void> setPrimaryPhoto(PhotoOwner owner, String photoId) =>
+      _api.post('${owner.path}/$photoId/primary');
 
-  Future<void> reorderPhotos(String roomTypeId, List<String> orderedIds) => _api
-      .patch('/room-types/$roomTypeId/photos/order', body: {'ids': orderedIds});
+  Future<void> reorderPhotos(PhotoOwner owner, List<String> orderedIds) =>
+      _api.patch('${owner.path}/order', body: {'ids': orderedIds});
 
-  Future<void> deletePhoto(String roomTypeId, String photoId) =>
-      _api.delete('/room-types/$roomTypeId/photos/$photoId');
+  Future<void> deletePhoto(PhotoOwner owner, String photoId) =>
+      _api.delete('${owner.path}/$photoId');
 
   // --------------------------------------------------------- rate plans --
 

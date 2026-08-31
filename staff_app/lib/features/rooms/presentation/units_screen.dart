@@ -33,7 +33,11 @@ enum UnitSort {
 final _sortProvider = StateProvider<UnitSort>((_) => UnitSort.nameAsc);
 final _accommodationProvider = StateProvider<AccommodationType?>((_) => null);
 
-/// **Units / Rooms & Rates** — the accommodation inventory.
+/// **Room types & rates** — the SHARED groupings.
+///
+/// Room-first properties never come here: a room carries its own
+/// specifications and is edited on the room itself. This page is for the
+/// grouped case, where several identical rooms really do share one sheet.
 ///
 /// The page holds the hierarchy the rest of the PMS depends on:
 ///
@@ -119,7 +123,7 @@ class _UnitsScreenState extends ConsumerState<UnitsScreen> {
       children: [
         PageHeader(
           eyebrow: 'Inventory',
-          title: 'Units / Rooms & Rates',
+          title: 'Room types & rates',
           subtitle:
               'Manage your accommodation types, rooms, inventory and rates.',
           actions: [

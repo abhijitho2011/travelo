@@ -287,11 +287,13 @@ class RoleConfig {
     requires: [P.roomRead],
   );
 
-  /// The accommodation inventory: room types, their physical units, and the
-  /// rate plans they are sold on. Gated on roomtype.read, which only the GM and
-  /// the AGM hold.
+  /// SHARED room types — the groupings used by properties that genuinely have
+  /// several identical rooms, plus the rate plans they are sold on. The
+  /// room-first path is Rooms above, where a room carries its own
+  /// specifications; this page exists for the grouped case. Gated on
+  /// roomtype.read, which only the GM and the AGM hold.
   static const _unitsMore = NavItem(
-    label: 'Units / Rooms & Rates',
+    label: 'Room types & rates',
     icon: Icons.meeting_room_outlined,
     route: Routes.roomTypes,
     requires: [P.roomTypeRead],

@@ -233,3 +233,62 @@ class FieldNote extends StatelessWidget {
     );
   }
 }
+
+/// The room-type picker, used by the bulk room form.
+///
+/// A catalogue that is still loading, empty, or unreadable says so rather than
+/// showing an empty dropdown that looks like a bug.
+class RoomTypeDropdown extends StatelessWidget {
+  const RoomTypeDropdown({
+    super.key,
+    required this.types,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final AsyncValue<List<RoomType>> types;
+  final String? value;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return types.when(
+      loading: () => const Shimmer(height: 52, radius: R.md),
+      error: (error, _) => ErrorState(error: error),
+      data: (list) {
+        if (list.isEmpty) {
+          return const FieldNote(
+            text:
+                'There are no active room types yet. Create one first — a room '
+                'has to be sold as something.',
+            icon: Icons.warning_amber_outlined,
+          );
+        }
+        // A type that was archived after the room was created is still the
+        // room's type; keeping the stale id out of the dropdown would silently
+        // re-point the room on the next save.
+        final ids = list.map((t) => t.id).toSet();
+        final selected = ids.contains(value) ? value : null;
+        return DropdownButtonFormField<String>(
+          initialValue: selected,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'Room type',
+            prefixIcon: Icon(Icons.bed_outlined, size: 20),
+          ),
+          items: [
+            for (final type in list)
+              DropdownMenuItem(
+                value: type.id,
+                child: Text(
+                  '${type.name} · ${type.baseRateLabel}',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+          onChanged: onChanged,
+        );
+      },
+    );
+  }
+}

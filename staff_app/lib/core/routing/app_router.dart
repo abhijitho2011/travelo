@@ -53,7 +53,6 @@ import '../../features/restaurant/presentation/orders_screen.dart';
 import '../../features/restaurant/presentation/menu_management_screen.dart';
 import '../../features/restaurant/presentation/tables_management_screen.dart';
 import '../../features/rooms/presentation/bulk_rooms_screen.dart';
-import '../../features/rooms/presentation/room_form_screen.dart';
 import '../../features/rooms/presentation/room_type_workspace_screen.dart';
 import '../../features/rooms/presentation/room_settings_screen.dart';
 import '../../features/rooms/presentation/units_screen.dart';
@@ -205,9 +204,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           // the literal paths win — go_router matches in declaration order,
           // and the pattern would otherwise swallow both.
           GoRoute(path: Routes.rooms, builder: (_, _) => const RoomsScreen()),
+          // Room-first: adding a room opens the full workspace, where the
+          // room's own specifications, photos and rates live. There is no
+          // separate "create the type first" step.
           GoRoute(
             path: Routes.roomNew,
-            builder: (_, _) => const RoomFormScreen(),
+            builder: (_, _) => const RoomTypeWorkspaceScreen(newRoom: true),
           ),
           GoRoute(
             path: Routes.roomBulk,
@@ -216,7 +218,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: Routes.roomPattern,
             builder: (_, state) =>
-                RoomFormScreen(roomId: state.pathParameters['id']),
+                RoomTypeWorkspaceScreen(roomId: state.pathParameters['id']),
           ),
           GoRoute(
             path: Routes.roomTypes,

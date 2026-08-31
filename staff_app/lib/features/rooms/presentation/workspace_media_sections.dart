@@ -21,19 +21,19 @@ import 'room_widgets.dart';
 /// does that, and the thumbnail on the Units list reads from it. Reordering is
 /// explicit (move earlier / later) rather than a drag: the gallery is a wrap of
 /// small tiles inside a scrolling form, where a drag would fight the scroll.
-class RoomTypePhotosSection extends ConsumerStatefulWidget {
-  const RoomTypePhotosSection({super.key, required this.roomTypeId});
+/// The photo gallery, for a room or a room type alike — [owner] says which.
+class PhotosSection extends ConsumerStatefulWidget {
+  const PhotosSection({super.key, required this.owner});
 
-  /// Null while the room type is unsaved — there is nowhere to put an upload
-  /// yet, so the section says so instead of buffering files it might lose.
-  final String? roomTypeId;
+  /// Null while the record is unsaved — there is nowhere to put an upload yet,
+  /// so the section says so instead of buffering files it might lose.
+  final PhotoOwner? owner;
 
   @override
-  ConsumerState<RoomTypePhotosSection> createState() =>
-      _RoomTypePhotosSectionState();
+  ConsumerState<PhotosSection> createState() => _PhotosSectionState();
 }
 
-class _RoomTypePhotosSectionState extends ConsumerState<RoomTypePhotosSection> {
+class _PhotosSectionState extends ConsumerState<PhotosSection> {
   bool _busy = false;
   bool _dragging = false;
   PhotoCategory _category = PhotoCategory.room;
@@ -83,8 +83,8 @@ class _RoomTypePhotosSectionState extends ConsumerState<RoomTypePhotosSection> {
   /// The one upload path both the picker and the drop target run through, so a
   /// dropped file and a browsed file are treated identically.
   Future<void> _upload(List<XFile> files, {int skipped = 0}) async {
-    final id = widget.roomTypeId;
-    if (id == null || files.isEmpty || !mounted) return;
+    final owner = widget.owner;
+    if (owner == null || files.isEmpty || !mounted) return;
     final messenger = ScaffoldMessenger.of(context);
 
     setState(() => _busy = true);
@@ -95,7 +95,7 @@ class _RoomTypePhotosSectionState extends ConsumerState<RoomTypePhotosSection> {
         await ref
             .read(unitsActionsProvider)
             .uploadPhoto(
-              id,
+              owner,
               bytes: bytes,
               filename: file.name,
               category: _category,
@@ -138,7 +138,7 @@ class _RoomTypePhotosSectionState extends ConsumerState<RoomTypePhotosSection> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final id = widget.roomTypeId;
+    final id = widget.owner;
 
     return SoftCard(
       child: Column(
@@ -284,8 +284,8 @@ class _RoomTypePhotosSectionState extends ConsumerState<RoomTypePhotosSection> {
     ],
   );
 
-  Widget _gallery(String id) {
-    final photos = ref.watch(roomTypePhotosProvider(id));
+  Widget _gallery(PhotoOwner id) {
+    final photos = ref.watch(photosProvider(id));
     return photos.when(
       loading: () => const Padding(
         padding: EdgeInsets.all(Sp.lg),
@@ -293,7 +293,7 @@ class _RoomTypePhotosSectionState extends ConsumerState<RoomTypePhotosSection> {
       ),
       error: (e, _) => ErrorState(
         error: e,
-        onRetry: () => ref.invalidate(roomTypePhotosProvider(id)),
+        onRetry: () => ref.invalidate(photosProvider(id)),
       ),
       data: (list) {
         if (list.isEmpty) {
@@ -309,7 +309,7 @@ class _RoomTypePhotosSectionState extends ConsumerState<RoomTypePhotosSection> {
           children: [
             for (var i = 0; i < list.length; i++)
               _PhotoTile(
-                roomTypeId: id,
+                owner: id,
                 photo: list[i],
                 canMoveEarlier: i > 0,
                 canMoveLater: i < list.length - 1,
@@ -325,7 +325,7 @@ class _RoomTypePhotosSectionState extends ConsumerState<RoomTypePhotosSection> {
 
 class _PhotoTile extends ConsumerWidget {
   const _PhotoTile({
-    required this.roomTypeId,
+    required this.owner,
     required this.photo,
     required this.canMoveEarlier,
     required this.canMoveLater,
@@ -333,7 +333,7 @@ class _PhotoTile extends ConsumerWidget {
     required this.index,
   });
 
-  final String roomTypeId;
+  final PhotoOwner owner;
   final RoomTypePhoto photo;
   final bool canMoveEarlier;
   final bool canMoveLater;
@@ -453,7 +453,7 @@ class _PhotoTile extends ConsumerWidget {
             ),
           );
         case 'primary':
-          await actions.setPrimaryPhoto(roomTypeId, photo.id);
+          await actions.setPrimaryPhoto(owner, photo.id);
           messenger.showSnackBar(
             const SnackBar(content: Text('Primary photo updated')),
           );
@@ -463,7 +463,7 @@ class _PhotoTile extends ConsumerWidget {
           final to = action == 'earlier' ? index - 1 : index + 1;
           final moved = next.removeAt(index);
           next.insert(to, moved);
-          await actions.reorderPhotos(roomTypeId, next);
+          await actions.reorderPhotos(owner, next);
         case 'delete':
           final ok = await showDialog<bool>(
             context: context,
@@ -483,7 +483,7 @@ class _PhotoTile extends ConsumerWidget {
             ),
           );
           if (ok != true) return;
-          await actions.deletePhoto(roomTypeId, photo.id);
+          await actions.deletePhoto(owner, photo.id);
           messenger.showSnackBar(
             const SnackBar(content: Text('Photo deleted')),
           );

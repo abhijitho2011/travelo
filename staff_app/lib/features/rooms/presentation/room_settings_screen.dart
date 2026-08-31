@@ -35,7 +35,7 @@ class RoomSettingsScreen extends ConsumerWidget {
               if (canReadRoomTypes) ...[
                 ListTile(
                   leading: const Icon(Icons.bed_outlined, size: 20),
-                  title: const Text('Units / Rooms & Rates'),
+                  title: const Text('Room types & rates'),
                   trailing: Icon(
                     Icons.chevron_right,
                     size: 18,

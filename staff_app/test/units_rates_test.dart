@@ -276,4 +276,85 @@ void main() {
       );
     });
   });
+
+  group('room-first inventory', () {
+    test(
+      'a photo gallery addresses rooms and room types one segment apart',
+      () {
+        expect(const PhotoOwner.room('r1').path, '/rooms/r1/photos');
+        expect(const PhotoOwner.roomType('t1').path, '/room-types/t1/photos');
+      },
+    );
+
+    test('owners compare by value, so they can key a provider family', () {
+      // Riverpod families dedupe on ==; identity would refetch on every build.
+      expect(const PhotoOwner.room('r1'), const PhotoOwner.room('r1'));
+      expect(
+        const PhotoOwner.room('r1').hashCode,
+        const PhotoOwner.room('r1').hashCode,
+      );
+      // Same id, different thing entirely.
+      expect(
+        const PhotoOwner.room('x') == const PhotoOwner.roomType('x'),
+        isFalse,
+      );
+    });
+
+    test('a new room sends its own specs and no room type', () {
+      final json = NewRoom(
+        number: '201',
+        specs: RoomTypeDraft(name: 'Garden villa', maxOccupancy: 4).toPayload(),
+      ).toJson();
+
+      expect(json['number'], '201');
+      expect((json['specs'] as Map)['name'], 'Garden villa');
+      // Sending both would be refused by the server as ambiguous.
+      expect(json.containsKey('roomTypeId'), isFalse);
+    });
+
+    test('a room joining a SHARED type sends the id and no specs', () {
+      final json = const NewRoom(number: '202', roomTypeId: 't1').toJson();
+      expect(json['roomTypeId'], 't1');
+      expect(json.containsKey('specs'), isFalse);
+    });
+
+    test('a room parses its own specification sheet and cover photo', () {
+      final room = Room.fromJson({
+        'id': 'r1',
+        'roomTypeId': 't1',
+        'roomTypeName': 'Garden villa',
+        'number': '201',
+        'status': 'AVAILABLE',
+        'specsArePrivate': true,
+        'primaryPhotoUrl': 'https://example.test/signed.jpg',
+        'specs': {
+          'id': 't1',
+          'name': 'Garden villa',
+          'maxOccupancy': 4,
+          'baseRate': 450000,
+        },
+      });
+
+      expect(room.specsArePrivate, isTrue);
+      expect(room.specs?.maxOccupancy, 4);
+      expect(room.primaryPhotoUrl, isNotNull);
+    });
+
+    test(
+      'a room on a shared type reports it, so the screen stays read-only',
+      () {
+        final room = Room.fromJson({
+          'id': 'r2',
+          'roomTypeId': 't1',
+          'roomTypeName': 'Deluxe',
+          'number': '202',
+          'status': 'AVAILABLE',
+        });
+        // Absent means shared: editing specs here would re-specify every other
+        // room of the type, so the default must be the cautious one.
+        expect(room.specsArePrivate, isFalse);
+        expect(room.specs, isNull);
+      },
+    );
+  });
 }

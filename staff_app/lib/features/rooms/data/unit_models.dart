@@ -156,6 +156,35 @@ enum PhotoCategory {
 /// One uploaded image. `url` is a short-lived presigned link — never a stored
 /// address, so it is re-fetched with the room type rather than cached.
 @immutable
+/// What a photo gallery hangs off.
+///
+/// Rooms and room types store photos identically — the same columns, the same
+/// endpoints one path segment apart — so the repository, the providers and the
+/// gallery section are written once and told which one they are looking at.
+/// Value equality matters: this keys a provider family.
+class PhotoOwner {
+  const PhotoOwner.roomType(this.id) : segment = 'room-types';
+  const PhotoOwner.room(this.id) : segment = 'rooms';
+
+  final String id;
+  final String segment;
+
+  bool get isRoom => segment == 'rooms';
+
+  /// The collection URL. Every photo call is this plus a suffix.
+  String get path => '/$segment/$id/photos';
+
+  /// What to call the thing in a sentence the hotelier reads.
+  String get noun => isRoom ? 'room' : 'room type';
+
+  @override
+  bool operator ==(Object other) =>
+      other is PhotoOwner && other.id == id && other.segment == segment;
+
+  @override
+  int get hashCode => Object.hash(id, segment);
+}
+
 class RoomTypePhoto {
   const RoomTypePhoto({
     required this.id,

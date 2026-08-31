@@ -185,6 +185,8 @@ class RoomTypeWorkspaceScreen extends ConsumerStatefulWidget {
     super.key,
     this.roomTypeId,
     this.duplicateOfId,
+    this.roomId,
+    this.newRoom = false,
   });
 
   /// Null for a new room type.
@@ -192,6 +194,13 @@ class RoomTypeWorkspaceScreen extends ConsumerStatefulWidget {
 
   /// Set when the page was opened from a row's Duplicate action.
   final String? duplicateOfId;
+
+  /// The room being edited. Room mode: the page describes ONE physical room,
+  /// and its specifications belong to that room rather than to a shared type.
+  final String? roomId;
+
+  /// Room mode, for a room that does not exist yet.
+  final bool newRoom;
 
   @override
   ConsumerState<RoomTypeWorkspaceScreen> createState() =>
@@ -210,7 +219,28 @@ class _RoomTypeWorkspaceScreenState
   bool _busy = false;
   String? _submitError;
 
-  bool get _isEdit => widget.roomTypeId != null;
+  /// Room identity — the fields that belong to the physical room rather than
+  /// to its specifications.
+  String _number = '';
+  String _floor = '';
+  String _roomNotes = '';
+  RoomStatus _roomStatus = RoomStatus.available;
+
+  /// The type behind the room, learned once the room is loaded. Rate plans,
+  /// taxes and channels key on it.
+  String? _roomTypeIdOfRoom;
+
+  /// Whether this room's specs are its own. A shared type is editable only
+  /// from the room type itself, so editing 201 cannot re-specify 202.
+  bool _specsArePrivate = true;
+
+  bool get _isRoomMode => widget.roomId != null || widget.newRoom;
+  bool get _isEdit =>
+      _isRoomMode ? widget.roomId != null : widget.roomTypeId != null;
+
+  /// The room type the rate sections hang off, whichever mode we are in.
+  String? get _effectiveTypeId =>
+      _isRoomMode ? _roomTypeIdOfRoom : widget.roomTypeId;
 
   void _touch(VoidCallback change) {
     setState(() {
@@ -234,7 +264,11 @@ class _RoomTypeWorkspaceScreenState
   /// the hotelier needs to fix, in their words.
   String? _validate() {
     final d = _draft;
-    if (d.name.trim().isEmpty) return 'Give this room type a name.';
+    if (_isRoomMode) {
+      if (_number.trim().isEmpty) return 'Give this room a number.';
+    } else if (d.name.trim().isEmpty) {
+      return 'Give this room type a name.';
+    }
     if (d.maxAdults < 1) return 'A room has to hold at least one adult.';
     if (d.baseOccupancy < 1) {
       return 'Base occupancy has to be at least one guest.';
@@ -281,6 +315,10 @@ class _RoomTypeWorkspaceScreenState
     final router = GoRouter.of(context);
     setState(() => _busy = true);
     try {
+      if (_isRoomMode) {
+        await _saveRoom(messenger, router);
+        return;
+      }
       final actions = ref.read(roomTypeActionsProvider);
       if (_isEdit) {
         await actions.update(widget.roomTypeId!, _draft.toPayload());
@@ -308,6 +346,52 @@ class _RoomTypeWorkspaceScreenState
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// Room mode. The room's own specifications ride along as `specs`, and the
+  /// server mints the private type behind them — there is no separate
+  /// "create the type first" step for the hotelier to remember.
+  Future<void> _saveRoom(
+    ScaffoldMessengerState messenger,
+    GoRouter router,
+  ) async {
+    final actions = ref.read(roomActionsProvider);
+    final number = _number.trim();
+
+    if (widget.roomId != null) {
+      await actions.update(widget.roomId!, {
+        'number': number,
+        'floor': _floor.trim().isEmpty ? null : _floor.trim(),
+        'notes': _roomNotes.trim().isEmpty ? null : _roomNotes.trim(),
+        'status': _roomStatus.wire,
+        'amenityIds': _draft.amenityIds.toList(),
+        // Specs are only ours to change when the type is private to this room.
+        if (_specsArePrivate) 'specs': _draft.toPayload(),
+      });
+      if (!mounted) return;
+      setState(() => _dirty = false);
+      messenger.showSnackBar(SnackBar(content: Text('Room $number saved')));
+      return;
+    }
+
+    final created = await actions.create(
+      NewRoom(
+        number: number,
+        specs: _draft.toPayload(),
+        floor: int.tryParse(_floor.trim()),
+        status: _roomStatus,
+        notes: _roomNotes.trim().isEmpty ? null : _roomNotes.trim(),
+        amenityIds: _draft.amenityIds.toList(),
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _dirty = false);
+    messenger.showSnackBar(
+      SnackBar(content: Text('Room ${created.number} created successfully.')),
+    );
+    // Straight into the saved room, so photos and rates become available
+    // without the hotelier hunting for the row they just made.
+    router.go(Routes.room(created.id));
   }
 
   /// The create payload. [NewRoomType] carries the fields the original API has
@@ -361,10 +445,229 @@ class _RoomTypeWorkspaceScreenState
     return ok == true;
   }
 
+  // ------------------------------------------------------------- room mode --
+
+  /// The same workspace, describing ONE room. The specification sections are
+  /// shared verbatim with the room-type mode — a room-first property fills in
+  /// exactly the same sheet, it just belongs to the room.
+  Widget _buildRoom(BuildContext context) {
+    final id = widget.roomId;
+    final source = id == null ? null : ref.watch(roomDetailProvider(id));
+
+    if (source != null && !_seeded) {
+      final room = source.valueOrNull;
+      if (room != null) {
+        _number = room.number;
+        _floor = room.floor?.toString() ?? '';
+        _roomNotes = room.notes ?? '';
+        _roomStatus = room.status;
+        _roomTypeIdOfRoom = room.roomTypeId;
+        _specsArePrivate = room.specsArePrivate;
+        // The specs sheet, when the server sent one. A room on a shared type
+        // still shows it — read-only, with a link to the type.
+        final specs = room.specs;
+        if (specs != null) _draft = RoomTypeDraft.from(specs);
+        _draft.amenityIds = room.extraAmenityIds;
+        _seeded = true;
+      }
+    }
+
+    if (source != null && !_seeded) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Room')),
+        body: source.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => ErrorState(
+            error: e,
+            onRetry: () => ref.invalidate(roomDetailProvider(id!)),
+          ),
+          data: (_) => const Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
+    final typeId = _effectiveTypeId;
+    return PopScope(
+      canPop: !_dirty,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        if (await _confirmLeave() && mounted) {
+          // ignore: use_build_context_synchronously — guarded by `mounted`.
+          context.go(Routes.rooms);
+        }
+      },
+      child: Scaffold(
+        body: Form(
+          key: _formKey,
+          child: PageBody(
+            children: [
+              _roomHeader(context),
+              gapSection,
+              _roomIdentity(context),
+              gapSection,
+              if (!_specsArePrivate) ...[_sharedSpecsNote(context), gapSection],
+              // Shared specifications are shown, not edited: the note above
+              // says why, and the fields are inert rather than accepting typing
+              // that save would then silently drop.
+              IgnorePointer(
+                ignoring: !_specsArePrivate,
+                child: Opacity(
+                  opacity: _specsArePrivate ? 1 : 0.6,
+                  child: Column(
+                    children: [
+                      _basicInformation(context),
+                      gapSection,
+                      _occupancy(context),
+                      gapSection,
+                      _beds(context),
+                    ],
+                  ),
+                ),
+              ),
+              gapSection,
+              PhotosSection(
+                owner: widget.roomId == null
+                    ? null
+                    : PhotoOwner.room(widget.roomId!),
+              ),
+              gapSection,
+              AmenitiesSection(
+                selected: _draft.amenityIds,
+                onChanged: (ids) => _touch(() => _draft.amenityIds = ids),
+              ),
+              gapSection,
+              if (typeId != null) ...[
+                RatePlansSection(roomTypeId: typeId),
+                gapSection,
+                TaxesFeesSection(
+                  roomTypeId: typeId,
+                  baseRatePaise: (_draft.baseRateRupees ?? 0) * 100,
+                  pricesIncludeTax: _draft.pricesIncludeTax,
+                  onPricesIncludeTaxChanged: (v) =>
+                      _touch(() => _draft.pricesIncludeTax = v),
+                ),
+                gapSection,
+                DynamicPricingSection(
+                  roomTypeId: typeId,
+                  enabled: _draft.dynamicPricingEnabled,
+                  onEnabledChanged: (v) =>
+                      _touch(() => _draft.dynamicPricingEnabled = v),
+                ),
+                gapSection,
+                SalesChannelsSection(roomTypeId: typeId),
+              ] else
+                const _SaveFirstNote(
+                  what: 'Photos, rate plans, taxes and dynamic pricing',
+                ),
+              if (_submitError != null) ...[
+                gapMd,
+                FormErrorNote(message: _submitError!),
+              ],
+              gapSection,
+            ],
+          ),
+        ),
+        bottomNavigationBar: _saveBar(context),
+      ),
+    );
+  }
+
+  Widget _roomHeader(BuildContext context) => PageHeader(
+    title: widget.roomId == null
+        ? 'Add room'
+        : 'Room ${_number.isEmpty ? '' : _number}'.trim(),
+    subtitle: widget.roomId == null
+        ? 'Describe this room. Everything here belongs to this room alone.'
+        : 'This room and its own specifications.',
+  );
+
+  /// Why the specification fields below are not editable here.
+  Widget _sharedSpecsNote(BuildContext context) {
+    final c = context.colors;
+    return SoftCard(
+      child: Row(
+        children: [
+          Icon(Icons.link_outlined, size: 18, color: c.mutedForeground),
+          const SizedBox(width: Sp.sm),
+          Expanded(
+            child: Text(
+              'This room shares its specifications with the other rooms of '
+              '“${_draft.name}”. Editing them here would change every one of '
+              'them, so they are edited on the room type instead.',
+              style: AppTypography.body(size: 12, color: c.mutedForeground),
+            ),
+          ),
+          if (_roomTypeIdOfRoom != null)
+            TextButton(
+              onPressed: () => context.go(Routes.roomType(_roomTypeIdOfRoom!)),
+              child: const Text('Open room type'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// The physical room: what it is called and what state it is in.
+  Widget _roomIdentity(BuildContext context) => _Section(
+    title: 'Room',
+    subtitle: 'How this room is identified on the board and on the key card.',
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _Field(
+          label: 'Room number',
+          required: true,
+          child: TextFormField(
+            initialValue: _number,
+            textCapitalization: TextCapitalization.characters,
+            decoration: const InputDecoration(hintText: '201, 3A, G-12'),
+            onChanged: (v) => _touch(() => _number = v),
+          ),
+        ),
+        gapMd,
+        _Field(
+          label: 'Floor',
+          child: TextFormField(
+            initialValue: _floor,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(hintText: '2'),
+            onChanged: (v) => _touch(() => _floor = v),
+          ),
+        ),
+        gapMd,
+        _Field(
+          label: 'Status',
+          child: DropdownButtonFormField<RoomStatus>(
+            initialValue: _roomStatus,
+            items: [
+              for (final s in RoomStatus.values)
+                DropdownMenuItem(value: s, child: Text(s.label)),
+            ],
+            onChanged: (v) => _touch(() => _roomStatus = v ?? _roomStatus),
+          ),
+        ),
+        gapMd,
+        _Field(
+          label: 'Notes',
+          child: TextFormField(
+            initialValue: _roomNotes,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              hintText: 'Anything the desk should know about this room',
+            ),
+            onChanged: (v) => _touch(() => _roomNotes = v),
+          ),
+        ),
+      ],
+    ),
+  );
+
   // ------------------------------------------------------------------ build --
 
   @override
   Widget build(BuildContext context) {
+    if (_isRoomMode) return _buildRoom(context);
+
     // Editing loads the record; duplicating loads the source and drops its
     // identity so the copy is saved as a new type.
     final sourceId = widget.roomTypeId ?? widget.duplicateOfId;
@@ -425,7 +728,11 @@ class _RoomTypeWorkspaceScreenState
                 draftName: _draft.name,
               ),
               gapSection,
-              RoomTypePhotosSection(roomTypeId: widget.roomTypeId),
+              PhotosSection(
+                owner: widget.roomTypeId == null
+                    ? null
+                    : PhotoOwner.roomType(widget.roomTypeId!),
+              ),
               gapSection,
               AmenitiesSection(
                 selected: _draft.amenityIds,
@@ -481,7 +788,7 @@ class _RoomTypeWorkspaceScreenState
             }
           },
           icon: const Icon(Icons.arrow_back, size: 16),
-          label: const Text('Units / Rooms & Rates'),
+          label: const Text('Room types & rates'),
           style: TextButton.styleFrom(
             padding: EdgeInsets.zero,
             foregroundColor: c.mutedForeground,

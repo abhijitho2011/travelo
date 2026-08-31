@@ -187,6 +187,7 @@ class RoomCard extends StatelessWidget {
     required this.statusLabel,
     required this.tone,
     this.occupant,
+    this.photoUrl,
     this.onTap,
   });
 
@@ -195,6 +196,12 @@ class RoomCard extends StatelessWidget {
   final String statusLabel;
   final StatusTone tone;
   final String? occupant;
+
+  /// A presigned cover photo. Set on the inventory screen, where a room is a
+  /// thing you look at; left null on the front-desk board, where the card is a
+  /// status tile and a photo would only slow the scan.
+  final String? photoUrl;
+
   final VoidCallback? onTap;
 
   @override
@@ -248,6 +255,27 @@ class RoomCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: AppTypography.body(size: 10, color: c.mutedForeground),
                 ),
+                if (photoUrl != null) ...[
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: R.rSm,
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: Image.network(
+                        photoUrl!,
+                        fit: BoxFit.cover,
+                        // A presigned URL can expire between the list load and
+                        // the paint. A room with no visible cover is a smaller
+                        // problem than a broken-image glyph on the board.
+                        errorBuilder: (_, _, _) => ColoredBox(color: c.muted),
+                        loadingBuilder: (context, child, progress) =>
+                            progress == null
+                            ? child
+                            : ColoredBox(color: c.muted),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 3),
                 Text(
                   statusLabel,

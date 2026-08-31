@@ -560,6 +560,9 @@ class Room {
     this.floor,
     this.notes,
     this.amenities = const <Amenity>[],
+    this.specs,
+    this.specsArePrivate = false,
+    this.primaryPhotoUrl,
     this.createdAt,
     this.updatedAt,
   });
@@ -577,6 +580,19 @@ class Room {
   final String? notes;
   final RoomStatus status;
   final List<Amenity> amenities;
+
+  /// This room's full specification sheet. Room-first inventory: the type is
+  /// where the columns live, but on this screen it reads as the room's own.
+  final RoomType? specs;
+
+  /// Whether [specs] belong to this room alone. False means the type is shared
+  /// with other rooms, and editing it here would re-specify all of them — so
+  /// the screen sends the user to the room type instead.
+  final bool specsArePrivate;
+
+  /// Presigned cover URL, already signed by the list endpoint. Expires.
+  final String? primaryPhotoUrl;
+
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -609,6 +625,15 @@ class Room {
     notes: _str(json['notes']),
     status: RoomStatus.fromWire(_str(json['status'])),
     amenities: _amenities(json['amenities']),
+    specs: json['specs'] is Map
+        ? RoomType.fromJson(json['specs'] as Map)
+        : null,
+    specsArePrivate: _bool(
+      _pick(json, ['specsArePrivate', 'specs_are_private']),
+    ),
+    primaryPhotoUrl: _str(
+      _pick(json, ['primaryPhotoUrl', 'primary_photo_url']),
+    ),
     createdAt: _date(_pick(json, ['createdAt', 'created_at'])),
     updatedAt: _date(_pick(json, ['updatedAt', 'updated_at'])),
   );
@@ -873,15 +898,23 @@ class NewRoomType {
 @immutable
 class NewRoom {
   const NewRoom({
-    required this.roomTypeId,
+    this.roomTypeId,
     required this.number,
+    this.specs,
     this.floor,
     this.status,
     this.notes,
     this.amenityIds = const <String>[],
   });
 
-  final String roomTypeId;
+  /// The type this room is filed under when it SHARES one with other rooms.
+  /// Null on the normal room-first path, where [specs] describes this room and
+  /// the server mints a type private to it. Exactly one of the two is sent.
+  final String? roomTypeId;
+
+  /// This room's own specifications — occupancy, beds, size, rate, policies.
+  final Map<String, dynamic>? specs;
+
   final String number;
   final int? floor;
   final RoomStatus? status;
@@ -891,7 +924,8 @@ class NewRoom {
   final List<String> amenityIds;
 
   Map<String, dynamic> toJson() => {
-    'roomTypeId': roomTypeId,
+    if (roomTypeId != null) 'roomTypeId': roomTypeId,
+    if (specs != null) 'specs': specs,
     'number': number,
     if (floor != null) 'floor': floor,
     if (status != null) 'status': status!.wire,

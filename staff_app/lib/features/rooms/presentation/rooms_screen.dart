@@ -201,6 +201,7 @@ class _FloorPanel extends ConsumerWidget {
                 SizedBox(
                   width: width,
                   child: RoomCard(
+                    photoUrl: room.primaryPhotoUrl,
                     number: room.number,
                     type: room.roomTypeName,
                     statusLabel: room.status.label,
