@@ -88,6 +88,11 @@ const GENERAL_MANAGER: readonly string[] = [
   'conversation.send',
   'review.read',
   'review.respond',
+  // Direct-billing accounts: management opens and settles them, sales raises
+  // them (see SALES_MANAGER), accounts posts against them.
+  'corporate.read',
+  'corporate.create',
+  'corporate.update',
   'room.read',
   'room.create',
   'room.update',
@@ -185,6 +190,9 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
     'folio.adjust',
     'property.settings.read',
     'rates.read',
+    'corporate.read',
+    'corporate.create',
+    'corporate.update',
     'tax.read',
     'reports.read',
     'reports.export',

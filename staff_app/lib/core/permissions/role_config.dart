@@ -120,11 +120,16 @@ class NavItem {
     required this.icon,
     required this.route,
     this.requires = const <String>[],
+    this.section,
   });
 
   final String label;
   final IconData icon;
   final String route;
+
+  /// The sidebar group this destination sits under on a tablet. Items with no
+  /// section (the bottom-bar primaries) lead the sidebar untitled.
+  final String? section;
 
   /// ALL of these permissions must be granted for the item to appear. An empty
   /// list means the item is available to anyone holding the role.
@@ -226,6 +231,7 @@ class RoleConfig {
     label: 'Settings',
     icon: Icons.settings_outlined,
     route: Routes.settings,
+    section: 'Admin',
   );
 
   /// The tail every More menu ends with. No role may have an empty More list —
@@ -285,6 +291,7 @@ class RoleConfig {
     icon: Icons.forum_outlined,
     route: Routes.conversations,
     requires: [P.conversationRead],
+    section: 'Guests',
   );
 
   static const _reviewsMore = NavItem(
@@ -292,13 +299,68 @@ class RoleConfig {
     icon: Icons.reviews_outlined,
     route: Routes.reviews,
     requires: [P.reviewRead],
+    section: 'Guests',
+  );
+
+  /// The per-day price and inventory grid. rates.read: GM, AGM, Accounts,
+  /// Receptionist (read-only for the desk).
+  static const _ratesMore = NavItem(
+    label: 'Rates & inventory',
+    icon: Icons.price_change_outlined,
+    route: Routes.rates,
+    requires: [P.ratesRead],
+    section: 'Revenue',
+  );
+
+  /// The booking calendar — the same screen Front desk reaches, listed
+  /// directly where the sidebar has room for it.
+  static const _calendarMore = NavItem(
+    label: 'Calendar',
+    icon: Icons.calendar_month_outlined,
+    route: Routes.reservationCalendar,
+    requires: [P.reservationRead],
+    section: 'Front office',
+  );
+
+  static const _reportBuilderMore = NavItem(
+    label: 'Custom report',
+    icon: Icons.table_chart_outlined,
+    route: Routes.reportBuilder,
+    requires: [P.reportsRead],
+    section: 'Revenue',
+  );
+
+  static const _cashMore = NavItem(
+    label: 'Cash tracker',
+    icon: Icons.point_of_sale_outlined,
+    route: Routes.accountsCash,
+    requires: [P.financeRead],
+    section: 'Finance',
+  );
+
+  static const _corporateMore = NavItem(
+    label: 'Corporate accounts',
+    icon: Icons.business_outlined,
+    route: Routes.accountsCorporate,
+    requires: [P.corporateRead],
+    section: 'Finance',
+  );
+
+  /// Taxes, policies, add-ons, booking sources, coupons, the booking page.
+  static const _propertySettingsMore = NavItem(
+    label: 'Property settings',
+    icon: Icons.tune_outlined,
+    route: Routes.propertySettings,
+    requires: [P.propertySettingsRead],
+    section: 'Admin',
   );
 
   static const _reportsMore = NavItem(
-    label: 'Reports',
+    label: 'Reports & night audit',
     icon: Icons.insights_outlined,
     route: Routes.reports,
     requires: [P.reportsRead],
+    section: 'Revenue',
   );
 
   static const _roomsMore = NavItem(
@@ -306,6 +368,7 @@ class RoleConfig {
     icon: Icons.meeting_room_outlined,
     route: Routes.rooms,
     requires: [P.roomRead],
+    section: 'Operations',
   );
 
   static const _myTasksMore = NavItem(
@@ -413,58 +476,72 @@ class RoleConfig {
         ),
       ],
       moreMenu: const [
-        _reportsMore,
-        _conversationsMore,
-        _reviewsMore,
+        _calendarMore,
         _roomsMore,
         NavItem(
           label: 'Housekeeping',
           icon: Icons.cleaning_services_outlined,
           route: Routes.housekeeping,
           requires: [P.housekeepingRead],
+          section: 'Operations',
         ),
         NavItem(
           label: 'Maintenance',
           icon: Icons.build_outlined,
           route: Routes.workOrders,
           requires: [P.workOrderRead],
-        ),
-        NavItem(
-          label: 'Restaurant',
-          icon: Icons.restaurant_outlined,
-          route: Routes.restaurant,
-          requires: [P.restaurantRead],
-        ),
-        NavItem(
-          label: 'Inventory',
-          icon: Icons.inventory_2_outlined,
-          route: Routes.inventory,
-          requires: [P.inventoryRead],
-        ),
-        NavItem(
-          label: 'Accounts',
-          icon: Icons.account_balance_outlined,
-          route: Routes.accounts,
-          requires: [P.financeRead],
-        ),
-        NavItem(
-          label: 'Spa',
-          icon: Icons.spa_outlined,
-          route: Routes.spa,
-          requires: [P.spaRead],
-        ),
-        NavItem(
-          label: 'Events',
-          icon: Icons.celebration_outlined,
-          route: Routes.events,
-          requires: [P.eventRead],
+          section: 'Operations',
         ),
         NavItem(
           label: 'Security',
           icon: Icons.shield_outlined,
           route: Routes.securityManager,
           requires: [P.incidentRead],
+          section: 'Operations',
         ),
+        _conversationsMore,
+        _reviewsMore,
+        _ratesMore,
+        _reportsMore,
+        _reportBuilderMore,
+        NavItem(
+          label: 'Accounts',
+          icon: Icons.account_balance_outlined,
+          route: Routes.accounts,
+          requires: [P.financeRead],
+          section: 'Finance',
+        ),
+        _cashMore,
+        _corporateMore,
+        NavItem(
+          label: 'Restaurant',
+          icon: Icons.restaurant_outlined,
+          route: Routes.restaurant,
+          requires: [P.restaurantRead],
+          section: 'Outlets',
+        ),
+        NavItem(
+          label: 'Inventory',
+          icon: Icons.inventory_2_outlined,
+          route: Routes.inventory,
+          requires: [P.inventoryRead],
+          section: 'Outlets',
+        ),
+        NavItem(
+          label: 'Spa',
+          icon: Icons.spa_outlined,
+          route: Routes.spa,
+          requires: [P.spaRead],
+          section: 'Outlets',
+        ),
+        NavItem(
+          label: 'Events',
+          icon: Icons.celebration_outlined,
+          route: Routes.events,
+          requires: [P.eventRead],
+          section: 'Outlets',
+        ),
+        _propertySettingsMore,
         ..._commonMore,
       ],
     ),
@@ -516,52 +593,72 @@ class RoleConfig {
         ),
       ],
       moreMenu: const [
-        _reportsMore,
-        _conversationsMore,
-        _reviewsMore,
+        _calendarMore,
         _roomsMore,
         NavItem(
           label: 'Housekeeping',
           icon: Icons.cleaning_services_outlined,
           route: Routes.housekeeping,
           requires: [P.housekeepingRead],
+          section: 'Operations',
         ),
         NavItem(
           label: 'Maintenance',
           icon: Icons.build_outlined,
           route: Routes.workOrders,
           requires: [P.workOrderRead],
-        ),
-        NavItem(
-          label: 'Restaurant',
-          icon: Icons.restaurant_outlined,
-          route: Routes.restaurant,
-          requires: [P.restaurantRead],
-        ),
-        NavItem(
-          label: 'Inventory',
-          icon: Icons.inventory_2_outlined,
-          route: Routes.inventory,
-          requires: [P.inventoryRead],
-        ),
-        NavItem(
-          label: 'Spa',
-          icon: Icons.spa_outlined,
-          route: Routes.spa,
-          requires: [P.spaRead],
-        ),
-        NavItem(
-          label: 'Events',
-          icon: Icons.celebration_outlined,
-          route: Routes.events,
-          requires: [P.eventRead],
+          section: 'Operations',
         ),
         NavItem(
           label: 'Security',
           icon: Icons.shield_outlined,
           route: Routes.securityManager,
           requires: [P.incidentRead],
+          section: 'Operations',
         ),
+        _conversationsMore,
+        _reviewsMore,
+        _ratesMore,
+        _reportsMore,
+        _reportBuilderMore,
+        NavItem(
+          label: 'Accounts',
+          icon: Icons.account_balance_outlined,
+          route: Routes.accounts,
+          requires: [P.financeRead],
+          section: 'Finance',
+        ),
+        _cashMore,
+        _corporateMore,
+        NavItem(
+          label: 'Restaurant',
+          icon: Icons.restaurant_outlined,
+          route: Routes.restaurant,
+          requires: [P.restaurantRead],
+          section: 'Outlets',
+        ),
+        NavItem(
+          label: 'Inventory',
+          icon: Icons.inventory_2_outlined,
+          route: Routes.inventory,
+          requires: [P.inventoryRead],
+          section: 'Outlets',
+        ),
+        NavItem(
+          label: 'Spa',
+          icon: Icons.spa_outlined,
+          route: Routes.spa,
+          requires: [P.spaRead],
+          section: 'Outlets',
+        ),
+        NavItem(
+          label: 'Events',
+          icon: Icons.celebration_outlined,
+          route: Routes.events,
+          requires: [P.eventRead],
+          section: 'Outlets',
+        ),
+        _propertySettingsMore,
         ..._commonMore,
       ],
     ),
@@ -631,9 +728,12 @@ class RoleConfig {
       // room.create/update/delete, so every other control on that screen gates
       // itself away without this config saying a word about it.
       moreMenu: const [
+        _calendarMore,
+        _roomsMore,
         _conversationsMore,
         _reviewsMore,
-        _roomsMore,
+        _ratesMore,
+        _propertySettingsMore,
         ..._commonMore,
       ],
     ),
@@ -746,7 +846,15 @@ class RoleConfig {
       Icons.account_balance_outlined,
       built: true,
       requires: [P.financeRead],
-      more: const [_reportsMore, _bookingsMore],
+      more: const [
+        _bookingsMore,
+        _reportsMore,
+        _reportBuilderMore,
+        _ratesMore,
+        _cashMore,
+        _corporateMore,
+        _propertySettingsMore,
+      ],
       // The expense register, reached from the dashboard.
       extraRoutes: const {Routes.accountsExpenses},
     ),

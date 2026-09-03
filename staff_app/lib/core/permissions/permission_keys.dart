@@ -73,6 +73,7 @@ class P {
   static const conversationSend = 'conversation.send';
   static const reviewRead = 'review.read';
   static const reviewRespond = 'review.respond';
+  static const corporateRead = 'corporate.read';
 
   // ----------------------------------------------------------- operations --
   static const housekeepingRead = 'housekeeping.read';

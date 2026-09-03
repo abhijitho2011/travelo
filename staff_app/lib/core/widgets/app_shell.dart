@@ -21,6 +21,37 @@ import 'tavelo_sidebar.dart';
 /// Nothing here knows what role is signed in — it renders whatever
 /// [RoleConfig] says the bottom nav and More menu contain, already filtered by
 /// the user's permissions.
+/// Group the sidebar by [NavItem.section], in first-seen order so the role
+/// config decides the sequence. Untitled items (the bottom-bar primaries)
+/// always lead.
+List<SidebarSection> _sections(BuildContext context, List<NavItem> items) {
+  final order = <String?>[];
+  final byTitle = <String?, List<SidebarEntry>>{};
+  for (final item in items) {
+    final key = item.section;
+    if (!byTitle.containsKey(key)) {
+      order.add(key);
+      byTitle[key] = [];
+    }
+    byTitle[key]!.add(
+      SidebarEntry(
+        label: item.label,
+        icon: item.icon,
+        route: item.route,
+        onTap: () => context.go(item.route),
+      ),
+    );
+  }
+  if (order.contains(null)) {
+    order
+      ..remove(null)
+      ..insert(0, null);
+  }
+  return [
+    for (final key in order) SidebarSection(title: key, entries: byTitle[key]!),
+  ];
+}
+
 class AppShell extends ConsumerWidget {
   const AppShell({super.key, required this.child});
 
@@ -111,19 +142,7 @@ class AppShell extends ConsumerWidget {
               TaveloSidebar(
                 currentLocation: location,
                 isActive: (route) => _routeActive(route, location),
-                sections: [
-                  SidebarSection(
-                    entries: [
-                      for (final item in items)
-                        SidebarEntry(
-                          label: item.label,
-                          icon: item.icon,
-                          route: item.route,
-                          onTap: () => context.go(item.route),
-                        ),
-                    ],
-                  ),
-                ],
+                sections: _sections(context, items),
               ),
               // Keep line length readable rather than letting a list span the
               // full width of a landscape tablet.
