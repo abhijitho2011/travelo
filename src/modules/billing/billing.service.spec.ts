@@ -559,6 +559,108 @@ describe('BillingService — gateway refunds', () => {
     expect(out).toMatchObject({ status: 'PROCESSED', gatewayRef: 'cfr_1' });
   });
 
+  it('locks the payment row while checking the refund ceiling', async () => {
+    // Two refunds racing on one payment must serialise on the row: without
+    // FOR UPDATE both read "0 refunded so far", both pass the ceiling, and
+    // together they refund more than was ever paid.
+    const db = mockDb({
+      select: { payments: [[payRow()]], refunds: [[{ sum: 0 }]] },
+      insert: {
+        refunds: [{ id: 'ref-1', paymentId: 'pay-1', amount: 250_000, status: 'PENDING' }],
+      },
+      update: { payments: [{ id: 'pay-1' }], refunds: [{ id: 'ref-1', status: 'MANUAL' }] },
+    });
+    const svc = new BillingService(
+      db as never,
+      mockAudit() as never,
+      { next: async () => 'INV' } as never,
+      { get: () => undefined } as never,
+      {} as never,
+      { generateQuietly: async () => undefined } as never,
+      { configured: false } as never,
+      { configured: false } as never,
+      mockNotifications() as never,
+    );
+    await svc.refundPayment('pay-1', { amount: 250_000 });
+    const paymentRead = db.selects.find((q) => q.table === 'payments');
+    expect(paymentRead?.lock).toBe('update');
+  });
+
+  it('sends our refund row id as the Razorpay receipt, so a retry can find it', async () => {
+    const db = mockDb({
+      select: {
+        payments: [[payRow({ gateway: 'RAZORPAY', gatewayRef: 'pay_rzp1', raw: null })]],
+        refunds: [[{ sum: 0 }]],
+      },
+      insert: {
+        refunds: [{ id: 'ref-1', paymentId: 'pay-1', amount: 250_000, status: 'PENDING' }],
+      },
+      update: {
+        payments: [{ id: 'pay-1' }],
+        refunds: [{ id: 'ref-1', status: 'PROCESSED', gatewayRef: 'rfnd_1' }],
+      },
+    });
+    const razorpay = {
+      configured: true,
+      findRefundByReceipt: jest.fn(async () => null),
+      createRefund: jest.fn(async () => ({ id: 'rfnd_1', amount: 250_000, status: 'processed' })),
+    };
+    const svc = new BillingService(
+      db as never,
+      mockAudit() as never,
+      { next: async () => 'INV' } as never,
+      { get: () => undefined } as never,
+      {} as never,
+      { generateQuietly: async () => undefined } as never,
+      razorpay as never,
+      { configured: false } as never,
+      mockNotifications() as never,
+    );
+    const out = await svc.refundPayment('pay-1', { amount: 250_000 });
+    expect(razorpay.findRefundByReceipt).toHaveBeenCalledWith('pay_rzp1', 'ref-1');
+    expect(razorpay.createRefund).toHaveBeenCalledWith('pay_rzp1', 250_000, 'ref-1');
+    expect(out).toMatchObject({ status: 'PROCESSED', gatewayRef: 'rfnd_1' });
+  });
+
+  it('reuses a Razorpay refund that already carries our receipt instead of refunding twice', async () => {
+    // The timeout case: Razorpay processed the refund but we never saw the
+    // reply, so the row stayed PENDING and the retry worker came round. A
+    // second createRefund here would be a second real-money refund.
+    const db = mockDb({
+      select: {
+        refunds: [
+          [{ id: 'ref-1', paymentId: 'pay-1', amount: 250_000, status: 'PENDING', reason: null }],
+        ],
+        payments: [[payRow({ gateway: 'RAZORPAY', gatewayRef: 'pay_rzp1', raw: null })]],
+      },
+      update: { refunds: [{ id: 'ref-1', status: 'PROCESSED', gatewayRef: 'rfnd_existing' }] },
+    });
+    const razorpay = {
+      configured: true,
+      findRefundByReceipt: jest.fn(async () => ({
+        id: 'rfnd_existing',
+        amount: 250_000,
+        status: 'processed',
+        receipt: 'ref-1',
+      })),
+      createRefund: jest.fn(),
+    };
+    const svc = new BillingService(
+      db as never,
+      mockAudit() as never,
+      { next: async () => 'INV' } as never,
+      { get: () => undefined } as never,
+      {} as never,
+      { generateQuietly: async () => undefined } as never,
+      razorpay as never,
+      { configured: false } as never,
+      mockNotifications() as never,
+    );
+    const res = await svc.retryPendingRefunds();
+    expect(razorpay.createRefund).not.toHaveBeenCalled();
+    expect(res).toEqual({ retried: 1, processed: 1 });
+  });
+
   it('degrades to MANUAL when Cashfree is not configured', async () => {
     const db = mockDb({
       select: { payments: [[payRow()]], refunds: [[{ sum: 0 }]] },

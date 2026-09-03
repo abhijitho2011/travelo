@@ -57,7 +57,7 @@ class AuthController extends StateNotifier<AuthState> {
     await _api.post('/auth/otp/request', body: {'mobile': mobile});
   }
 
-  /// Verify OTP → receive JWT pair → load profile.
+  /// Verify OTP → either a session or an MFA challenge → load profile.
   Future<void> verifyOtp({required String mobile, required String otp}) async {
     final data =
         await _api.post(
@@ -65,11 +65,7 @@ class AuthController extends StateNotifier<AuthState> {
               body: {'mobile': mobile, 'otp': otp},
             )
             as Map;
-    await _tokens.save(
-      access: data['accessToken'] as String,
-      refresh: data['refreshToken'] as String,
-    );
-    await _loadMe();
+    await _acceptSignIn(data);
   }
 
   /// Google sign-in → Firebase ID token → backend exchange for a Tavelo
@@ -78,6 +74,39 @@ class AuthController extends StateNotifier<AuthState> {
     final idToken = await _google.signInAndGetIdToken();
     final data =
         await _api.post('/auth/google', body: {'idToken': idToken}) as Map;
+    await _acceptSignIn(data);
+  }
+
+  /// The second factor. Consumes the held challenge token plus the TOTP (or a
+  /// recovery code); only a success mints the session.
+  Future<void> completeMfa(String code) async {
+    final token = state.mfaToken;
+    if (token == null) throw StateError('No MFA challenge in progress');
+    final data =
+        await _api.post('/auth/mfa', body: {'mfaToken': token, 'code': code})
+            as Map;
+    await _acceptSignIn(data);
+  }
+
+  /// Abandons a pending second factor and returns to the sign-in screen —
+  /// there is no session to revoke, only a challenge token to forget.
+  void cancelMfa() {
+    if (state.isMfaPending) state = const AuthState.signedOut();
+  }
+
+  /// Every sign-in path lands here. First-factor endpoints answer with EITHER
+  /// a token pair OR `{mfaRequired: true, mfaToken}` for an enrolled account;
+  /// reading `accessToken` unconditionally used to throw on the second shape
+  /// and lock every MFA-enrolled owner out of the app.
+  Future<void> _acceptSignIn(Map data) async {
+    if (data['mfaRequired'] == true) {
+      final token = data['mfaToken'];
+      if (token is! String || token.isEmpty) {
+        throw StateError('MFA challenge without a token');
+      }
+      state = AuthState.mfaPending(token);
+      return;
+    }
     await _tokens.save(
       access: data['accessToken'] as String,
       refresh: data['refreshToken'] as String,

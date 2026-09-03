@@ -16,6 +16,8 @@ export type Row = Record<string, unknown>;
 export interface RecordedQuery {
   table: string;
   where: unknown[];
+  /** `'update'` when the query asked for `FOR UPDATE`. */
+  lock?: string;
   values?: Row;
 }
 
@@ -160,11 +162,15 @@ export function mockDb(opts: MockDbOptions = {}): MockDb {
       'offset',
       'returning',
       'onConflictDoNothing',
-      // `SELECT ... FOR UPDATE`, used by the reservations overlap check.
-      'for',
     ]) {
       c[m] = passthrough;
     }
+    // `SELECT ... FOR UPDATE` (reservations overlap check, refund ceiling).
+    // Recorded, not just swallowed, so a test can prove the lock was asked for.
+    c.for = (mode: unknown) => {
+      record.lock = String(mode);
+      return c;
+    };
     c.where = (cond: unknown) => {
       record.where.push(cond);
       return c;

@@ -634,7 +634,7 @@ export class BillingService {
 
     try {
       const gatewayRefId = razorpayReady
-        ? (await this.razorpay.createRefund(pay.gatewayRef!, refund.amount)).id
+        ? await this.razorpayRefundIdempotent(pay.gatewayRef!, refund)
         : (
             await this.cashfree.createRefund({
               orderId: cashfreeOrderId!,
@@ -668,6 +668,29 @@ export class BillingService {
       });
       return refund;
     }
+  }
+
+  /**
+   * Refund at Razorpay exactly once per refund row.
+   *
+   * Razorpay has no server-side idempotency key on refunds, so a retry after a
+   * timeout would mint a SECOND real-money refund. Our refund row id is sent
+   * as the refund `receipt`, and a retry first looks for an existing refund
+   * carrying that receipt and reuses it. This is the same contract Cashfree
+   * gets from `refundId` — applied by hand where the gateway will not do it.
+   */
+  private async razorpayRefundIdempotent(
+    paymentRef: string,
+    refund: typeof refunds.$inferSelect,
+  ): Promise<string> {
+    const existing = await this.razorpay.findRefundByReceipt(paymentRef, refund.id);
+    if (existing) {
+      this.logger.warn(
+        `Razorpay refund for row ${refund.id} already exists as ${existing.id}; reusing it`,
+      );
+      return existing.id;
+    }
+    return (await this.razorpay.createRefund(paymentRef, refund.amount, refund.id)).id;
   }
 
   /**
@@ -726,7 +749,15 @@ export class BillingService {
   private async refundInTx(paymentId: string, dto: { amount: number; reason?: string }) {
     const ctx = getRequestContext();
     return this.db.transaction(async (tx) => {
-      const [pay] = await tx.select().from(payments).where(eq(payments.id, paymentId)).limit(1);
+      // FOR UPDATE: two refunds racing on the same payment must serialise here,
+      // or both read the same "already refunded" sum, both pass the ceiling
+      // check below, and together refund more than was ever paid.
+      const [pay] = await tx
+        .select()
+        .from(payments)
+        .where(eq(payments.id, paymentId))
+        .for('update')
+        .limit(1);
       if (!pay) throw new NotFoundException('Payment not found');
       if (pay.status !== 'SUCCESS' && pay.status !== 'PARTIALLY_REFUNDED') {
         throw new BadRequestException(
@@ -875,6 +906,8 @@ export class BillingService {
     intraState?: boolean;
     /** Place of supply (state); recorded on the invoice for GST. */
     placeOfSupply?: string;
+    /** Per-unit tariff the accommodation slab is resolved on. */
+    unitAmountPaise?: number;
   }) {
     const intraState = dto.intraState ?? true;
     let cgstPaise = 0;
@@ -896,11 +929,16 @@ export class BillingService {
         igstPaise = taxPaise;
       }
     } else {
-      // Auto-compute GST from the subtotal via the engine.
+      // Auto-compute GST via the engine. The accommodation slab is set by the
+      // tariff PER NIGHT, not the invoice total: a three-night stay at ₹3,000
+      // is ₹9,000 on the invoice but still a ₹3,000 room, and 12%, not 18%.
+      // `unitAmountPaise` carries that tariff; without it the subtotal is the
+      // only basis we have, which for a one-unit invoice is the same number.
       const category = dto.category ?? 'accommodation';
       const gst = computeGstForCategory({
         category,
         taxableAmountPaise: dto.subtotal,
+        slabBasisPaise: dto.unitAmountPaise,
         intraState,
       });
       cgstPaise = gst.cgstPaise;

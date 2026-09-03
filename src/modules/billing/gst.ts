@@ -145,9 +145,16 @@ export function computeGst(input: ComputeGstInput): GstBreakdown {
 export function computeGstForCategory(args: {
   category: GstCategory;
   taxableAmountPaise: number;
+  /**
+   * The amount the SLAB is chosen on, when it differs from the amount taxed.
+   * For accommodation that is the declared tariff per room per night — the
+   * law sets the rate by the room's price, not by how many nights were sold.
+   * Defaults to the taxable amount, which is right for a single-unit invoice.
+   */
+  slabBasisPaise?: number;
   intraState: boolean;
 }): GstBreakdown & { ratePercent: number; hsnCode: string } {
-  const ratePercent = resolveGstRate(args.category, args.taxableAmountPaise);
+  const ratePercent = resolveGstRate(args.category, args.slabBasisPaise ?? args.taxableAmountPaise);
   const breakdown = computeGst({
     taxableAmountPaise: args.taxableAmountPaise,
     ratePercent,

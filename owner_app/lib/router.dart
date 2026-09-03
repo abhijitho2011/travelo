@@ -19,6 +19,7 @@ import 'features/account/profile_screen.dart';
 import 'features/account/security_screen.dart';
 import 'features/auth/invite_screen.dart';
 import 'features/auth/login_screen.dart';
+import 'features/auth/mfa_screen.dart';
 import 'features/dashboard/portfolio_screen.dart';
 import 'features/notifications/notifications_screen.dart';
 import 'features/properties/add_property_screen.dart';
@@ -51,11 +52,14 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final auth = ref.read(authControllerProvider);
       final loc = state.matchedLocation;
-      final onAuthPage = loc == '/login' || loc == '/invite';
+      final onAuthPage = loc == '/login' || loc == '/invite' || loc == '/mfa';
 
       if (auth.phase == AuthPhase.unknown) return null; // splash handles it
+      // A pending second factor is pinned to /mfa: nothing authenticated may
+      // render, and going back to /login would drop the challenge silently.
+      if (auth.isMfaPending) return loc == '/mfa' ? null : '/mfa';
       if (!auth.isAuthenticated) {
-        return onAuthPage ? null : '/login';
+        return onAuthPage && loc != '/mfa' ? null : '/login';
       }
       if (onAuthPage) return '/';
       return null;
@@ -63,6 +67,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       GoRoute(path: '/invite', builder: (_, __) => const InviteScreen()),
+      GoRoute(path: '/mfa', builder: (_, __) => const MfaScreen()),
 
       // ------------------------------------------------- inside the shell ---
       // The seven destinations the navigation offers. Everything else is a
@@ -153,7 +158,8 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
     // A deep link (or a tapped notification) to a path that no longer resolves
     // lands here instead of a raw go_router error page.
-    errorBuilder: (context, state) => _RouteNotFound(location: state.uri.toString()),
+    errorBuilder: (context, state) =>
+        _RouteNotFound(location: state.uri.toString()),
   );
 });
 
@@ -176,11 +182,18 @@ class _RouteNotFound extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.explore_off_outlined, size: 48, color: c.mutedForeground),
+              Icon(
+                Icons.explore_off_outlined,
+                size: 48,
+                color: c.mutedForeground,
+              ),
               const SizedBox(height: 16),
               Text(
                 'This page could not be opened',
-                style: AppTypography.body(color: c.foreground, weight: FontWeight.w600),
+                style: AppTypography.body(
+                  color: c.foreground,
+                  weight: FontWeight.w600,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),

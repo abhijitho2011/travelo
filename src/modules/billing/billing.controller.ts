@@ -43,6 +43,12 @@ class CreateInvoiceDto {
   @IsOptional() @IsString() dueDate?: string;
   /** GST category for auto-computation; defaults to accommodation. */
   @IsOptional() @IsIn(['accommodation', 'restaurant', 'saas', 'other']) category?: GstCategory;
+  /**
+   * The per-unit amount the GST slab is resolved on — for accommodation, the
+   * tariff per room per night. Send it whenever `subtotal` spans more than one
+   * night, or the slab is chosen on the wrong number.
+   */
+  @IsOptional() @IsInt() @Min(0) unitAmountPaise?: number;
   /** true (default) → CGST+SGST split; false → IGST. */
   @IsOptional() @IsBoolean() intraState?: boolean;
   @IsOptional() @IsString() placeOfSupply?: string;
@@ -171,6 +177,7 @@ export class BillingController {
       category: dto.category,
       intraState: dto.intraState,
       placeOfSupply: dto.placeOfSupply,
+      unitAmountPaise: dto.unitAmountPaise,
     });
   }
 

@@ -146,4 +146,38 @@ describe('GST engine', () => {
       }
     });
   });
+
+  describe('computeGstForCategory — the slab is chosen on the per-night tariff', () => {
+    it('a multi-night stay keeps the per-night slab, whatever the invoice total', () => {
+      // Three nights at ₹3,000: ₹9,000 on the invoice, but a ₹3,000 room.
+      const r = computeGstForCategory({
+        category: 'accommodation',
+        taxableAmountPaise: 900_000,
+        slabBasisPaise: 300_000,
+        intraState: true,
+      });
+      expect(r.ratePercent).toBe(12);
+      expect(r.taxPaise).toBe(108_000); // 12% of ₹9,000
+    });
+
+    it('without a basis the taxable amount is the basis — right for one unit', () => {
+      const r = computeGstForCategory({
+        category: 'accommodation',
+        taxableAmountPaise: 900_000,
+        intraState: true,
+      });
+      expect(r.ratePercent).toBe(18);
+    });
+
+    it('a genuinely expensive room is still 18% per night', () => {
+      const r = computeGstForCategory({
+        category: 'accommodation',
+        taxableAmountPaise: 1_600_000,
+        slabBasisPaise: 800_000,
+        intraState: false,
+      });
+      expect(r.ratePercent).toBe(18);
+      expect(r.igstPaise).toBe(288_000);
+    });
+  });
 });

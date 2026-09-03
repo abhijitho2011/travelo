@@ -23,7 +23,10 @@ class GoogleAuthService {
       } else {
         final googleUser = await GoogleSignIn().signIn();
         if (googleUser == null) {
-          throw const ApiException(code: 'CANCELLED', message: 'Sign-in cancelled.');
+          throw const ApiException(
+            code: 'CANCELLED',
+            message: 'Sign-in cancelled.',
+          );
         }
         final googleAuth = await googleUser.authentication;
         final credential = GoogleAuthProvider.credential(
@@ -33,12 +36,18 @@ class GoogleAuthService {
         cred = await auth.signInWithCredential(credential);
       }
     } on FirebaseAuthException catch (e) {
-      throw ApiException(code: e.code, message: e.message ?? 'Google sign-in failed.');
+      throw ApiException(
+        code: e.code,
+        message: e.message ?? 'Google sign-in failed.',
+      );
     }
 
     final idToken = await cred.user?.getIdToken();
     if (idToken == null) {
-      throw const ApiException(code: 'NO_TOKEN', message: 'Could not obtain Google token.');
+      throw const ApiException(
+        code: 'NO_TOKEN',
+        message: 'Could not obtain Google token.',
+      );
     }
     return idToken;
   }

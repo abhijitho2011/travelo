@@ -27,6 +27,8 @@ export interface RazorpayRefund {
   id: string;
   amount: number;
   status: string;
+  /** Our refund row id, echoed back — the handle idempotency hangs on. */
+  receipt?: string | null;
 }
 
 @Injectable()
@@ -65,27 +67,59 @@ export class RazorpayClient {
     });
   }
 
-  async createRefund(paymentRef: string, amountPaise: number): Promise<RazorpayRefund> {
+  /**
+   * `receipt` is our own refund row id (Razorpay allows 40 chars; a UUID is
+   * 36). It is the only durable link between their refund and our row, and
+   * what `findRefundByReceipt` keys on so a retry never refunds twice.
+   */
+  async createRefund(
+    paymentRef: string,
+    amountPaise: number,
+    receipt?: string,
+  ): Promise<RazorpayRefund> {
     return this.post<RazorpayRefund>(`/v1/payments/${encodeURIComponent(paymentRef)}/refund`, {
       amount: amountPaise,
+      ...(receipt ? { receipt } : {}),
     });
   }
 
-  /** Minimal HTTPS POST with basic auth. Rejects on any non-2xx. */
+  /** Every refund Razorpay holds against one payment. */
+  async listRefunds(paymentRef: string): Promise<RazorpayRefund[]> {
+    const page = await this.get<{ items?: RazorpayRefund[] }>(
+      `/v1/payments/${encodeURIComponent(paymentRef)}/refunds`,
+    );
+    return page.items ?? [];
+  }
+
+  /** The refund already created for `receipt`, if any — the idempotency read. */
+  async findRefundByReceipt(paymentRef: string, receipt: string): Promise<RazorpayRefund | null> {
+    const all = await this.listRefunds(paymentRef);
+    return all.find((r) => r.receipt === receipt) ?? null;
+  }
+
   private post<T>(path: string, body: unknown): Promise<T> {
-    const payload = JSON.stringify(body);
+    return this.send<T>('POST', path, JSON.stringify(body));
+  }
+
+  private get<T>(path: string): Promise<T> {
+    return this.send<T>('GET', path);
+  }
+
+  /** Minimal HTTPS call with basic auth. Rejects on any non-2xx. */
+  private send<T>(method: 'GET' | 'POST', path: string, payload?: string): Promise<T> {
     const auth = Buffer.from(`${this.keyId}:${this.keySecret}`).toString('base64');
     return new Promise<T>((resolve, reject) => {
       const req = request(
         {
           host: RAZORPAY_API_HOST,
           path,
-          method: 'POST',
+          method,
           timeout: 15_000,
           headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(payload),
             Authorization: `Basic ${auth}`,
+            ...(payload !== undefined
+              ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+              : {}),
           },
         },
         (res) => {
@@ -109,7 +143,7 @@ export class RazorpayClient {
       );
       req.on('timeout', () => req.destroy(new Error(`Razorpay ${path} timed out`)));
       req.on('error', reject);
-      req.write(payload);
+      if (payload !== undefined) req.write(payload);
       req.end();
     });
   }
