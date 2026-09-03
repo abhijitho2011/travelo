@@ -18,6 +18,7 @@ import {
 import { DRIZZLE, Database } from '../../database/database.module';
 import { FolioService } from '../folio/folio.service';
 import { RatesService, type DayRules } from '../rates/rates.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import {
   propertySettings,
   OCCUPYING_STATUSES,
@@ -96,6 +97,7 @@ export class ReservationsService {
     // notifications: a booking must never fail because a module is not wired;
     // without it, prices fall back to overrides/base and no day rules apply.
     @Optional() private readonly rates?: RatesService,
+    @Optional() private readonly realtime?: RealtimeService,
   ) {}
 
   /**
@@ -449,6 +451,7 @@ export class ReservationsService {
       return updated;
     });
     const [dto] = await this.hydrate([row]);
+    this.realtime?.emit(propertyId, 'reservation.changed', { id: dto.id, status: dto.status });
     return dto;
   }
 
@@ -924,6 +927,10 @@ export class ReservationsService {
         });
 
         const [hydrated] = await this.hydrate([row]);
+        this.realtime?.emit(propertyId, 'reservation.changed', {
+          id: hydrated.id,
+          status: hydrated.status,
+        });
         // A booking that lands already CONFIRMED (walk-in, or a synced OTA
         // booking) is a confirmation the guest should hear about immediately.
         if (hydrated.status === 'CONFIRMED') {
@@ -1035,6 +1042,7 @@ export class ReservationsService {
     });
 
     const [after] = await this.hydrate([row]);
+    this.realtime?.emit(propertyId, 'reservation.changed', { id: after.id, status: after.status });
     return {
       before: {
         id: before.id,
@@ -1114,6 +1122,7 @@ export class ReservationsService {
       return updated;
     });
     const [after] = await this.hydrate([row]);
+    this.realtime?.emit(propertyId, 'reservation.changed', { id: after.id, status: after.status });
     return { previousCheckOut: before.checkOut, ...after };
   }
 
@@ -1192,6 +1201,7 @@ export class ReservationsService {
       return updated;
     });
     const [after] = await this.hydrate([row]);
+    this.realtime?.emit(propertyId, 'reservation.changed', { id: after.id, status: after.status });
     return { previousRoomId: before.roomId, ...after, roomNumber: room.number };
   }
 
@@ -1229,6 +1239,7 @@ export class ReservationsService {
     });
 
     const [after] = await this.hydrate([row]);
+    this.realtime?.emit(propertyId, 'reservation.changed', { id: after.id, status: after.status });
     this.notifyGuestQuietly('booking.confirmed', after);
     return { previousStatus: before.status, ...after };
   }
@@ -1274,6 +1285,7 @@ export class ReservationsService {
     });
 
     const [after] = await this.hydrate([row]);
+    this.realtime?.emit(propertyId, 'reservation.changed', { id: after.id, status: after.status });
     return after;
   }
 
@@ -1347,6 +1359,7 @@ export class ReservationsService {
     });
 
     const [after] = await this.hydrate([row]);
+    this.realtime?.emit(propertyId, 'reservation.changed', { id: after.id, status: after.status });
     this.notifyGuestQuietly('booking.checked_in', after);
     return { ...after, previousStatus: before.status, roomNumber: room.number };
   }
@@ -1428,6 +1441,7 @@ export class ReservationsService {
     });
 
     const [after] = await this.hydrate([row]);
+    this.realtime?.emit(propertyId, 'reservation.changed', { id: after.id, status: after.status });
     return { previousStatus: before.status, ...after, balancePaise, outstandingOverride: overrode };
   }
 
@@ -1503,6 +1517,7 @@ export class ReservationsService {
     });
 
     const [after] = await this.hydrate([row]);
+    this.realtime?.emit(propertyId, 'reservation.changed', { id: after.id, status: after.status });
     return { previousStatus: before.status, ...after };
   }
 
@@ -1535,6 +1550,7 @@ export class ReservationsService {
     });
 
     const [after] = await this.hydrate([row]);
+    this.realtime?.emit(propertyId, 'reservation.changed', { id: after.id, status: after.status });
     return { previousStatus: before.status, ...after };
   }
 }

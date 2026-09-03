@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, gt, inArray, isNull, lt, ne, sql } from 'drizzle-orm';
+import { gte, and, asc, desc, eq, gt, inArray, isNull, lt, ne, sql } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import {
   hotelStaff,
@@ -91,6 +91,109 @@ export class OwnerPortalService {
    * an accounting one; night-level apportionment needs a folio/ledger table
    * that does not exist yet.
    */
+  /**
+   * The group dashboard: every property's closed-day performance by month —
+   * occupancy, ADR, RevPAR, revenue — plus the booking-source mix, so one
+   * owner can compare hotels and see the top and bottom performers.
+   */
+  async portfolioPerformance(ownerId: string, months = 6) {
+    const props = await this.db
+      .select({ id: properties.id, name: properties.name, city: properties.city })
+      .from(properties)
+      .where(and(eq(properties.ownerId, ownerId), isNull(properties.deletedAt)));
+    if (props.length === 0) return { months, properties: [], top: null, low: null, sources: [] };
+    const ids = props.map((p) => p.id);
+    const since = new Date();
+    since.setUTCMonth(since.getUTCMonth() - (months - 1), 1);
+    const sinceIso = since.toISOString().slice(0, 10);
+
+    const rows = await this.db
+      .select({
+        propertyId: propertyDailySnapshots.propertyId,
+        month: sql<string>`to_char(${propertyDailySnapshots.businessDate}, 'YYYY-MM')`,
+        revenue: sql<number>`coalesce(sum(${propertyDailySnapshots.revenuePaise}),0)::int`,
+        sold: sql<number>`coalesce(sum(${propertyDailySnapshots.roomsSold}),0)::int`,
+        available: sql<number>`coalesce(sum(${propertyDailySnapshots.roomsAvailable}),0)::int`,
+      })
+      .from(propertyDailySnapshots)
+      .where(
+        and(
+          inArray(propertyDailySnapshots.propertyId, ids),
+          gte(propertyDailySnapshots.businessDate, sinceIso),
+        ),
+      )
+      .groupBy(
+        propertyDailySnapshots.propertyId,
+        sql`to_char(${propertyDailySnapshots.businessDate}, 'YYYY-MM')`,
+      );
+
+    const byProp = props.map((p) => {
+      const mine = rows
+        .filter((r) => r.propertyId === p.id)
+        .sort((a, b) => a.month.localeCompare(b.month));
+      const total = mine.reduce(
+        (acc, r) => ({
+          revenue: acc.revenue + Number(r.revenue),
+          sold: acc.sold + Number(r.sold),
+          available: acc.available + Number(r.available),
+        }),
+        { revenue: 0, sold: 0, available: 0 },
+      );
+      return {
+        ...p,
+        months: mine.map((r) => ({
+          month: r.month,
+          revenuePaise: Number(r.revenue),
+          occupancyPct:
+            Number(r.available) > 0 ? Math.round((Number(r.sold) / Number(r.available)) * 100) : 0,
+          adrPaise: Number(r.sold) > 0 ? Math.round(Number(r.revenue) / Number(r.sold)) : 0,
+          revparPaise:
+            Number(r.available) > 0 ? Math.round(Number(r.revenue) / Number(r.available)) : 0,
+        })),
+        totals: {
+          revenuePaise: total.revenue,
+          occupancyPct: total.available > 0 ? Math.round((total.sold / total.available) * 100) : 0,
+          adrPaise: total.sold > 0 ? Math.round(total.revenue / total.sold) : 0,
+          revparPaise: total.available > 0 ? Math.round(total.revenue / total.available) : 0,
+        },
+      };
+    });
+    const ranked = [...byProp].sort((a, b) => b.totals.revparPaise - a.totals.revparPaise);
+
+    const sources = await this.db
+      .select({
+        source: reservations.source,
+        rooms: sql<number>`count(*)::int`,
+        revenue: sql<number>`coalesce(sum(${reservations.totalPaise}),0)::int`,
+      })
+      .from(reservations)
+      .where(
+        and(
+          inArray(reservations.propertyId, ids),
+          gte(reservations.checkIn, sinceIso),
+          inArray(reservations.status, ['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT']),
+          isNull(reservations.deletedAt),
+        ),
+      )
+      .groupBy(reservations.source);
+
+    return {
+      months,
+      from: sinceIso,
+      properties: byProp,
+      top: ranked[0] ? { id: ranked[0].id, name: ranked[0].name } : null,
+      low:
+        ranked.length > 1
+          ? { id: ranked[ranked.length - 1].id, name: ranked[ranked.length - 1].name }
+          : null,
+      sources: sources.map((s) => ({
+        source: s.source,
+        roomsSold: Number(s.rooms),
+        revenuePaise: Number(s.revenue),
+      })),
+    };
+  }
+
   async portfolioSummary(ownerId: string) {
     const [row] = await this.db
       .select({

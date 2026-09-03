@@ -109,6 +109,10 @@ describe('staff role → permission map', () => {
         'rates.read',
         'property.settings.read',
         'folio.read',
+        // Guest messaging and reading reviews belong to the desk.
+        'conversation.read',
+        'conversation.send',
+        'review.read',
       ].sort(),
     );
   });

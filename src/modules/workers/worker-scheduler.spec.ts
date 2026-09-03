@@ -36,6 +36,7 @@ describe('WorkerSchedulerService', () => {
       retention as never,
       { run: async () => ({ expired: 0 }) } as never,
       { run: async () => ({ properties: 0, priced: 0, reverted: 0 }) } as never,
+      { run: async () => ({ preArrival: 0, reviews: 0 }) } as never,
     );
     return {
       svc,

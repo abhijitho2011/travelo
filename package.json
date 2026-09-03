@@ -29,6 +29,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.123.0",
     "@aws-sdk/client-s3": "^3.1121.0",
     "@aws-sdk/s3-request-presigner": "^3.1121.0",
     "@nestjs/bullmq": "^10.2.2",
@@ -38,10 +39,12 @@
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/passport": "^10.0.3",
     "@nestjs/platform-express": "^10.4.15",
+    "@nestjs/platform-socket.io": "^10.4.22",
     "@nestjs/schedule": "^4.1.2",
     "@nestjs/swagger": "^7.4.2",
     "@nestjs/terminus": "^10.2.3",
     "@nestjs/throttler": "^6.4.0",
+    "@nestjs/websockets": "^10.4.22",
     "@types/qrcode": "^1.5.6",
     "argon2": "^0.41.1",
     "bullmq": "^5.34.10",

@@ -6,6 +6,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -83,6 +84,10 @@ export const propertySettings = pgTable('property_settings', {
   currency: varchar('currency', { length: 8 }).notNull().default('INR'),
   /** No rule may price a room below this. */
   minRoomPricePaise: integer('min_room_price_paise'),
+  /** What the desk tells guests on their stay link. */
+  guestInstructions: text('guest_instructions'),
+  /** Where post-checkout review requests point (Google / OTA). */
+  reviewUrl: varchar('review_url', { length: 512 }),
   /** Basis points auto-added to every restaurant bill. */
   restaurantServiceChargeBp: integer('restaurant_service_charge_bp').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -501,3 +506,122 @@ export type CorporateAccount = typeof corporateAccounts.$inferSelect;
 export type CorporateLedgerEntry = typeof corporateLedger.$inferSelect;
 export type StaffShift = typeof staffShifts.$inferSelect;
 export type CashEntry = typeof cashEntries.$inferSelect;
+
+// ------------------------------------------------------- guest journey ----
+
+/** One contactless link per reservation. Only the token HASH is stored. */
+export const guestLinks = pgTable(
+  'guest_links',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    propertyId: uuid('property_id').notNull(),
+    reservationId: uuid('reservation_id')
+      .notNull()
+      .references(() => reservations.id, { onDelete: 'cascade' }),
+    tokenHash: varchar('token_hash', { length: 64 }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    openedAt: timestamp('opened_at', { withTimezone: true }),
+    checkinSubmittedAt: timestamp('checkin_submitted_at', { withTimezone: true }),
+    checkoutRequestedAt: timestamp('checkout_requested_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    tokenUnique: uniqueIndex('guest_links_token_hash_unique').on(t.tokenHash),
+    reservationIdx: index('guest_links_reservation_idx').on(t.reservationId),
+  }),
+);
+
+// ------------------------------------------------------- conversations ----
+
+export const messageChannelValues = ['SMS', 'EMAIL', 'WHATSAPP', 'INTERNAL'] as const;
+export type MessageChannel = (typeof messageChannelValues)[number];
+
+export const conversations = pgTable(
+  'conversations',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    propertyId: uuid('property_id').notNull(),
+    reservationId: uuid('reservation_id'),
+    guestName: varchar('guest_name', { length: 160 }),
+    guestPhone: varchar('guest_phone', { length: 32 }),
+    guestEmail: varchar('guest_email', { length: 254 }),
+    lastMessageAt: timestamp('last_message_at', { withTimezone: true }),
+    lastPreview: varchar('last_preview', { length: 200 }),
+    unreadCount: integer('unread_count').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    propertyLastIdx: index('conversations_property_last_idx').on(t.propertyId, t.lastMessageAt),
+    propertyPhoneIdx: index('conversations_property_phone_idx').on(t.propertyId, t.guestPhone),
+  }),
+);
+
+export const messages = pgTable(
+  'messages',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    conversationId: uuid('conversation_id')
+      .notNull()
+      .references(() => conversations.id, { onDelete: 'cascade' }),
+    propertyId: uuid('property_id').notNull(),
+    direction: varchar('direction', { length: 3 }).notNull().$type<'IN' | 'OUT'>(),
+    channel: varchar('channel', { length: 12 }).notNull().$type<MessageChannel>(),
+    body: text('body').notNull(),
+    status: varchar('status', { length: 12 }).notNull().default('QUEUED').$type<'QUEUED' | 'SENT' | 'FAILED' | 'RECEIVED'>(),
+    origin: varchar('origin', { length: 12 }).notNull().default('MANUAL').$type<'MANUAL' | 'AUTOMATION' | 'GUEST'>(),
+    automationKey: varchar('automation_key', { length: 64 }),
+    sentBy: uuid('sent_by'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ conversationCreatedIdx: index('messages_conversation_created_idx').on(t.conversationId, t.createdAt) }),
+);
+
+/** Once per reservation per automation key. */
+export const stayAutomationsSent = pgTable(
+  'stay_automations_sent',
+  {
+    reservationId: uuid('reservation_id').notNull(),
+    automationKey: varchar('automation_key', { length: 64 }).notNull(),
+    sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.reservationId, t.automationKey] }) }),
+);
+
+// -------------------------------------------------------------- reviews ----
+
+export const reviewSourceValues = ['GOOGLE', 'BOOKING_COM', 'MAKEMYTRIP', 'TRIPADVISOR', 'DIRECT', 'OTHER'] as const;
+
+export const reviews = pgTable(
+  'reviews',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    propertyId: uuid('property_id').notNull(),
+    reservationId: uuid('reservation_id'),
+    source: varchar('source', { length: 24 }).notNull().default('DIRECT').$type<(typeof reviewSourceValues)[number]>(),
+    guestName: varchar('guest_name', { length: 160 }),
+    rating: integer('rating').notNull(),
+    title: varchar('title', { length: 200 }),
+    body: text('body'),
+    reviewedAt: date('reviewed_at'),
+    response: text('response'),
+    respondedAt: timestamp('responded_at', { withTimezone: true }),
+    respondedBy: uuid('responded_by'),
+    externalUrl: varchar('external_url', { length: 512 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ propertyCreatedIdx: index('reviews_property_created_idx').on(t.propertyId, t.createdAt) }),
+);
+
+export type GuestLink = typeof guestLinks.$inferSelect;
+export type Conversation = typeof conversations.$inferSelect;
+export type Message = typeof messages.$inferSelect;
+export type Review = typeof reviews.$inferSelect;

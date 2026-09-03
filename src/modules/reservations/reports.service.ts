@@ -1,5 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import { propertyDailySnapshots, reservations, roomTypes, rooms } from '../../database/schema';
 
@@ -109,4 +109,166 @@ export class ReportsService {
       revparPaise: r.roomsAvailable > 0 ? Math.round(r.revenuePaise / r.roomsAvailable) : 0,
     };
   }
+
+  /**
+   * The custom report builder — a constrained query, never raw SQL. The
+   * caller picks an entity, a date window, optional filters, a grouping and
+   * measures from fixed whitelists; the service assembles the SQL. Everything
+   * is scoped to the property, and each entity's date column is fixed.
+   */
+  async customReport(propertyId: string, q: CustomReportQuery) {
+    const spec = CUSTOM_REPORT_ENTITIES[q.entity];
+    if (!spec) throw new BadRequestException('Unknown entity');
+    const groupCol = q.groupBy ? spec.dimensions[q.groupBy] : null;
+    if (q.groupBy && !groupCol)
+      throw new BadRequestException(`Cannot group ${q.entity} by ${q.groupBy}`);
+    const measures = (q.measures?.length ? q.measures : ['count']).map((m) => {
+      const expr = spec.measures[m];
+      if (!expr) throw new BadRequestException(`Unknown measure ${m} for ${q.entity}`);
+      return { key: m, expr };
+    });
+    const where: string[] = [
+      `${spec.propertyCol} = '${propertyId.replace(/'/g, '')}'`,
+      `${spec.dateCol} >= '${q.from}'`,
+      `${spec.dateCol} <= '${q.to}'`,
+    ];
+    if (spec.softDelete) where.push(`${spec.softDelete} is null`);
+    for (const f of q.filters ?? []) {
+      const col = spec.dimensions[f.field];
+      if (!col) throw new BadRequestException(`Cannot filter ${q.entity} by ${f.field}`);
+      const vals = f.values.map((v) => `'${String(v).replace(/'/g, "''")}'`).join(',');
+      where.push(`${col} in (${vals})`);
+    }
+    const select = [
+      groupCol ? `${groupCol} as "group"` : `null as "group"`,
+      ...measures.map((m) => `${m.expr} as "${m.key}"`),
+    ].join(', ');
+    const groupSql = groupCol ? ` group by ${groupCol}` : '';
+    const orderSql = groupCol
+      ? ` order by ${measures[0].key === 'count' ? '"count"' : `"${measures[0].key}"`} desc nulls last`
+      : '';
+    const text = `select ${select} from ${spec.table}${where.length ? ` where ${where.join(' and ')}` : ''}${groupSql}${orderSql} limit 500`;
+    const res = await this.db.execute(sql.raw(text));
+    const rows =
+      (res as unknown as { rows: Record<string, unknown>[] }).rows ??
+      (res as unknown as Record<string, unknown>[]);
+    // The assembled SQL is returned so the report shows exactly what ran.
+    return {
+      query: text,
+      entity: q.entity,
+      from: q.from,
+      to: q.to,
+      groupBy: q.groupBy ?? null,
+      measures: measures.map((m) => m.key),
+      rows,
+    };
+  }
 }
+
+export interface CustomReportQuery {
+  entity: keyof typeof CUSTOM_REPORT_ENTITIES;
+  from: string;
+  to: string;
+  groupBy?: string;
+  measures?: string[];
+  filters?: { field: string; values: (string | number)[] }[];
+}
+
+/**
+ * What the builder may touch. Dimensions and measures are SQL fragments the
+ * builder chooses BY NAME — a client never sends SQL.
+ */
+export const CUSTOM_REPORT_ENTITIES: Record<
+  string,
+  {
+    table: string;
+    propertyCol: string;
+    dateCol: string;
+    softDelete?: string;
+    dimensions: Record<string, string>;
+    measures: Record<string, string>;
+  }
+> = {
+  reservations: {
+    table: 'reservations',
+    propertyCol: 'property_id',
+    dateCol: 'check_in',
+    softDelete: 'deleted_at',
+    dimensions: {
+      status: 'status',
+      source: 'source',
+      segment: "coalesce(segment, '')",
+      roomType: 'room_type_id',
+      month: "to_char(check_in, 'YYYY-MM')",
+      week: "to_char(check_in, 'IYYY-IW')",
+      day: 'check_in::text',
+    },
+    measures: {
+      count: 'count(*)::int',
+      nights: 'coalesce(sum(check_out - check_in), 0)::int',
+      revenuePaise: 'coalesce(sum(total_paise), 0)::bigint',
+      paidPaise: 'coalesce(sum(paid_paise), 0)::bigint',
+      avgRatePaise: 'coalesce(avg(rate_paise), 0)::bigint',
+      adults: 'coalesce(sum(adults), 0)::int',
+    },
+  },
+  payments: {
+    table: 'folio_payments',
+    propertyCol: 'property_id',
+    dateCol: 'collected_at::date',
+    dimensions: {
+      method: 'method',
+      direction: 'direction',
+      month: "to_char(collected_at, 'YYYY-MM')",
+      day: 'collected_at::date::text',
+    },
+    measures: {
+      count: 'count(*)::int',
+      amountPaise:
+        "coalesce(sum(case when direction = 'REFUND' then -amount_paise else amount_paise end), 0)::bigint",
+    },
+  },
+  orders: {
+    table: 'restaurant_orders',
+    propertyCol: 'property_id',
+    dateCol: 'created_at::date',
+    dimensions: {
+      status: 'status',
+      paymentMethod: "coalesce(payment_method, '')",
+      month: "to_char(created_at, 'YYYY-MM')",
+      day: 'created_at::date::text',
+    },
+    measures: {
+      count: 'count(*)::int',
+      totalPaise: 'coalesce(sum(total_paise), 0)::bigint',
+      discountPaise: 'coalesce(sum(discount_paise), 0)::bigint',
+      taxPaise: 'coalesce(sum(tax_paise), 0)::bigint',
+    },
+  },
+  expenses: {
+    table: 'expenses',
+    propertyCol: 'property_id',
+    dateCol: 'incurred_on::date',
+    softDelete: 'deleted_at',
+    dimensions: {
+      category: 'category',
+      status: 'status',
+      vendor: "coalesce(vendor, '')",
+      month: "to_char(incurred_on, 'YYYY-MM')",
+    },
+    measures: { count: 'count(*)::int', amountPaise: 'coalesce(sum(amount_paise), 0)::bigint' },
+  },
+  nightAudit: {
+    table: 'property_daily_snapshots',
+    propertyCol: 'property_id',
+    dateCol: 'business_date',
+    dimensions: { month: "to_char(business_date, 'YYYY-MM')", day: 'business_date::text' },
+    measures: {
+      days: 'count(*)::int',
+      revenuePaise: 'coalesce(sum(revenue_paise), 0)::bigint',
+      roomsSold: 'coalesce(sum(rooms_sold), 0)::int',
+      roomsAvailable: 'coalesce(sum(rooms_available), 0)::int',
+      noShows: 'coalesce(sum(no_shows), 0)::int',
+    },
+  },
+};

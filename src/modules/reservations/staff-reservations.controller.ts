@@ -29,6 +29,7 @@ import { DirectBillingService } from '../direct-billing/direct-billing.service';
 import { FolioReceiptService } from '../folio/folio-receipt.service';
 import { ReportsService } from './reports.service';
 import {
+  CustomReportDto,
   FolioTaxExemptDto,
   FolioReasonDto,
   FolioDiscountDto,
@@ -641,6 +642,13 @@ export class StaffDashboardController {
 @Controller({ path: 'api/v1/staff/reports', version: VERSION_NEUTRAL })
 export class StaffReportsController {
   constructor(private readonly reports: ReportsService) {}
+
+  /** The custom report builder: a whitelisted entity × window × group × measures. */
+  @Post('custom')
+  @RequireStaffPermissions('reports.read')
+  custom(@CurrentStaff() me: AuthenticatedStaff, @Body() dto: CustomReportDto) {
+    return this.reports.customReport(me.propertyId, dto);
+  }
 
   @Get('occupancy')
   @RequireStaffPermissions('reports.read')

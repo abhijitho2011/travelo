@@ -47,6 +47,7 @@ dependencies:
 
   # Drag-and-drop photo uploads on desktop and web
   desktop_drop: ^0.8.3
+  socket_io_client: ^3.1.6
 
 dev_dependencies:
   flutter_test:

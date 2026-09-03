@@ -39,6 +39,7 @@ import { TablesService, type Tx } from './tables.service';
 import { FolioService } from '../folio/folio.service';
 import { DirectBillingService } from '../direct-billing/direct-billing.service';
 import { CashService } from '../cash/cash.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import { ItemsService } from '../inventory/items.service';
 
 const MAX_LIMIT = 200;
@@ -75,6 +76,7 @@ export class OrdersService {
     private readonly folio: FolioService,
     @Optional() private readonly directBilling?: DirectBillingService,
     @Optional() private readonly cash?: CashService,
+    @Optional() private readonly realtime?: RealtimeService,
   ) {}
 
   private taxPercent(): number {
@@ -315,6 +317,7 @@ export class OrdersService {
         .where(eq(restaurantOrders.id, orderId));
 
       const refreshed = await this.requireOrder(propertyId, orderId, tx);
+      this.realtime?.emit(propertyId, 'order.changed', { id: orderId, status: refreshed.status });
       return this.hydrate(refreshed, tx);
     });
   }
@@ -360,6 +363,7 @@ export class OrdersService {
         .set({ kotStatus: to, updatedAt: new Date() })
         .where(eq(orderItems.id, itemId));
       const refreshed = await this.requireOrder(propertyId, orderId, tx);
+      this.realtime?.emit(propertyId, 'order.changed', { id: orderId, status: refreshed.status });
       return this.hydrate(refreshed, tx);
     });
   }
@@ -376,6 +380,7 @@ export class OrdersService {
         .set({ kotStatus: 'CANCELLED', updatedAt: new Date() })
         .where(eq(orderItems.id, itemId));
       const refreshed = await this.requireOrder(propertyId, orderId, tx);
+      this.realtime?.emit(propertyId, 'order.changed', { id: orderId, status: refreshed.status });
       return this.hydrate(refreshed, tx);
     });
   }
@@ -412,6 +417,7 @@ export class OrdersService {
       if (order.tableId) await TablesService.setStatus(tx, order.tableId, 'BILLED');
 
       const refreshed = await this.requireOrder(propertyId, orderId, tx);
+      this.realtime?.emit(propertyId, 'order.changed', { id: orderId, status: refreshed.status });
       return this.hydrate(refreshed, tx);
     });
   }
@@ -610,6 +616,7 @@ export class OrdersService {
       }
 
       const refreshed = await this.requireOrder(propertyId, orderId, tx);
+      this.realtime?.emit(propertyId, 'order.changed', { id: orderId, status: refreshed.status });
       return this.hydrate(refreshed, tx);
     });
   }
@@ -680,6 +687,7 @@ export class OrdersService {
       if (order.tableId) await TablesService.setStatus(tx, order.tableId, 'OPEN');
 
       const refreshed = await this.requireOrder(propertyId, orderId, tx);
+      this.realtime?.emit(propertyId, 'order.changed', { id: orderId, status: refreshed.status });
       return this.hydrate(refreshed, tx);
     });
   }

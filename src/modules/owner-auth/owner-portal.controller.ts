@@ -47,6 +47,13 @@ export class OwnerPortalController {
     private readonly photos: PropertyPhotosService,
   ) {}
 
+  /** The group dashboard: every property, by month, with top/low performers. */
+  @Get('portfolio/performance')
+  performance(@CurrentOwner() me: AuthenticatedOwner, @Query('months') months?: string) {
+    const m = Math.min(Math.max(Number(months) || 6, 1), 24);
+    return this.portal.portfolioPerformance(me.id, m);
+  }
+
   @Get('portfolio/summary')
   summary(@CurrentOwner() owner: AuthenticatedOwner) {
     return this.portal.portfolioSummary(owner.id);

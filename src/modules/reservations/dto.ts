@@ -1,5 +1,8 @@
 import { Type } from 'class-transformer';
 import {
+  ValidateNested,
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -281,4 +284,24 @@ export class FolioDiscountDto extends FolioReasonDto {
 
 export class FolioTaxExemptDto extends FolioReasonDto {
   @IsBoolean() exempt!: boolean;
+}
+
+export class ReportFilterDto {
+  @IsString() @Length(1, 40) field!: string;
+  @IsArray() @ArrayMaxSize(50) values!: (string | number)[];
+}
+
+export class CustomReportDto {
+  @IsIn(['reservations', 'payments', 'orders', 'expenses', 'nightAudit']) entity!:
+    'reservations' | 'payments' | 'orders' | 'expenses' | 'nightAudit';
+  @Matches(ISO_DATE, { message: `from ${DATE_MESSAGE}` }) from!: string;
+  @Matches(ISO_DATE, { message: `to ${DATE_MESSAGE}` }) to!: string;
+  @IsOptional() @IsString() @Length(1, 40) groupBy?: string;
+  @IsOptional() @IsArray() @ArrayMaxSize(8) @IsString({ each: true }) measures?: string[];
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @ValidateNested({ each: true })
+  @Type(() => ReportFilterDto)
+  filters?: ReportFilterDto[];
 }

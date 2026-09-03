@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { and, asc, eq, ilike, inArray, isNull, sql, SQL } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import {
@@ -16,6 +16,7 @@ import {
 import { AmenitiesService } from './amenities.service';
 import { ROOM_TYPE_PHOTO_URL_TTL_SECONDS, RoomTypesService } from './room-types.service';
 import { StorageService } from '../storage/storage.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import { effectiveAmenities, type AmenityRef } from './effective-amenities';
 import {
   BulkCreateRoomsDto,
@@ -51,6 +52,7 @@ export class RoomsService {
     private readonly roomTypesService: RoomTypesService,
     private readonly amenityCatalogue: AmenitiesService,
     private readonly storage: StorageService,
+    @Optional() private readonly realtime?: RealtimeService,
   ) {}
 
   // ---------- roomCount, derived ----------
@@ -561,6 +563,7 @@ export class RoomsService {
       .set(patch)
       .where(and(eq(rooms.propertyId, propertyId), inArray(rooms.id, ids), isNull(rooms.deletedAt)))
       .returning();
+    this.realtime?.emit(propertyId, 'room.status', { ids: updated.map((r) => r.id), status });
     return { updated: updated.length, items: await this.hydrate(updated) };
   }
 
@@ -586,6 +589,7 @@ export class RoomsService {
     if (note !== undefined && note !== '') patch.notes = note;
 
     const [row] = await this.db.update(rooms).set(patch).where(eq(rooms.id, id)).returning();
+    this.realtime?.emit(propertyId, 'room.status', { id, status });
     return {
       id: row.id,
       number: row.number,

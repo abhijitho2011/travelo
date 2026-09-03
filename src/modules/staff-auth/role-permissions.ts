@@ -83,6 +83,11 @@ const GENERAL_MANAGER: readonly string[] = [
   'folio.adjust',
   // Assign, auto-allocate, swap, lock — placing bookings into rooms.
   'reservation.allocate',
+  // Guest messaging and reviews.
+  'conversation.read',
+  'conversation.send',
+  'review.read',
+  'review.respond',
   'room.read',
   'room.create',
   'room.update',
@@ -205,6 +210,9 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
     'rates.read',
     'property.settings.read',
     'folio.read',
+    'conversation.read',
+    'conversation.send',
+    'review.read',
     'checkin.perform',
     'checkout.perform',
     'guest.read',

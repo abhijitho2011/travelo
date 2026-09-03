@@ -34,6 +34,8 @@ import { StaffPermissionsGuard } from '../staff-auth/staff-permissions.guard';
 import { StaffNightAuditController } from './staff-night-audit.controller';
 import { RevenueEngineService } from '../rate-plans/revenue-engine.service';
 import { RatePlansModule } from '../rate-plans/rate-plans.module';
+import { ConversationsService } from '../conversations/conversations.service';
+import { ConversationsModule } from '../conversations/conversations.module';
 
 @Injectable()
 export class SubscriptionLifecycleWorker {
@@ -594,6 +596,15 @@ export class RevenueRuleWorker {
   }
 }
 
+/** Pre-arrival and post-checkout guest messages, hourly, once per stay. */
+@Injectable()
+export class StayAutomationWorker {
+  constructor(private readonly conversations: ConversationsService) {}
+  run(): Promise<{ preArrival: number; reviews: number }> {
+    return this.conversations.runAutomations();
+  }
+}
+
 export class RetentionWorker {
   private readonly logger = new Logger(RetentionWorker.name);
   constructor(@Inject(DRIZZLE) private readonly db: Database) {}
@@ -644,7 +655,14 @@ export class WorkerSchedulerService {
     private readonly retention: RetentionWorker,
     private readonly holds: HoldExpiryWorker,
     private readonly revenue: RevenueRuleWorker,
+    private readonly stays: StayAutomationWorker,
   ) {}
+
+  /** Guest journey messages: the day before arrival, the day after departure. */
+  @Cron(CronExpression.EVERY_HOUR)
+  runStayAutomations(): Promise<void> {
+    return this.guard('stay-automations', () => this.stays.run());
+  }
 
   /** Pricing rules react within the hour; switched-off rules revert within the hour. */
   @Cron(CronExpression.EVERY_HOUR)
@@ -738,6 +756,7 @@ export class WorkerSchedulerService {
     SharedAuthModule,
     AuditModule,
     RatePlansModule,
+    ConversationsModule,
   ],
   controllers: [StaffNightAuditController],
   providers: [
@@ -753,6 +772,7 @@ export class WorkerSchedulerService {
     RetentionWorker,
     HoldExpiryWorker,
     RevenueRuleWorker,
+    StayAutomationWorker,
   ],
   exports: [
     ChannexSyncWorker,
@@ -764,6 +784,7 @@ export class WorkerSchedulerService {
     RetentionWorker,
     HoldExpiryWorker,
     RevenueRuleWorker,
+    StayAutomationWorker,
   ],
 })
 export class WorkersModule {}

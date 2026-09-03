@@ -1,4 +1,11 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
+import { RealtimeService } from '../realtime/realtime.service';
 import { randomUUID } from 'node:crypto';
 import { and, asc, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
@@ -90,7 +97,10 @@ type Tx = Pick<Database, 'select' | 'insert' | 'update'>;
  */
 @Injectable()
 export class RatesService {
-  constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Database,
+    @Optional() private readonly realtime?: RealtimeService,
+  ) {}
 
   // ------------------------------------------------------------ resolver --
 
@@ -452,6 +462,8 @@ export class RatesService {
       }
     });
 
+    if (changed)
+      this.realtime?.emit(propertyId, 'rates.changed', { roomTypeIds: input.roomTypeIds, batchId });
     return { batchId, cells: input.roomTypeIds.length * dateList.length, changed };
   }
 

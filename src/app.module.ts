@@ -55,6 +55,10 @@ import { WorkersModule } from './modules/workers/workers.module';
 import { PropertyConfigModule } from './modules/property-config/property-config.module';
 import { BookingEngineModule } from './modules/booking-engine/booking-engine.module';
 import { CashModule } from './modules/cash/cash.module';
+import { RealtimeModule } from './modules/realtime/realtime.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
+import { ConversationsModule } from './modules/conversations/conversations.module';
+import { GuestJourneyModule } from './modules/guest-journey/guest-journey.module';
 import { DirectBillingModule } from './modules/direct-billing/direct-billing.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
@@ -164,6 +168,10 @@ import { ScheduleModule } from '@nestjs/schedule';
     PropertyConfigModule,
     BookingEngineModule,
     CashModule,
+    RealtimeModule,
+    ReviewsModule,
+    ConversationsModule,
+    GuestJourneyModule,
     DirectBillingModule,
   ],
   providers: [
