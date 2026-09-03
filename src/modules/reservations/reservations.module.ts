@@ -13,6 +13,7 @@ import { DeskService } from './desk.service';
 import { ReservationsService } from './reservations.service';
 import { ReportsService } from './reports.service';
 import { FolioModule } from '../folio/folio.module';
+import { RatesModule } from '../rates/rates.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 /**
@@ -27,7 +28,13 @@ import { NotificationsModule } from '../notifications/notifications.module';
  * exactly one definition of each.
  */
 @Module({
-  imports: [JwtModule.register({}), SharedAuthModule, FolioModule, NotificationsModule],
+  imports: [
+    JwtModule.register({}),
+    SharedAuthModule,
+    FolioModule,
+    NotificationsModule,
+    RatesModule,
+  ],
   controllers: [
     StaffReservationsController,
     StaffDeskController,

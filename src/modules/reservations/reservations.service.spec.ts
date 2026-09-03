@@ -789,3 +789,69 @@ describe('ReservationsService — placing bookings into rooms', () => {
     ).toBeNull();
   });
 });
+
+describe('ReservationsService.assertRules — what the rates grid says, the booking obeys', () => {
+  const rule = (date: string, over = {}) => ({
+    date,
+    cap: null,
+    minLos: null,
+    maxLos: null,
+    stopSell: false,
+    closedToArrival: false,
+    closedToDeparture: false,
+    ...over,
+  });
+
+  it('passes a stay the grid has no opinion on', () => {
+    expect(() =>
+      ReservationsService.assertRules(
+        [rule('2026-09-10'), rule('2026-09-11')],
+        '2026-09-10',
+        '2026-09-12',
+      ),
+    ).not.toThrow();
+  });
+
+  it('refuses arrival on a closed-to-arrival night, but lets a stay-through pass', () => {
+    const rules = [rule('2026-09-10', { closedToArrival: true }), rule('2026-09-11')];
+    expect(() => ReservationsService.assertRules(rules, '2026-09-10', '2026-09-12')).toThrow(
+      /Arrivals are closed/,
+    );
+    expect(() => ReservationsService.assertRules(rules, '2026-09-09', '2026-09-12')).not.toThrow();
+  });
+
+  it('refuses departure on a closed-to-departure day', () => {
+    const rules = [
+      rule('2026-09-10'),
+      rule('2026-09-11'),
+      rule('2026-09-12', { closedToDeparture: true }),
+    ];
+    expect(() => ReservationsService.assertRules(rules, '2026-09-10', '2026-09-12')).toThrow(
+      /Departures are closed/,
+    );
+  });
+
+  it('enforces min and max stay on the arrival night', () => {
+    expect(() =>
+      ReservationsService.assertRules(
+        [rule('2026-09-10', { minLos: 3 })],
+        '2026-09-10',
+        '2026-09-12',
+      ),
+    ).toThrow(/Minimum stay is 3/);
+    expect(() =>
+      ReservationsService.assertRules(
+        [rule('2026-09-10', { maxLos: 1 })],
+        '2026-09-10',
+        '2026-09-12',
+      ),
+    ).toThrow(/Maximum stay is 1/);
+  });
+
+  it('a stop-sell on ANY night of the stay refuses it', () => {
+    const rules = [rule('2026-09-10'), rule('2026-09-11', { stopSell: true })];
+    expect(() => ReservationsService.assertRules(rules, '2026-09-10', '2026-09-12')).toThrow(
+      /Closed for sale on 2026-09-11/,
+    );
+  });
+});

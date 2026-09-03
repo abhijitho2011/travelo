@@ -17,6 +17,7 @@ import {
 } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import { FolioService } from '../folio/folio.service';
+import { RatesService, type DayRules } from '../rates/rates.service';
 import {
   propertySettings,
   OCCUPYING_STATUSES,
@@ -91,6 +92,10 @@ export class ReservationsService {
     // Optional so unit tests that construct the service directly stay valid and
     // so a missing notifications wiring can never block a booking.
     @Optional() private readonly notifications?: NotificationDeliveryService,
+    // The per-day rates & inventory engine. Optional for the same reason as
+    // notifications: a booking must never fail because a module is not wired;
+    // without it, prices fall back to overrides/base and no day rules apply.
+    @Optional() private readonly rates?: RatesService,
   ) {}
 
   /**
@@ -206,7 +211,10 @@ export class ReservationsService {
     checkIn: IsoDate,
     checkOut: IsoDate,
     excludeId?: string,
+    /** Per-night restrictions from the rates grid; undefined = none apply. */
+    rules?: DayRules[],
   ): Promise<void> {
+    if (rules) ReservationsService.assertRules(rules, checkIn, checkOut);
     const [{ count: roomCount }] = await tx
       .select({ count: sql<number>`count(*)::int` })
       .from(rooms)
@@ -243,7 +251,34 @@ export class ReservationsService {
         // A stay covers `night` when check_in <= night < check_out.
         if ((s.checkIn as IsoDate) <= night && night < (s.checkOut as IsoDate)) sold += 1;
       }
-      if (sold >= rooms_) throw ReservationErrors.noAvailability(night);
+      // A cap on the day sells fewer rooms than exist: "we have 10 but sell 6".
+      const cap = rules?.find((r) => r.date === night)?.cap;
+      const sellable = cap == null ? rooms_ : Math.min(rooms_, cap);
+      if (sold >= sellable) throw ReservationErrors.noAvailability(night);
+    }
+  }
+
+  /**
+   * Stop-sell, closed-to-arrival/departure and min/max stay, exactly as the
+   * grid states them. Pure, so the rules are tested without a database.
+   */
+  static assertRules(rules: DayRules[], checkIn: IsoDate, checkOut: IsoDate): void {
+    const nights = nightsBetween(checkIn, checkOut);
+    const arrival = rules.find((r) => r.date === checkIn);
+    if (arrival?.closedToArrival)
+      throw ReservationErrors.restricted(checkIn, 'Arrivals are closed');
+    if (arrival?.minLos && nights < arrival.minLos) {
+      throw ReservationErrors.restricted(checkIn, `Minimum stay is ${arrival.minLos} night(s)`);
+    }
+    if (arrival?.maxLos && nights > arrival.maxLos) {
+      throw ReservationErrors.restricted(checkIn, `Maximum stay is ${arrival.maxLos} night(s)`);
+    }
+    const departure = rules.find((r) => r.date === checkOut);
+    if (departure?.closedToDeparture)
+      throw ReservationErrors.restricted(checkOut, 'Departures are closed');
+    for (let d = checkIn; d < checkOut; d = addDays(d, 1)) {
+      if (rules.find((r) => r.date === d)?.stopSell)
+        throw ReservationErrors.restricted(d, 'Closed for sale');
     }
   }
 
@@ -305,6 +340,44 @@ export class ReservationsService {
    * standing discount). First cut of rate plans — one rate for the stay, from
    * the arrival date.
    */
+  /**
+   * Nightly prices for a stay, from the rates engine when it is wired. Falls
+   * back to the single-date resolver otherwise, so older tests and a property
+   * without the module keep the one-price-per-stay behaviour.
+   */
+  private async nightlyQuote(
+    propertyId: string,
+    roomTypeId: string,
+    checkIn: IsoDate,
+    checkOut: IsoDate,
+    ratePlanId: string | undefined,
+    fallback: number,
+  ): Promise<number[]> {
+    if (this.rates) {
+      const nights = await this.rates.nightlyPrices(
+        propertyId,
+        roomTypeId,
+        checkIn,
+        checkOut,
+        ratePlanId ?? null,
+      );
+      return nights.map((n) => n.pricePaise);
+    }
+    const one = await this.resolveRate(propertyId, roomTypeId, checkIn, fallback);
+    return Array.from({ length: Math.max(1, nightsBetween(checkIn, checkOut)) }, () => one);
+  }
+
+  private async rulesFor(
+    propertyId: string,
+    roomTypeId: string,
+    checkIn: IsoDate,
+    checkOut: IsoDate,
+  ): Promise<DayRules[] | undefined> {
+    if (!this.rates) return undefined;
+    // The check-out DAY matters too (closed-to-departure), so read one past.
+    return this.rates.dayRules(propertyId, roomTypeId, checkIn, addDays(checkOut, 1));
+  }
+
   private async resolveRate(
     propertyId: string,
     roomTypeId: string,
@@ -746,9 +819,26 @@ export class ReservationsService {
 
     // The rate is SNAPSHOTTED here, not read at check-out: a base-rate change
     // next week must not rewrite what this guest was quoted today.
+    // Priced per NIGHT: with the rates grid in play a three-night stay across a
+    // weekend is three different prices, and the total is their sum. The
+    // stored `ratePaise` is the average, so every existing reader of it still
+    // makes sense; the total is what the guest was quoted.
+    const nightly = dto.ratePaise
+      ? null
+      : await this.nightlyQuote(
+          propertyId,
+          type.id,
+          dto.checkIn,
+          dto.checkOut,
+          dto.ratePlanId,
+          type.baseRate,
+        );
+    const quotedTotal = nightly ? nightly.reduce((a, n) => a + n, 0) : null;
     const ratePaise =
-      dto.ratePaise ?? (await this.resolveRate(propertyId, type.id, dto.checkIn, type.baseRate));
+      dto.ratePaise ??
+      (nightly && nightly.length ? Math.round(quotedTotal! / nightly.length) : type.baseRate);
     const status: ReservationStatus = dto.status ?? 'PENDING';
+    const rules = await this.rulesFor(propertyId, type.id, dto.checkIn, dto.checkOut);
     // A PENDING booking is an enquiry hold. It expires after `holdMinutes`
     // (0 = never), else the property's default, else never — so a room is not
     // quietly kept off sale by a booking nobody came back to confirm.
@@ -776,6 +866,8 @@ export class ReservationsService {
               dto.roomTypeId,
               dto.checkIn,
               dto.checkOut,
+              undefined,
+              rules,
             );
           }
 
@@ -803,7 +895,7 @@ export class ReservationsService {
               checkOut: dto.checkOut,
               status,
               ratePaise,
-              totalPaise: totalPaise(ratePaise, dto.checkIn, dto.checkOut),
+              totalPaise: quotedTotal ?? totalPaise(ratePaise, dto.checkIn, dto.checkOut),
               currency: type.currency,
               source: dto.source ?? 'WALK_IN',
               notes: dto.notes ?? null,
@@ -899,6 +991,9 @@ export class ReservationsService {
     }
 
     if (Object.keys(patch).length === 1) throw ReservationErrors.nothingToUpdate();
+    const movedRules = movingDates
+      ? await this.rulesFor(propertyId, before.roomTypeId, checkIn, checkOut)
+      : undefined;
 
     const row = await this.db.transaction(async (tx) => {
       const handle = tx as unknown as Tx;
@@ -922,6 +1017,7 @@ export class ReservationsService {
           checkIn,
           checkOut,
           id,
+          movedRules,
         );
       }
       const [updated] = await handle

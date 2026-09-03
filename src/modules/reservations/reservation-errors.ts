@@ -83,6 +83,10 @@ export const ReservationErrors = {
       HttpStatus.CONFLICT,
     ),
 
+  /** A rate restriction refused the stay — stop-sell, CTA/CTD, min/max stay. */
+  restricted: (date: string, reason: string) =>
+    reservationError('STAY_RESTRICTED', `${reason} on ${date}`, HttpStatus.CONFLICT),
+
   /** Lock, swap: the booking has no room yet, so there is nothing to act on. */
   roomRequired: () => reservationError('ROOM_REQUIRED', 'Assign a room first', HttpStatus.CONFLICT),
 

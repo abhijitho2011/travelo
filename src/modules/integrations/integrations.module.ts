@@ -10,6 +10,7 @@ import { RequirePermissions } from '../../common/decorators/permissions.decorato
 import { loadEnv } from '../../config/env';
 import { AuditModule } from '../audit/audit.module';
 import { ReservationsModule } from '../reservations/reservations.module';
+import { RatesModule } from '../rates/rates.module';
 import { JwtModule } from '@nestjs/jwt';
 import { SharedAuthModule } from '../shared-auth/shared-auth.module';
 import { ChannexClient } from './channex.client';
@@ -110,7 +111,7 @@ export const CHANNEX_CLIENT_PROVIDER = {
 @Module({
   // JwtModule + SharedAuthModule are what the STAFF guards on the channels
   // controllers below resolve against, exactly as KeyCardsModule wires them.
-  imports: [AuditModule, ReservationsModule, JwtModule.register({}), SharedAuthModule],
+  imports: [AuditModule, ReservationsModule, RatesModule, JwtModule.register({}), SharedAuthModule],
   providers: [
     IntegrationsService,
     ChannexSyncService,

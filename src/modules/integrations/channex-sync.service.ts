@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Optional, Inject, Injectable, Logger } from '@nestjs/common';
 import { and, desc, eq, gt, inArray, isNull, lt, ne } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import {
@@ -10,6 +10,7 @@ import {
   type RoomStatus,
 } from '../../database/schema';
 import { ReservationsService } from '../reservations/reservations.service';
+import { RatesService } from '../rates/rates.service';
 import { addDays, coversDate, today, type IsoDate } from '../reservations/reservation-rules';
 import {
   ChannexClient,
@@ -84,6 +85,8 @@ export class ChannexSyncService {
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly client: ChannexClient,
     private readonly reservations: ReservationsService,
+    /** Day-level prices, caps and stop-sells. Optional: unit tests build without it. */
+    @Optional() private readonly rates?: RatesService,
   ) {}
 
   get configured(): boolean {
@@ -352,12 +355,34 @@ export class ChannexSyncService {
           ),
         );
 
-      const nights = ChannexSyncService.computeAvailability({
+      let nights = ChannexSyncService.computeAvailability({
         rooms: roomRows,
         reservations: stays,
         start: window.start,
         end: window.end,
       });
+      // The grid's word is final: a stop-sell publishes zero, a cap publishes
+      // no more than the cap, and a per-channel cap for THIS connection wins
+      // over both. Without the engine the physical count goes out as before.
+      if (this.rates) {
+        const typeIds = [...new Set(nights.map((n) => n.roomTypeId))];
+        const grid = await this.rates.grid(propertyId, window.start, window.end);
+        const cell = new Map<
+          string,
+          { available: number; channelOverrides: Record<string, { available?: number }> }
+        >();
+        for (const t of grid.roomTypes) {
+          if (!typeIds.includes(t.id)) continue;
+          for (const d of t.days) cell.set(`${t.id}|${d.date}`, d);
+        }
+        nights = nights.map((n) => {
+          const c = cell.get(`${n.roomTypeId}|${n.date}`);
+          if (!c) return n;
+          const perChannel = c.channelOverrides[connectionId]?.available;
+          const capped = Math.min(n.available, c.available);
+          return { ...n, available: perChannel == null ? capped : Math.min(capped, perChannel) };
+        });
+      }
       const { updates, unmapped } = ChannexSyncService.toAvailabilityRanges(
         cfg.channexPropertyId as string,
         nights,
@@ -408,14 +433,46 @@ export class ChannexSyncService {
           unmapped.push(t.id);
           continue;
         }
-        updates.push({
-          property_id: cfg.channexPropertyId as string,
-          rate_plan_id: ratePlanId,
-          date_from: window.start,
-          // Channex's date_to is inclusive; our `end` is exclusive.
-          date_to: addDays(window.end, -1),
-          rate: (t.baseRate / 100).toFixed(2),
-        });
+        if (!this.rates) {
+          updates.push({
+            property_id: cfg.channexPropertyId as string,
+            rate_plan_id: ratePlanId,
+            date_from: window.start,
+            // Channex's date_to is inclusive; our `end` is exclusive.
+            date_to: addDays(window.end, -1),
+            rate: (t.baseRate / 100).toFixed(2),
+          });
+          continue;
+        }
+        // Per-night prices from the grid, plus this channel's own delta,
+        // collapsed into runs of equal price so a flat month is one update.
+        const nightly = await this.rates.nightlyPrices(propertyId, t.id, window.start, window.end);
+        const grid = await this.rates.grid(propertyId, window.start, window.end);
+        const days = grid.roomTypes.find((g) => g.id === t.id)?.days ?? [];
+        let run: { from: IsoDate; to: IsoDate; paise: number } | null = null;
+        const flush = () => {
+          if (!run) return;
+          updates.push({
+            property_id: cfg.channexPropertyId as string,
+            rate_plan_id: ratePlanId,
+            date_from: run.from,
+            date_to: run.to,
+            rate: (run.paise / 100).toFixed(2),
+          });
+          run = null;
+        };
+        for (const n of nightly) {
+          const delta =
+            days.find((d) => d.date === n.date)?.channelOverrides[connectionId]?.priceDeltaBp ?? 0;
+          const paise = Math.max(0, Math.round((n.pricePaise * (10_000 + delta)) / 10_000));
+          if (run && run.paise === paise && addDays(run.to, 1) === n.date) {
+            run.to = n.date;
+          } else {
+            flush();
+            run = { from: n.date, to: n.date, paise };
+          }
+        }
+        flush();
       }
 
       const res = await this.client.pushRates(cfg.channexPropertyId as string, updates);
