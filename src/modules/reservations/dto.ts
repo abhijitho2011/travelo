@@ -21,6 +21,7 @@ import {
 } from '../../database/schema';
 
 /** `YYYY-MM-DD`. The one date shape this module accepts — see reservation-rules. */
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const DATE_MESSAGE = 'must be a date in YYYY-MM-DD form';
 
@@ -77,6 +78,34 @@ export class CreateReservationDto {
 
   @IsOptional() @IsString() @Length(0, 2000) notes?: string;
 
+  /** The rate plan sold (EP/CP/MAP…). Omitted means a flat nightly rate. */
+  @IsOptional() @IsUUID() ratePlanId?: string;
+
+  /** The hotel-defined finer source; `source` stays the coarse channel. */
+  @IsOptional() @IsUUID() bookingSourceId?: string;
+
+  @IsOptional() @IsString() @Length(1, 32) segment?: string;
+
+  @IsOptional() @IsString() @Length(1, 64) subSegment?: string;
+
+  /**
+   * An enquiry hold: keep it PENDING for this many minutes, then expire it
+   * unless confirmed. Omitted → the property's default; 0 → never expires.
+   */
+  @IsOptional() @IsInt() @Min(0) @Max(43_200) holdMinutes?: number;
+
+  /** Actual arrival/departure times for slot-based properties (HH:MM). */
+  @IsOptional() @Matches(HHMM) checkinTime?: string;
+
+  @IsOptional() @Matches(HHMM) checkoutTime?: string;
+
+  /** Company details that print on the invoice for a corporate stay. */
+  @IsOptional() @IsString() @Length(1, 160) companyName?: string;
+
+  @IsOptional() @IsString() @Length(15, 15) companyGstin?: string;
+
+  @IsOptional() @IsString() @Length(0, 1000) companyAddress?: string;
+
   /**
    * Book straight into CONFIRMED. A walk-in at the desk is never a soft hold —
    * making reception press "create" then "confirm" for every arrival is the
@@ -110,6 +139,26 @@ export class UpdateReservationDto {
   @IsOptional() @IsIn(reservationSourceValues) source?: (typeof reservationSourceValues)[number];
 
   @IsOptional() @IsString() @Length(0, 2000) notes?: string;
+
+  @IsOptional() @IsUUID() ratePlanId?: string;
+
+  @IsOptional() @IsUUID() bookingSourceId?: string;
+
+  @IsOptional() @IsString() @Length(1, 32) segment?: string;
+
+  @IsOptional() @IsString() @Length(1, 64) subSegment?: string;
+
+  @IsOptional() @IsBoolean() scantyBaggage?: boolean;
+
+  @IsOptional() @Matches(HHMM) checkinTime?: string;
+
+  @IsOptional() @Matches(HHMM) checkoutTime?: string;
+
+  @IsOptional() @IsString() @Length(1, 160) companyName?: string;
+
+  @IsOptional() @IsString() @Length(15, 15) companyGstin?: string;
+
+  @IsOptional() @IsString() @Length(0, 1000) companyAddress?: string;
 }
 
 export class AssignRoomDto {
@@ -194,4 +243,24 @@ export class AvailabilityQueryDto {
 
   /** Narrow to one type; omitted returns every ACTIVE type at the property. */
   @IsOptional() @IsUUID() roomTypeId?: string;
+}
+
+/** Pin or release a booking from its room. Pinned bookings never auto-move. */
+export class LockRoomDto {
+  @IsBoolean() locked!: boolean;
+}
+
+/** Swap the rooms of two bookings for their overlapping nights. */
+export class SwapRoomsDto {
+  @IsUUID() otherReservationId!: string;
+}
+
+/**
+ * Auto-allocate: place every unassigned CONFIRMED arrival in a date window
+ * into a free room of its type. Dry-run reports the plan without writing.
+ */
+export class AutoAllocateDto {
+  @Matches(ISO_DATE, { message: `from ${DATE_MESSAGE}` }) from!: string;
+  @Matches(ISO_DATE, { message: `to ${DATE_MESSAGE}` }) to!: string;
+  @IsOptional() @IsBoolean() dryRun?: boolean;
 }

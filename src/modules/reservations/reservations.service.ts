@@ -18,6 +18,7 @@ import {
 import { DRIZZLE, Database } from '../../database/database.module';
 import { FolioService } from '../folio/folio.service';
 import {
+  propertySettings,
   OCCUPYING_STATUSES,
   rateOverrides,
   reservationEvents,
@@ -79,6 +80,9 @@ type Tx = Pick<Database, 'select' | 'insert' | 'update' | 'delete'>;
  *  3. ONE TRANSITION MAP. Every status change goes through `assertTransition`
  *     in reservation-rules.ts. There is no second opinion anywhere in here.
  */
+/** Thrown inside a dry-run transaction purely to roll it back. */
+class DryRunRollback extends Error {}
+
 @Injectable()
 export class ReservationsService {
   constructor(
@@ -164,6 +168,8 @@ export class ReservationsService {
     checkIn: IsoDate,
     checkOut: IsoDate,
     excludeId?: string,
+    /** A second booking to ignore — the partner in a room swap. */
+    excludeId2?: string,
   ): Promise<void> {
     const clashes = await tx
       .select({ id: reservations.id })
@@ -173,6 +179,7 @@ export class ReservationsService {
           eq(reservations.propertyId, propertyId),
           eq(reservations.roomId, roomId),
           ...ReservationsService.occupyingOverlap(checkIn, checkOut, excludeId),
+          ...(excludeId2 ? [ne(reservations.id, excludeId2)] : []),
         ),
       )
       // Locks the clashing rows for the life of the transaction so a
@@ -321,6 +328,259 @@ export class ReservationsService {
     return ov?.ratePaise ?? fallback;
   }
 
+  /**
+   * When an enquiry hold stops holding. `minutes` 0 means never; undefined
+   * defers to the property's `holdExpiryMinutes`, and a property with none
+   * set keeps holds forever (the pre-existing behaviour).
+   */
+  private async holdDeadline(
+    propertyId: string,
+    minutes: number | undefined,
+  ): Promise<Date | null> {
+    let m = minutes;
+    if (m === undefined) {
+      const [settings] = await this.db
+        .select({ holdExpiryMinutes: propertySettings.holdExpiryMinutes })
+        .from(propertySettings)
+        .where(eq(propertySettings.propertyId, propertyId))
+        .limit(1);
+      m = settings?.holdExpiryMinutes ?? 0;
+    }
+    return m > 0 ? new Date(Date.now() + m * 60_000) : null;
+  }
+
+  /**
+   * Pin a booking to its room (or release it). A locked booking is skipped by
+   * auto-allocation and refused by swap — the desk decided, and the machine
+   * does not second-guess it.
+   */
+  async lockRoom(propertyId: string, id: string, locked: boolean, actorStaffId: string | null) {
+    const before = await this.requireReservation(propertyId, id);
+    if (locked && !before.roomId) throw ReservationErrors.roomRequired();
+    const row = await this.db.transaction(async (tx) => {
+      const handle = tx as unknown as Tx;
+      const [updated] = await handle
+        .update(reservations)
+        .set({ roomLocked: locked, updatedAt: new Date() })
+        .where(eq(reservations.id, id))
+        .returning();
+      await ReservationsService.recordEvent(
+        handle,
+        id,
+        locked ? 'room_locked' : 'room_unlocked',
+        actorStaffId,
+        {
+          roomId: before.roomId,
+        },
+      );
+      return updated;
+    });
+    const [dto] = await this.hydrate([row]);
+    return dto;
+  }
+
+  /**
+   * Swap two bookings' rooms. Distinct from move: both stays keep their dates
+   * and each takes the other's room, in one transaction, so there is never a
+   * moment where one room holds two guests or neither. Both must be of the
+   * same room type (a swap is not an upgrade) and neither may be locked.
+   */
+  async swapRooms(propertyId: string, id: string, otherId: string, actorStaffId: string | null) {
+    if (id === otherId) throw ReservationErrors.swapSelf();
+    const a = await this.requireReservation(propertyId, id);
+    const b = await this.requireReservation(propertyId, otherId);
+    if (!a.roomId || !b.roomId) throw ReservationErrors.roomRequired();
+    if (a.roomLocked || b.roomLocked) throw ReservationErrors.roomLocked();
+    if (a.roomTypeId !== b.roomTypeId) throw ReservationErrors.roomTypeMismatch();
+    for (const r of [a, b]) {
+      if (r.status !== 'CONFIRMED' && r.status !== 'CHECKED_IN')
+        throw ReservationErrors.datesLocked();
+    }
+
+    const rows = await this.db.transaction(async (tx) => {
+      const handle = tx as unknown as Tx;
+      // Each booking must fit its NEW room for its own nights, ignoring both
+      // swap partners (they are the ones vacating).
+      await ReservationsService.assertRoomFree(
+        handle,
+        propertyId,
+        b.roomId!,
+        a.checkIn,
+        a.checkOut,
+        a.id,
+        b.id,
+      );
+      await ReservationsService.assertRoomFree(
+        handle,
+        propertyId,
+        a.roomId!,
+        b.checkIn,
+        b.checkOut,
+        b.id,
+        a.id,
+      );
+      const now = new Date();
+      const [ra] = await handle
+        .update(reservations)
+        .set({ roomId: b.roomId, updatedAt: now })
+        .where(eq(reservations.id, a.id))
+        .returning();
+      const [rb] = await handle
+        .update(reservations)
+        .set({ roomId: a.roomId, updatedAt: now })
+        .where(eq(reservations.id, b.id))
+        .returning();
+      await ReservationsService.recordEvent(handle, a.id, 'room_swapped', actorStaffId, {
+        from: a.roomId,
+        to: b.roomId,
+        with: b.id,
+      });
+      await ReservationsService.recordEvent(handle, b.id, 'room_swapped', actorStaffId, {
+        from: b.roomId,
+        to: a.roomId,
+        with: a.id,
+      });
+      return [ra, rb];
+    });
+    return this.hydrate(rows);
+  }
+
+  /**
+   * Auto room allocation. For every CONFIRMED, unassigned booking arriving in
+   * [from, to], pick the first room of its type that is free for the whole
+   * stay — lowest room number first, so a floor fills in order and
+   * housekeeping's walk is short. Rooms out of order or in maintenance are
+   * never offered. Locked bookings are by definition assigned, so they are
+   * untouched. `dryRun` returns the plan without writing it.
+   *
+   * Sequential within one transaction: each placement is checked against the
+   * rooms already claimed earlier in the same run, so two arrivals of the
+   * same type on the same night cannot be handed the same door.
+   */
+  async autoAllocate(
+    propertyId: string,
+    input: { from: string; to: string; dryRun?: boolean },
+    actorStaffId: string | null,
+  ) {
+    // A window, not a stay: a single day (from == to) is the common case —
+    // "place today's arrivals" — so this is inclusive, unlike assertDateOrder.
+    if (input.to < input.from) throw ReservationErrors.invalidDates();
+    const pending = await this.db
+      .select()
+      .from(reservations)
+      .where(
+        and(
+          eq(reservations.propertyId, propertyId),
+          eq(reservations.status, 'CONFIRMED'),
+          isNull(reservations.roomId),
+          isNull(reservations.deletedAt),
+          gte(reservations.checkIn, input.from),
+          lte(reservations.checkIn, input.to),
+        ),
+      )
+      .orderBy(asc(reservations.checkIn), asc(reservations.createdAt));
+
+    const sellable = await this.db
+      .select({
+        id: rooms.id,
+        number: rooms.number,
+        roomTypeId: rooms.roomTypeId,
+        status: rooms.status,
+      })
+      .from(rooms)
+      .where(and(eq(rooms.propertyId, propertyId), isNull(rooms.deletedAt)))
+      .orderBy(asc(rooms.number));
+    const offerable = sellable.filter(
+      (r) => r.status !== 'OUT_OF_ORDER' && r.status !== 'MAINTENANCE',
+    );
+
+    const plan: {
+      reservationId: string;
+      reservationNumber: string;
+      roomId: string | null;
+      roomNumber: string | null;
+    }[] = [];
+    const assigned: { id: string; roomId: string }[] = [];
+
+    await this.db
+      .transaction(async (tx) => {
+        const handle = tx as unknown as Tx;
+        for (const res of pending) {
+          let chosen: (typeof offerable)[number] | null = null;
+          for (const room of offerable.filter((r) => r.roomTypeId === res.roomTypeId)) {
+            // Claimed earlier in THIS run for an overlapping stay?
+            const claimed = assigned.some(
+              (a) => a.roomId === room.id && ReservationsService.overlaps(pending, a.id, res),
+            );
+            if (claimed) continue;
+            try {
+              await ReservationsService.assertRoomFree(
+                handle,
+                propertyId,
+                room.id,
+                res.checkIn,
+                res.checkOut,
+                res.id,
+              );
+              chosen = room;
+              break;
+            } catch {
+              /* occupied — try the next door */
+            }
+          }
+          plan.push({
+            reservationId: res.id,
+            reservationNumber: res.reservationNumber,
+            roomId: chosen?.id ?? null,
+            roomNumber: chosen?.number ?? null,
+          });
+          if (chosen) {
+            assigned.push({ id: res.id, roomId: chosen.id });
+            if (!input.dryRun) {
+              await handle
+                .update(reservations)
+                .set({ roomId: chosen.id, updatedAt: new Date() })
+                .where(eq(reservations.id, res.id));
+              await ReservationsService.recordEvent(
+                handle,
+                res.id,
+                'room_auto_assigned',
+                actorStaffId,
+                {
+                  roomId: chosen.id,
+                  roomNumber: chosen.number,
+                },
+              );
+            }
+          }
+        }
+        if (input.dryRun) {
+          // Nothing was written, but a rollback keeps the intent explicit.
+          throw new DryRunRollback();
+        }
+      })
+      .catch((err) => {
+        if (!(err instanceof DryRunRollback)) throw err;
+      });
+
+    return {
+      from: input.from,
+      to: input.to,
+      dryRun: !!input.dryRun,
+      considered: pending.length,
+      assigned: plan.filter((p) => p.roomId).length,
+      unplaced: plan.filter((p) => !p.roomId).length,
+      plan,
+    };
+  }
+
+  /** Do two pending bookings (by id) share a night? Used by the in-run claim check. */
+  private static overlaps(pool: Reservation[], idA: string, b: Reservation): boolean {
+    const a = pool.find((r) => r.id === idA);
+    if (!a) return false;
+    return a.checkIn < b.checkOut && b.checkIn < a.checkOut;
+  }
+
   private async requireRoom(propertyId: string, id: string) {
     const [row] = await this.db
       .select()
@@ -387,6 +647,21 @@ export class ReservationsService {
       currency: r.currency,
       source: r.source,
       notes: r.notes,
+      ratePlanId: r.ratePlanId,
+      bookingSourceId: r.bookingSourceId,
+      segment: r.segment,
+      subSegment: r.subSegment,
+      holdExpiresAt: r.holdExpiresAt,
+      roomLocked: r.roomLocked,
+      scantyBaggage: r.scantyBaggage,
+      registrationCardPrintedAt: r.registrationCardPrintedAt,
+      hasGuestPhoto: !!r.guestPhotoKey,
+      hasIdProof: !!r.guestIdProofKey,
+      companyName: r.companyName,
+      companyGstin: r.companyGstin,
+      companyAddress: r.companyAddress,
+      checkinTime: r.checkinTime,
+      checkoutTime: r.checkoutTime,
       checkedInAt: r.checkedInAt,
       checkedOutAt: r.checkedOutAt,
       cancelledAt: r.cancelledAt,
@@ -474,6 +749,11 @@ export class ReservationsService {
     const ratePaise =
       dto.ratePaise ?? (await this.resolveRate(propertyId, type.id, dto.checkIn, type.baseRate));
     const status: ReservationStatus = dto.status ?? 'PENDING';
+    // A PENDING booking is an enquiry hold. It expires after `holdMinutes`
+    // (0 = never), else the property's default, else never — so a room is not
+    // quietly kept off sale by a booking nobody came back to confirm.
+    const holdExpiresAt =
+      status === 'PENDING' ? await this.holdDeadline(propertyId, dto.holdMinutes) : null;
 
     for (let attempt = 0; attempt < NUMBER_ATTEMPTS; attempt += 1) {
       try {
@@ -527,6 +807,16 @@ export class ReservationsService {
               currency: type.currency,
               source: dto.source ?? 'WALK_IN',
               notes: dto.notes ?? null,
+              ratePlanId: dto.ratePlanId ?? null,
+              bookingSourceId: dto.bookingSourceId ?? null,
+              segment: dto.segment ?? null,
+              subSegment: dto.subSegment ?? null,
+              holdExpiresAt,
+              checkinTime: dto.checkinTime ?? null,
+              checkoutTime: dto.checkoutTime ?? null,
+              companyName: dto.companyName ?? null,
+              companyGstin: dto.companyGstin ?? null,
+              companyAddress: dto.companyAddress ?? null,
               createdBy: actorStaffId,
             })
             .returning();
@@ -587,6 +877,16 @@ export class ReservationsService {
     if (dto.children !== undefined) patch.children = dto.children;
     if (dto.source !== undefined) patch.source = dto.source;
     if (dto.notes !== undefined) patch.notes = dto.notes;
+    if (dto.ratePlanId !== undefined) patch.ratePlanId = dto.ratePlanId;
+    if (dto.bookingSourceId !== undefined) patch.bookingSourceId = dto.bookingSourceId;
+    if (dto.segment !== undefined) patch.segment = dto.segment;
+    if (dto.subSegment !== undefined) patch.subSegment = dto.subSegment;
+    if (dto.scantyBaggage !== undefined) patch.scantyBaggage = dto.scantyBaggage;
+    if (dto.checkinTime !== undefined) patch.checkinTime = dto.checkinTime;
+    if (dto.checkoutTime !== undefined) patch.checkoutTime = dto.checkoutTime;
+    if (dto.companyName !== undefined) patch.companyName = dto.companyName;
+    if (dto.companyGstin !== undefined) patch.companyGstin = dto.companyGstin;
+    if (dto.companyAddress !== undefined) patch.companyAddress = dto.companyAddress;
     if (dto.checkIn !== undefined) patch.checkIn = dto.checkIn;
     if (dto.checkOut !== undefined) patch.checkOut = dto.checkOut;
 

@@ -405,9 +405,12 @@ describe('ReservationsService — check-out, cancel and no-show', () => {
   it('refuses checkout when the folio still shows a balance and no override', async () => {
     const db = mockDb({
       select: {
-        reservations: [[resRow({ status: 'CHECKED_IN' })]], // room 1,350,000, paid 0
-        folio_line_items: [[{ ancillary: 0 }]],
-        folio_payments: [[{ net: 0 }]],
+        // The gate reads the tax-inclusive folio summary: the reservation row
+        // (once for the gate, once for the summary), no lines, no payments.
+        reservations: [[resRow({ status: 'CHECKED_IN' })], [resRow({ status: 'CHECKED_IN' })]],
+        folio_line_items: [[]],
+        folio_payments: [[]],
+        property_taxes: [[]],
       },
     });
     await expect(svc(db).checkOut(MY_PROPERTY, 'res-1', {}, STAFF_ID)).rejects.toMatchObject({
@@ -628,5 +631,161 @@ describe('ReservationsService — seasonal rate override (4.2)', () => {
     await svc(db).create(MY_PROPERTY, newBooking(), STAFF_ID);
     const values = db.inserts.find((i) => i.table === 'reservations')!.values!;
     expect(values.ratePaise).toBe(450_000);
+  });
+});
+
+describe('ReservationsService — placing bookings into rooms', () => {
+  const room = (id: string, number: string, over = {}) => ({
+    id,
+    number,
+    propertyId: MY_PROPERTY,
+    roomTypeId: TYPE_ID,
+    status: 'AVAILABLE',
+    ...over,
+  });
+
+  it('lock pins a booking; a booking with no room cannot be pinned', async () => {
+    const db = mockDb({
+      select: { reservations: [[resRow({ roomId: 'room-1' })]] },
+      update: { reservations: [resRow({ roomId: 'room-1', roomLocked: true })] },
+      insert: { reservation_events: [{}] },
+    });
+    await svc(db).lockRoom(MY_PROPERTY, 'res-1', true, STAFF_ID);
+    expect(db.updates.find((u) => u.table === 'reservations')?.values).toMatchObject({
+      roomLocked: true,
+    });
+
+    const noRoom = mockDb({ select: { reservations: [[resRow({ roomId: null })]] } });
+    await expect(svc(noRoom).lockRoom(MY_PROPERTY, 'res-1', true, STAFF_ID)).rejects.toMatchObject({
+      response: { error: 'ROOM_REQUIRED' },
+    });
+  });
+
+  it('swap gives each booking the other room in one transaction, and refuses a locked one', async () => {
+    const a = resRow({ id: 'res-a', roomId: 'room-1', status: 'CONFIRMED' });
+    const b = resRow({ id: 'res-b', roomId: 'room-2', status: 'CONFIRMED' });
+    const db = mockDb({
+      select: { reservations: [[a], [b], [], []] }, // two lookups, two free-checks
+      update: {
+        reservations: [
+          { ...a, roomId: 'room-2' },
+          { ...b, roomId: 'room-1' },
+        ],
+      },
+      insert: { reservation_events: [{}, {}] },
+    });
+    await svc(db).swapRooms(MY_PROPERTY, 'res-a', 'res-b', STAFF_ID);
+    const writes = db.updates.filter((u) => u.table === 'reservations').map((u) => u.values);
+    expect(writes).toEqual([
+      expect.objectContaining({ roomId: 'room-2' }),
+      expect.objectContaining({ roomId: 'room-1' }),
+    ]);
+
+    const locked = mockDb({
+      select: { reservations: [[{ ...a, roomLocked: true }], [b]] },
+    });
+    await expect(
+      svc(locked).swapRooms(MY_PROPERTY, 'res-a', 'res-b', STAFF_ID),
+    ).rejects.toMatchObject({
+      response: { error: 'ROOM_LOCKED' },
+    });
+  });
+
+  it('auto-allocate fills the lowest free room of the type and never a room out of order', async () => {
+    const arrival = resRow({
+      id: 'res-1',
+      roomId: null,
+      status: 'CONFIRMED',
+      checkIn: '2026-09-10',
+      checkOut: '2026-09-12',
+    });
+    const db = mockDb({
+      select: {
+        reservations: [[arrival], []], // the unassigned queue; then room-1 is free
+        rooms: [
+          [
+            room('room-ooo', '101', { status: 'OUT_OF_ORDER' }),
+            room('room-1', '102'),
+            room('room-2', '103'),
+          ],
+        ],
+      },
+      update: { reservations: [{ ...arrival, roomId: 'room-1' }] },
+      insert: { reservation_events: [{}] },
+    });
+    const res = await svc(db).autoAllocate(
+      MY_PROPERTY,
+      { from: '2026-09-10', to: '2026-09-10' },
+      STAFF_ID,
+    );
+    expect(res.assigned).toBe(1);
+    expect(res.plan[0]).toMatchObject({ roomId: 'room-1', roomNumber: '102' });
+    expect(db.updates.find((u) => u.table === 'reservations')?.values).toMatchObject({
+      roomId: 'room-1',
+    });
+  });
+
+  it('auto-allocate dry run plans without writing', async () => {
+    const arrival = resRow({ id: 'res-1', roomId: null, status: 'CONFIRMED' });
+    const db = mockDb({
+      select: { reservations: [[arrival], []], rooms: [[room('room-1', '102')]] },
+    });
+    const res = await svc(db).autoAllocate(
+      MY_PROPERTY,
+      { from: '2026-09-10', to: '2026-09-10', dryRun: true },
+      STAFF_ID,
+    );
+    expect(res.dryRun).toBe(true);
+    expect(res.assigned).toBe(1);
+    expect(db.updates).toEqual([]);
+  });
+
+  it('an enquiry keeps the hold deadline it was given; 0 means never', async () => {
+    const db = mockDb({
+      select: { room_types: [[typeRow]], rate_overrides: [[]], reservations: [[{ count: 0 }]] },
+      insert: { reservations: [resRow({ status: 'PENDING' })] },
+    });
+    await svc(db).create(
+      MY_PROPERTY,
+      {
+        roomTypeId: TYPE_ID,
+        guestName: 'Asha Menon',
+        guestPhone: '9876543210',
+        adults: 1,
+        checkIn: '2026-09-10',
+        checkOut: '2026-09-12',
+        status: 'PENDING',
+        holdMinutes: 30,
+      } as never,
+      STAFF_ID,
+    );
+    const written = db.inserts.find((i) => i.table === 'reservations')?.values as {
+      holdExpiresAt: Date | null;
+    };
+    expect(written.holdExpiresAt).toBeInstanceOf(Date);
+    expect(written.holdExpiresAt!.getTime()).toBeGreaterThan(Date.now() + 29 * 60_000);
+
+    const never = mockDb({
+      select: { room_types: [[typeRow]], rate_overrides: [[]], reservations: [[{ count: 0 }]] },
+      insert: { reservations: [resRow({ status: 'PENDING' })] },
+    });
+    await svc(never).create(
+      MY_PROPERTY,
+      {
+        roomTypeId: TYPE_ID,
+        guestName: 'Asha Menon',
+        guestPhone: '9876543210',
+        adults: 1,
+        checkIn: '2026-09-10',
+        checkOut: '2026-09-12',
+        status: 'PENDING',
+        holdMinutes: 0,
+      } as never,
+      STAFF_ID,
+    );
+    expect(
+      (never.inserts.find((i) => i.table === 'reservations')?.values as { holdExpiresAt: unknown })
+        .holdExpiresAt,
+    ).toBeNull();
   });
 });

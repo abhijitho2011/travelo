@@ -52,7 +52,15 @@ export type ReservationStatus = (typeof reservationStatusValues)[number];
  */
 export const OCCUPYING_STATUSES = ['CONFIRMED', 'CHECKED_IN'] as const;
 
-export const reservationSourceValues = ['WALK_IN', 'PHONE', 'EMAIL', 'OTA', 'OTHER'] as const;
+export const reservationSourceValues = [
+  'WALK_IN',
+  'PHONE',
+  'EMAIL',
+  'OTA',
+  /** The hotel's own hosted page / embedded widget. */
+  'BOOKING_ENGINE',
+  'OTHER',
+] as const;
 export type ReservationSource = (typeof reservationSourceValues)[number];
 
 export const reservations = pgTable(
@@ -100,12 +108,32 @@ export const reservations = pgTable(
     paidPaise: integer('paid_paise').notNull().default(0),
     currency: varchar('currency', { length: 8 }).notNull().default('INR'),
 
-    source: varchar('source', { length: 16 })
+    source: varchar('source', { length: 24 })
       .notNull()
       .default('WALK_IN')
       .$type<ReservationSource>(),
     notes: text('notes'),
 
+    /** Which rate plan was sold. Null for a flat nightly rate or old bookings. */
+    ratePlanId: uuid('rate_plan_id'),
+    /** The hotel-defined finer source; `source` is the coarse channel. */
+    bookingSourceId: uuid('booking_source_id'),
+    segment: varchar('segment', { length: 32 }),
+    subSegment: varchar('sub_segment', { length: 64 }),
+    /** PENDING with a deadline: an enquiry hold the worker expires. */
+    holdExpiresAt: timestamp('hold_expires_at', { withTimezone: true }),
+    /** Pinned to its room; auto-allocation and bulk moves leave it alone. */
+    roomLocked: boolean('room_locked').notNull().default(false),
+    scantyBaggage: boolean('scanty_baggage').notNull().default(false),
+    registrationCardPrintedAt: timestamp('registration_card_printed_at', { withTimezone: true }),
+    /** Object-store KEYS, presigned on read — never bytes. */
+    guestPhotoKey: varchar('guest_photo_key', { length: 512 }),
+    guestIdProofKey: varchar('guest_id_proof_key', { length: 512 }),
+    companyName: varchar('company_name', { length: 160 }),
+    companyGstin: varchar('company_gstin', { length: 15 }),
+    companyAddress: text('company_address'),
+    checkinTime: varchar('checkin_time', { length: 5 }),
+    checkoutTime: varchar('checkout_time', { length: 5 }),
     createdBy: uuid('created_by').references(() => hotelStaff.id, { onDelete: 'set null' }),
     checkedInAt: timestamp('checked_in_at', { withTimezone: true }),
     checkedOutAt: timestamp('checked_out_at', { withTimezone: true }),

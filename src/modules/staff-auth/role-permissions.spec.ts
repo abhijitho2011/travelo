@@ -103,6 +103,12 @@ describe('staff role → permission map', () => {
         'maintenance.report',
         'keycard.issue',
         'payment.collect',
+        // The desk places arrivals into rooms and quotes tonight's price. It
+        // reads the rate grid and the property's policies; it edits neither.
+        'reservation.allocate',
+        'rates.read',
+        'property.settings.read',
+        'folio.read',
       ].sort(),
     );
   });

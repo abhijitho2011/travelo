@@ -24,6 +24,9 @@ import { ReservationsService } from './reservations.service';
 import { FolioReceiptService } from '../folio/folio-receipt.service';
 import { ReportsService } from './reports.service';
 import {
+  AutoAllocateDto,
+  SwapRoomsDto,
+  LockRoomDto,
   AssignRoomDto,
   AvailabilityQueryDto,
   CancelReservationDto,
@@ -98,6 +101,28 @@ export class StaffReservationsController {
     return row;
   }
 
+  /**
+   * Auto-allocate unassigned arrivals in a window. Declared before `:id` so
+   * "auto-allocate" is never read as a reservation id.
+   */
+  @Post('auto-allocate')
+  @RequireStaffPermissions('reservation.allocate')
+  async autoAllocate(@CurrentStaff() me: AuthenticatedStaff, @Body() dto: AutoAllocateDto) {
+    const res = await this.reservations.autoAllocate(me.propertyId, dto, me.id);
+    if (!dto.dryRun) {
+      await this.audit.record({
+        action: 'staff.reservation.auto_allocated',
+        entity: 'reservation',
+        entityId: me.propertyId,
+        after: { from: dto.from, to: dto.to, assigned: res.assigned, unplaced: res.unplaced },
+        actorId: me.id,
+        actorEmail: me.email,
+        actorRole: me.role,
+      });
+    }
+    return res;
+  }
+
   @Get(':id')
   @RequireStaffPermissions('reservation.read')
   get(@CurrentStaff() me: AuthenticatedStaff, @Param('id') id: string) {
@@ -160,6 +185,47 @@ export class StaffReservationsController {
       entity: 'reservation',
       entityId: id,
       after: { roomId: dto.roomId },
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return res;
+  }
+
+  /** Pin or release a booking from its room; pinned bookings never auto-move. */
+  @Post(':id/lock')
+  @RequireStaffPermissions('reservation.allocate')
+  async lockRoom(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @Body() dto: LockRoomDto,
+  ) {
+    const res = await this.reservations.lockRoom(me.propertyId, id, dto.locked, me.id);
+    await this.audit.record({
+      action: dto.locked ? 'staff.reservation.room_locked' : 'staff.reservation.room_unlocked',
+      entity: 'reservation',
+      entityId: id,
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return res;
+  }
+
+  /** Swap rooms with another booking of the same type. Distinct from move. */
+  @Post(':id/swap-room')
+  @RequireStaffPermissions('reservation.allocate')
+  async swapRooms(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @Body() dto: SwapRoomsDto,
+  ) {
+    const res = await this.reservations.swapRooms(me.propertyId, id, dto.otherReservationId, me.id);
+    await this.audit.record({
+      action: 'staff.reservation.rooms_swapped',
+      entity: 'reservation',
+      entityId: id,
+      after: { with: dto.otherReservationId },
       actorId: me.id,
       actorEmail: me.email,
       actorRole: me.role,

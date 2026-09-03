@@ -528,6 +528,30 @@ export class NightAuditWorker {
  * deployment with a compliance hold simply sets it to 0.
  */
 @Injectable()
+/**
+ * Expires enquiry holds. A PENDING booking with `hold_expires_at` in the past
+ * becomes CANCELLED — it never blocked a room, but it did sit in the
+ * unassigned queue and on the guest's mind. One statement, so a large backlog
+ * after downtime clears in a single pass.
+ */
+@Injectable()
+export class HoldExpiryWorker {
+  private readonly logger = new Logger(HoldExpiryWorker.name);
+  constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+
+  async run(now: Date = new Date()): Promise<{ expired: number }> {
+    const res = await this.db.execute(sql`
+      UPDATE reservations
+      SET status='CANCELLED', cancelled_at=${now}, updated_at=${now}
+      WHERE status='PENDING' AND hold_expires_at IS NOT NULL AND hold_expires_at < ${now}
+        AND deleted_at IS NULL
+    `);
+    const expired = Number((res as { rowCount?: number }).rowCount ?? 0);
+    if (expired) this.logger.log(`Expired ${expired} unpaid hold(s)`);
+    return { expired };
+  }
+}
+
 export class RetentionWorker {
   private readonly logger = new Logger(RetentionWorker.name);
   constructor(@Inject(DRIZZLE) private readonly db: Database) {}
@@ -576,7 +600,14 @@ export class WorkerSchedulerService {
     private readonly billing: BillingService,
     private readonly nightAudit: NightAuditWorker,
     private readonly retention: RetentionWorker,
+    private readonly holds: HoldExpiryWorker,
   ) {}
+
+  /** Unpaid enquiry holds lapse on the minute they said they would. */
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  expireHolds(): Promise<void> {
+    return this.guard('hold-expiry', () => this.holds.run());
+  }
 
   /** Queued notifications are user-visible, so they drain often. */
   @Cron(CronExpression.EVERY_MINUTE)
@@ -660,6 +691,7 @@ export class WorkerSchedulerService {
     NotificationDispatchWorker,
     NightAuditWorker,
     RetentionWorker,
+    HoldExpiryWorker,
   ],
   exports: [
     ChannexSyncWorker,
@@ -669,6 +701,7 @@ export class WorkerSchedulerService {
     NotificationDispatchWorker,
     NightAuditWorker,
     RetentionWorker,
+    HoldExpiryWorker,
   ],
 })
 export class WorkersModule {}

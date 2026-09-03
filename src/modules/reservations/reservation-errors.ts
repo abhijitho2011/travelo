@@ -83,6 +83,24 @@ export const ReservationErrors = {
       HttpStatus.CONFLICT,
     ),
 
+  /** Lock, swap: the booking has no room yet, so there is nothing to act on. */
+  roomRequired: () => reservationError('ROOM_REQUIRED', 'Assign a room first', HttpStatus.CONFLICT),
+
+  swapSelf: () =>
+    reservationError(
+      'SWAP_SELF',
+      'A booking cannot swap rooms with itself',
+      HttpStatus.BAD_REQUEST,
+    ),
+
+  /** The desk pinned this booking to its room; unlock it before moving it. */
+  roomLocked: () =>
+    reservationError(
+      'ROOM_LOCKED',
+      'This booking is locked to its room. Unlock it to move or swap it.',
+      HttpStatus.CONFLICT,
+    ),
+
   /** The room is of a different type than the reservation was sold as. */
   roomTypeMismatch: () =>
     reservationError(

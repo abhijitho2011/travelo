@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   pgTable,
   uuid,
   varchar,
@@ -67,6 +68,17 @@ export const folioLineItems = pgTable(
      */
     sourceType: varchar('source_type', { length: 32 }),
     sourceId: uuid('source_id'),
+    /** Pre-tax discount already taken off `amountPaise`'s taxable base. */
+    discountPaise: integer('discount_paise').notNull().default(0),
+    /** The GST rate applied, in basis points, so the invoice can show it. */
+    taxRateBp: integer('tax_rate_bp').notNull().default(0),
+    taxExempt: boolean('tax_exempt').notNull().default(false),
+    /** accommodation | restaurant | other — the statutory treatment used. */
+    taxCategory: varchar('tax_category', { length: 16 }),
+    quantity: integer('quantity').notNull().default(1),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    voidedBy: uuid('voided_by'),
+    voidReason: varchar('void_reason', { length: 200 }),
     postedBy: uuid('posted_by').references(() => hotelStaff.id, { onDelete: 'set null' }),
     postedAt: timestamp('posted_at', { withTimezone: true }).notNull().defaultNow(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

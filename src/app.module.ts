@@ -52,6 +52,7 @@ import { JobsModule } from './modules/jobs/jobs.module';
 import { SearchModule } from './modules/search/search.module';
 import { ExportModule } from './modules/export/export.module';
 import { WorkersModule } from './modules/workers/workers.module';
+import { PropertyConfigModule } from './modules/property-config/property-config.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { RequestContextMiddleware } from './common/middleware/request-context.middleware';
@@ -157,6 +158,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     SearchModule,
     ExportModule,
     WorkersModule,
+    PropertyConfigModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

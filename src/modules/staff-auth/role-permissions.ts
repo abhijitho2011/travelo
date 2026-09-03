@@ -68,6 +68,21 @@ const GENERAL_MANAGER: readonly string[] = [
   'roomtype.create',
   'roomtype.update',
   'roomtype.delete',
+  // Property configuration: taxes, policies, add-ons, booking sources, the
+  // folio format and the booking engine. Read is wide (the folio and booking
+  // screens need it); update is management's alone — a cancellation policy or
+  // a tax rate is not something the desk edits between check-ins.
+  'property.settings.read',
+  'property.settings.update',
+  // The per-day rates & inventory grid. Read for anyone quoting a price;
+  // update for management and revenue.
+  'rates.read',
+  'rates.update',
+  // Discounts, tax exemptions, voids and price edits on a folio — the money
+  // moves that need a name of their own beyond `folio.update`.
+  'folio.adjust',
+  // Assign, auto-allocate, swap, lock — placing bookings into rooms.
+  'reservation.allocate',
   'room.read',
   'room.create',
   'room.update',
@@ -162,6 +177,9 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
     'payment.refund',
     'folio.read',
     'folio.update',
+    'folio.adjust',
+    'property.settings.read',
+    'rates.read',
     'tax.read',
     'reports.read',
     'reports.export',
@@ -181,6 +199,12 @@ export const STAFF_ROLE_PERMISSIONS: Readonly<Record<HotelStaffRole, readonly st
     // — a guest who rings to cancel cannot be told to wait for the GM — but
     // sales and the travel desk, who can raise bookings, deliberately cannot.
     'reservation.cancel',
+    // The desk places arrivals into rooms and quotes tonight's price; it does
+    // not edit the price or the hotel's policies.
+    'reservation.allocate',
+    'rates.read',
+    'property.settings.read',
+    'folio.read',
     'checkin.perform',
     'checkout.perform',
     'guest.read',
