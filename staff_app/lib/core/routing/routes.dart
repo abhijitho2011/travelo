@@ -129,4 +129,12 @@ class Routes {
   /// `/events/...` route so a static path is never matched as an event id.
   static String event(String id) => '/events/$id';
   static const eventPattern = '/events/:id';
+
+  // Property configuration (management) and the rates & inventory grid.
+  static const propertySettings = '/property-settings';
+  static const propertyTaxes = '/property-settings/taxes';
+  static const propertyPolicies = '/property-settings/policies';
+  static const propertyAddons = '/property-settings/addons';
+  static const propertySources = '/property-settings/booking-sources';
+  static const rates = '/rates';
 }

@@ -319,8 +319,9 @@ class _PhotosSectionState extends ConsumerState<PhotosSection> {
   }
 
   Widget _showcasePending(AppColors c) {
-    if (_pending.isEmpty)
+    if (_pending.isEmpty) {
       return _emptyShowcase(c, 'Add photos of this room below.');
+    }
     return _carousel(_pending.length, (i) {
       final p = _pending[i];
       return Stack(
@@ -349,8 +350,9 @@ class _PhotosSectionState extends ConsumerState<PhotosSection> {
         onRetry: () => ref.invalidate(photosProvider(owner)),
       ),
       data: (list) {
-        if (list.isEmpty)
+        if (list.isEmpty) {
           return _emptyShowcase(c, 'No photos yet. Add the first below.');
+        }
         return _carousel(list.length, (i) {
           final photo = list[i];
           return Stack(

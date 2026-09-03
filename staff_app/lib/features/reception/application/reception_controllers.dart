@@ -40,6 +40,12 @@ final reservationProvider = FutureProvider.autoDispose
 
 /// The itemised folio for one stay. Autodisposed and keyed by reservation id,
 /// invalidated whenever a payment, refund or checkout lands.
+/// The folio's own log — who changed what on the bill.
+final folioEventsProvider = FutureProvider.autoDispose
+    .family<List<FolioEvent>, String>(
+      (ref, id) => ref.watch(receptionRepositoryProvider).folioEvents(id),
+    );
+
 final folioProvider = FutureProvider.autoDispose.family<Folio, String>(
   (ref, id) => ref.watch(receptionRepositoryProvider).folio(id),
 );
@@ -105,6 +111,59 @@ class ReservationActions {
     final updated = await _repo.update(id, changes);
     _invalidate(id);
     return updated;
+  }
+
+  Future<void> folioDiscount(
+    String id, {
+    required int amountPaise,
+    required String reason,
+  }) async {
+    await _repo.folioDiscount(id, amountPaise: amountPaise, reason: reason);
+    _ref.invalidate(folioProvider(id));
+    _ref.invalidate(folioEventsProvider(id));
+  }
+
+  Future<void> folioVoidLine(
+    String id,
+    String lineId, {
+    required String reason,
+  }) async {
+    await _repo.folioVoidLine(id, lineId, reason: reason);
+    _ref.invalidate(folioProvider(id));
+    _ref.invalidate(folioEventsProvider(id));
+  }
+
+  Future<void> folioTaxExempt(
+    String id,
+    String lineId, {
+    required bool exempt,
+    required String reason,
+  }) async {
+    await _repo.folioTaxExempt(id, lineId, exempt: exempt, reason: reason);
+    _ref.invalidate(folioProvider(id));
+    _ref.invalidate(folioEventsProvider(id));
+  }
+
+  Future<Reservation> lockRoom(String id, bool locked) async {
+    final r = await _repo.lockRoom(id, locked);
+    _invalidate(id);
+    return r;
+  }
+
+  Future<void> swapRooms(String id, String otherId) async {
+    await _repo.swapRooms(id, otherId);
+    _invalidate(id);
+    _invalidate(otherId);
+  }
+
+  Future<Map> autoAllocate(
+    DateTime from,
+    DateTime to, {
+    bool dryRun = false,
+  }) async {
+    final res = await _repo.autoAllocate(from, to, dryRun: dryRun);
+    if (!dryRun) _invalidate();
+    return res;
   }
 
   Future<Reservation> confirm(String id) async {

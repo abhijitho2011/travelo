@@ -359,6 +359,9 @@ class RoleConfig {
         // only allowedRoutes, so they must stay listed here.
         Routes.reservations,
         Routes.checkIn,
+        // Reached from Settings; guarded by their own permissions.
+        Routes.propertySettings,
+        Routes.rates,
       },
       bottomNav: const [
         NavItem(
@@ -455,6 +458,9 @@ class RoleConfig {
         // only allowedRoutes, so they must stay listed here.
         Routes.reservations,
         Routes.checkIn,
+        // Reached from Settings; guarded by their own permissions.
+        Routes.propertySettings,
+        Routes.rates,
       },
       bottomNav: const [
         NavItem(
@@ -571,7 +577,12 @@ class RoleConfig {
       built: true,
       // Bookings lost its own nav item in the dedupe (Front desk reaches it),
       // but the guard admits only allowedRoutes — so it rides here.
-      extraRoutes: const {Routes.reservations},
+      extraRoutes: const {
+        Routes.reservations,
+        // Read-only: the desk quotes from the grid and reads the policies.
+        Routes.rates,
+        Routes.propertySettings,
+      },
       bottomNav: const [
         NavItem(
           label: 'Front desk',

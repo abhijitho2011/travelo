@@ -155,6 +155,78 @@ class _ReservationCalendarScreenState
     return ok == true;
   }
 
+  /// Place every unassigned arrival in the visible window into a free room of
+  /// its type. Previews first — the desk sees the plan and confirms it.
+  Future<void> _autoAllocate() async {
+    final start = ref.read(calendarWindowStartProvider);
+    final end = start.add(const Duration(days: kCalendarWindowDays - 1));
+    final messenger = ScaffoldMessenger.of(context);
+    final actions = ref.read(reservationActionsProvider);
+    setState(() => _busy = true);
+    try {
+      final plan = await actions.autoAllocate(start, end, dryRun: true);
+      final rows = (plan['plan'] as List? ?? const [])
+          .whereType<Map>()
+          .toList();
+      if (!mounted) return;
+      if (rows.isEmpty) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Nothing to place — every arrival in this window has a room.',
+            ),
+          ),
+        );
+        return;
+      }
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(
+            'Place ${plan['assigned']} of ${plan['considered']} arrivals?',
+          ),
+          content: SizedBox(
+            width: 360,
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                for (final r in rows)
+                  ListTile(
+                    dense: true,
+                    title: Text('${r['reservationNumber']}'),
+                    trailing: Text(
+                      r['roomNumber'] == null
+                          ? 'no room free'
+                          : 'Room ${r['roomNumber']}',
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Place rooms'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+      final done = await actions.autoAllocate(start, end);
+      messenger.showSnackBar(
+        SnackBar(content: Text('${done['assigned']} arrival(s) placed')),
+      );
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   /// Dropping a pill on another room. A guest already in the building is MOVED
   /// (the server re-quotes on a type change); anyone earlier in the stay is
   /// simply assigned the room.
@@ -335,6 +407,19 @@ class _ReservationCalendarScreenState
                   child: const Text('Today'),
                 ),
               ),
+              if (ref
+                  .watch(permissionsProvider)
+                  .has(P.reservationAllocate)) ...[
+                const SizedBox(width: Sp.sm),
+                SizedBox(
+                  height: 34,
+                  child: FilledButton.tonalIcon(
+                    onPressed: _busy ? null : _autoAllocate,
+                    icon: const Icon(Icons.auto_fix_high_outlined, size: 16),
+                    label: const Text('Auto-allocate'),
+                  ),
+                ),
+              ],
             ],
           ),
         ],

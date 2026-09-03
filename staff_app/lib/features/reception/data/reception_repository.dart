@@ -219,6 +219,71 @@ class ReceptionRepository {
     );
   }
 
+  // ---- folio adjustments (folio.adjust) ----
+
+  Future<void> folioDiscount(
+    String id, {
+    required int amountPaise,
+    required String reason,
+  }) => _api.post(
+    '/reservations/$id/folio/discount',
+    body: {'amountPaise': amountPaise, 'reason': reason},
+  );
+
+  Future<void> folioVoidLine(
+    String id,
+    String lineId, {
+    required String reason,
+  }) => _api.post(
+    '/reservations/$id/folio/lines/$lineId/void',
+    body: {'reason': reason},
+  );
+
+  Future<void> folioTaxExempt(
+    String id,
+    String lineId, {
+    required bool exempt,
+    required String reason,
+  }) => _api.post(
+    '/reservations/$id/folio/lines/$lineId/tax-exempt',
+    body: {'exempt': exempt, 'reason': reason},
+  );
+
+  Future<List<FolioEvent>> folioEvents(String id) async {
+    final data = await _api.get('/reservations/$id/folio/events');
+    final items = data is Map ? data['items'] : data;
+    return (items as List? ?? const [])
+        .whereType<Map>()
+        .map(FolioEvent.fromJson)
+        .toList();
+  }
+
+  // ---- placing bookings into rooms (reservation.allocate) ----
+
+  Future<Reservation> lockRoom(String id, bool locked) async {
+    final data = await _api.post(
+      '/reservations/$id/lock',
+      body: {'locked': locked},
+    );
+    return _one(data, Reservation.fromJson, 'reservation');
+  }
+
+  Future<void> swapRooms(String id, String otherId) => _api.post(
+    '/reservations/$id/swap-room',
+    body: {'otherReservationId': otherId},
+  );
+
+  Future<Map> autoAllocate(
+    DateTime from,
+    DateTime to, {
+    bool dryRun = false,
+  }) async =>
+      await _api.post(
+            '/reservations/auto-allocate',
+            body: {'from': isoDate(from), 'to': isoDate(to), 'dryRun': dryRun},
+          )
+          as Map;
+
   /// The reason is required by the server, not optional politeness: a
   /// cancellation nobody explained is unauditable.
   Future<Reservation> cancel(String id, String reason) async {

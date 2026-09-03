@@ -161,6 +161,7 @@ enum ReservationSource {
   phone('PHONE', 'Phone'),
   email('EMAIL', 'Email'),
   ota('OTA', 'OTA'),
+  bookingEngine('BOOKING_ENGINE', 'Booking page'),
   other('OTHER', 'Other');
 
   const ReservationSource(this.wire, this.label);
@@ -217,6 +218,14 @@ class Reservation {
     this.createdAt,
     this.updatedAt,
     this.events = const <ReservationEventEntry>[],
+    this.roomLocked = false,
+    this.holdExpiresAt,
+    this.ratePlanId,
+    this.segment,
+    this.subSegment,
+    this.companyName,
+    this.companyGstin,
+    this.scantyBaggage = false,
   });
 
   final String id;
@@ -258,6 +267,18 @@ class Reservation {
 
   final ReservationSource source;
   final String? notes;
+
+  /// Pinned to its room: auto-allocation and swaps leave it alone.
+  final bool roomLocked;
+
+  /// A PENDING enquiry expires unpaid at this time; null keeps it forever.
+  final DateTime? holdExpiresAt;
+  final String? ratePlanId;
+  final String? segment;
+  final String? subSegment;
+  final String? companyName;
+  final String? companyGstin;
+  final bool scantyBaggage;
   final DateTime? checkedInAt;
   final DateTime? checkedOutAt;
   final DateTime? cancelledAt;
@@ -335,6 +356,14 @@ class Reservation {
               _int(_pick(json, ['paidPaise', 'paid_paise'])),
       currency: _str(json['currency']) ?? 'INR',
       source: ReservationSource.fromWire(_str(json['source'])),
+      roomLocked: _bool(json['roomLocked']),
+      holdExpiresAt: _date(json['holdExpiresAt']),
+      ratePlanId: _str(json['ratePlanId']),
+      segment: _str(json['segment']),
+      subSegment: _str(json['subSegment']),
+      companyName: _str(json['companyName']),
+      companyGstin: _str(json['companyGstin']),
+      scantyBaggage: _bool(json['scantyBaggage']),
       notes: _str(json['notes']),
       checkedInAt: _date(_pick(json, ['checkedInAt', 'checked_in_at'])),
       checkedOutAt: _date(_pick(json, ['checkedOutAt', 'checked_out_at'])),
@@ -752,9 +781,27 @@ class NewReservation {
     this.source,
     this.notes,
     this.confirmImmediately = false,
+    this.ratePlanId,
+    this.bookingSourceId,
+    this.segment,
+    this.holdMinutes,
+    this.companyName,
+    this.companyGstin,
   });
 
   final String roomTypeId;
+
+  /// The rate plan sold; null means the flat nightly rate.
+  final String? ratePlanId;
+
+  /// The hotel's own finer source; `source` stays the coarse channel.
+  final String? bookingSourceId;
+  final String? segment;
+
+  /// For an enquiry: minutes the hold survives unpaid. 0 = never expires.
+  final int? holdMinutes;
+  final String? companyName;
+  final String? companyGstin;
 
   /// Optional at booking time — reception usually picks the room on arrival.
   final String? roomId;
@@ -798,6 +845,15 @@ class NewReservation {
     if (ratePaise != null) 'ratePaise': ratePaise,
     if (source != null) 'source': source!.wire,
     if (notes != null && notes!.isNotEmpty) 'notes': notes,
+    if (ratePlanId != null && ratePlanId!.isNotEmpty) 'ratePlanId': ratePlanId,
+    if (bookingSourceId != null && bookingSourceId!.isNotEmpty)
+      'bookingSourceId': bookingSourceId,
+    if (segment != null && segment!.isNotEmpty) 'segment': segment,
+    if (holdMinutes != null) 'holdMinutes': holdMinutes,
+    if (companyName != null && companyName!.isNotEmpty)
+      'companyName': companyName,
+    if (companyGstin != null && companyGstin!.isNotEmpty)
+      'companyGstin': companyGstin,
     'status': confirmImmediately ? 'CONFIRMED' : 'PENDING',
   };
 }
@@ -852,15 +908,37 @@ class Folio {
     required this.balancePaise,
     required this.lineItems,
     required this.payments,
+    this.roomTaxPaise = 0,
+    this.roomTaxRatePercent = 0,
+    this.lineTaxPaise = 0,
+    this.propertyTaxPaise = 0,
+    this.taxPaise = 0,
+    this.subtotalPaise = 0,
+    this.intraState = true,
   });
 
   final int roomChargePaise;
   final int ancillaryPaise;
+
+  /// Subtotal + tax — what the guest owes before payments.
   final int chargesPaise;
   final int netPaidPaise;
   final int balancePaise;
   final List<FolioLineItem> lineItems;
   final List<FolioPayment> payments;
+
+  /// GST on the room, slab chosen on the nightly tariff.
+  final int roomTaxPaise;
+  final int roomTaxRatePercent;
+  final int lineTaxPaise;
+
+  /// Hotel-defined fees on the room (service charge, levies).
+  final int propertyTaxPaise;
+  final int taxPaise;
+  final int subtotalPaise;
+
+  /// CGST+SGST when true, IGST when a corporate guest is from another state.
+  final bool intraState;
 
   bool get hasBalance => balancePaise > 0;
   String get roomChargeLabel => formatPaise(roomChargePaise);
@@ -876,6 +954,13 @@ class Folio {
     chargesPaise: _int(_pick(json, ['chargesPaise', 'charges_paise'])),
     netPaidPaise: _int(_pick(json, ['netPaidPaise', 'net_paid_paise'])),
     balancePaise: _int(_pick(json, ['balancePaise', 'balance_paise'])),
+    roomTaxPaise: _int(json['roomTaxPaise']),
+    roomTaxRatePercent: _int(json['roomTaxRatePercent']),
+    lineTaxPaise: _int(json['lineTaxPaise']),
+    propertyTaxPaise: _int(json['propertyTaxPaise']),
+    taxPaise: _int(json['taxPaise']),
+    subtotalPaise: _int(json['subtotalPaise']),
+    intraState: json['intraState'] == null ? true : _bool(json['intraState']),
     lineItems: (json['lineItems'] as List? ?? const [])
         .whereType<Map>()
         .map(FolioLineItem.fromJson)
@@ -892,18 +977,63 @@ class FolioLineItem {
     required this.kind,
     required this.description,
     required this.amountPaise,
+    this.id,
+    this.taxPaise = 0,
+    this.taxRateBp = 0,
+    this.taxExempt = false,
+    this.voided = false,
   });
 
+  final String? id;
   final String kind;
   final String description;
   final int amountPaise;
+  final int taxPaise;
+  final int taxRateBp;
+  final bool taxExempt;
+  final bool voided;
 
+  bool get isDiscount => kind == 'ADJUSTMENT' && amountPaise < 0;
   String get amountLabel => formatPaise(amountPaise);
+  String get taxLabel => taxExempt
+      ? 'tax exempt'
+      : taxRateBp > 0
+      ? '+${formatPaise(taxPaise)} tax (${(taxRateBp / 100).toStringAsFixed(taxRateBp % 100 == 0 ? 0 : 1)}%)'
+      : '';
 
   factory FolioLineItem.fromJson(Map json) => FolioLineItem(
+    id: _str(json['id']),
     kind: _str(json['kind']) ?? 'MISC',
     description: _str(json['description']) ?? '',
     amountPaise: _int(_pick(json, ['amountPaise', 'amount_paise'])),
+    taxPaise: _int(json['taxPaise']),
+    taxRateBp: _int(json['taxRateBp']),
+    taxExempt: _bool(json['taxExempt']),
+    voided: json['voidedAt'] != null,
+  );
+}
+
+/// One entry of the folio's own log.
+class FolioEvent {
+  const FolioEvent({
+    required this.type,
+    required this.createdAt,
+    this.payload = const {},
+  });
+  final String type;
+  final DateTime createdAt;
+  final Map payload;
+  String get label => switch (type) {
+    'discount_applied' => 'Discount applied',
+    'line_voided' => 'Line voided',
+    'tax_exempted' => 'Tax exemption granted',
+    'tax_exemption_removed' => 'Tax exemption removed',
+    _ => type.replaceAll('_', ' '),
+  };
+  factory FolioEvent.fromJson(Map json) => FolioEvent(
+    type: _str(json['type']) ?? '',
+    createdAt: _date(json['createdAt']) ?? DateTime.now(),
+    payload: json['payload'] is Map ? json['payload'] as Map : const {},
   );
 }
 

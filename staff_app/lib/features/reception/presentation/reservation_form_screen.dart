@@ -15,6 +15,8 @@ import '../../../core/widgets/states.dart';
 import '../../rooms/data/room_models.dart' show formatPaise;
 import '../../rooms/presentation/room_widgets.dart'
     show FieldNote, FormErrorNote;
+import '../../property_settings/application/property_settings_controllers.dart';
+import '../../rooms/application/units_controllers.dart';
 import '../application/reception_controllers.dart';
 import '../data/reception_models.dart';
 import '../data/reception_repository.dart';
@@ -72,6 +74,12 @@ class _ReservationFormScreenState extends ConsumerState<ReservationFormScreen> {
   int _adults = 2;
   int _children = 0;
   ReservationSource _source = ReservationSource.walkIn;
+  String? _ratePlanId;
+  String? _bookingSourceId;
+  final _segment = TextEditingController();
+  final _holdMinutes = TextEditingController();
+  final _companyName = TextEditingController();
+  final _companyGstin = TextEditingController();
 
   /// A walk-in standing at the desk is not a soft hold, so the common case is
   /// the default and the clerk presses one button, not two.
@@ -98,6 +106,10 @@ class _ReservationFormScreenState extends ConsumerState<ReservationFormScreen> {
 
   @override
   void dispose() {
+    _segment.dispose();
+    _holdMinutes.dispose();
+    _companyName.dispose();
+    _companyGstin.dispose();
     for (final c in [_name, _phone, _email, _notes, _rate]) {
       c.dispose();
     }
@@ -189,6 +201,14 @@ class _ReservationFormScreenState extends ConsumerState<ReservationFormScreen> {
               source: _source,
               notes: _notes.text.trim(),
               confirmImmediately: _confirmNow,
+              ratePlanId: _ratePlanId,
+              bookingSourceId: _bookingSourceId,
+              segment: _segment.text.trim(),
+              holdMinutes: _confirmNow || _holdMinutes.text.trim().isEmpty
+                  ? null
+                  : int.tryParse(_holdMinutes.text.trim()),
+              companyName: _companyName.text.trim(),
+              companyGstin: _companyGstin.text.trim().toUpperCase(),
             ),
           );
       messenger.showSnackBar(
@@ -359,6 +379,59 @@ class _ReservationFormScreenState extends ConsumerState<ReservationFormScreen> {
                           DropdownMenuItem(value: s, child: Text(s.label)),
                       ],
                       onChanged: (s) => setState(() => _source = s ?? _source),
+                    ),
+                    gapMd,
+                    _BookingSourcePicker(
+                      value: _bookingSourceId,
+                      onChanged: (id) => setState(() => _bookingSourceId = id),
+                    ),
+                    if (_roomTypeId != null) ...[
+                      gapMd,
+                      _RatePlanPicker(
+                        roomTypeId: _roomTypeId!,
+                        value: _ratePlanId,
+                        onChanged: (id) => setState(() => _ratePlanId = id),
+                      ),
+                    ],
+                    gapMd,
+                    TextFormField(
+                      controller: _segment,
+                      decoration: const InputDecoration(
+                        labelText: 'Segment (optional)',
+                        hintText: 'Leisure, Corporate, Group, Wedding…',
+                      ),
+                    ),
+                    if (!_confirmNow) ...[
+                      gapMd,
+                      TextFormField(
+                        controller: _holdMinutes,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        decoration: const InputDecoration(
+                          labelText: 'Hold expires after (minutes)',
+                          hintText: 'Blank = property default · 0 = never',
+                        ),
+                      ),
+                    ],
+                    gapMd,
+                    TextFormField(
+                      controller: _companyName,
+                      decoration: const InputDecoration(
+                        labelText: 'Company (optional)',
+                        hintText: 'Bills to a company — prints on the invoice',
+                      ),
+                    ),
+                    gapMd,
+                    TextFormField(
+                      controller: _companyGstin,
+                      textCapitalization: TextCapitalization.characters,
+                      maxLength: 15,
+                      decoration: const InputDecoration(
+                        labelText: 'Company GSTIN (optional)',
+                        counterText: '',
+                      ),
                     ),
                   ],
                 ),
@@ -589,6 +662,66 @@ class _Counter extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The hotel's own booking sources, when it has defined any.
+class _BookingSourcePicker extends ConsumerWidget {
+  const _BookingSourcePicker({required this.value, required this.onChanged});
+  final String? value;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sources = ref.watch(bookingSourcesProvider).valueOrNull ?? const [];
+    final active = sources.where((s) => s.isActive).toList();
+    if (active.isEmpty) return const SizedBox.shrink();
+    return DropdownButtonFormField<String?>(
+      initialValue: active.any((s) => s.id == value) ? value : null,
+      isExpanded: true,
+      decoration: const InputDecoration(labelText: 'Source (detailed)'),
+      items: [
+        const DropdownMenuItem(value: null, child: Text('—')),
+        for (final s in active)
+          DropdownMenuItem(value: s.id, child: Text(s.name)),
+      ],
+      onChanged: onChanged,
+    );
+  }
+}
+
+/// Rate plans for the chosen room type. Absent when the type has none.
+class _RatePlanPicker extends ConsumerWidget {
+  const _RatePlanPicker({
+    required this.roomTypeId,
+    required this.value,
+    required this.onChanged,
+  });
+  final String roomTypeId;
+  final String? value;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final plans =
+        ref.watch(ratePlansProvider(roomTypeId)).valueOrNull ?? const [];
+    if (plans.isEmpty) return const SizedBox.shrink();
+    return DropdownButtonFormField<String?>(
+      initialValue: plans.any((p) => p.id == value) ? value : null,
+      isExpanded: true,
+      decoration: const InputDecoration(labelText: 'Rate plan'),
+      items: [
+        const DropdownMenuItem(value: null, child: Text('Flat nightly rate')),
+        for (final p in plans)
+          DropdownMenuItem(
+            value: p.id,
+            child: Text(
+              '${p.name} · ${formatPaise(p.basePricePaise)} · ${p.mealPlan.label}',
+            ),
+          ),
+      ],
+      onChanged: onChanged,
     );
   }
 }

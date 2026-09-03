@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/networking/api_exception.dart';
 import '../../../core/permissions/permission_gate.dart';
 import '../../../core/permissions/permission_keys.dart';
+import '../../../core/providers.dart';
 import '../../../core/routing/routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -134,6 +135,12 @@ class _ReservationDetailScreenState
                         label: 'Sold as',
                         value: r.roomTypeName ?? Fmt.dash,
                       ),
+                      if (r.roomId != null &&
+                          (r.status == ReservationStatus.confirmed ||
+                              r.status == ReservationStatus.checkedIn)) ...[
+                        const RowDivider(),
+                        _RoomPlacementActions(reservation: r),
+                      ],
                       const RowDivider(),
                       _Fact(
                         label: 'Room',
@@ -280,8 +287,33 @@ class _FolioPanel extends ConsumerWidget {
           if (folio != null)
             for (final item in folio.lineItems) ...[
               const RowDivider(),
-              _Fact(label: item.description, value: item.amountLabel),
+              _FolioLineRow(reservation: r, item: item),
             ],
+          if (folio != null) ...[
+            const RowDivider(),
+            _Fact(label: 'Subtotal', value: formatPaiseOf(folio.subtotalPaise)),
+            const RowDivider(),
+            _Fact(
+              label: folio.roomTaxRatePercent > 0
+                  ? 'GST on room (${folio.roomTaxRatePercent}%${folio.intraState ? ', CGST+SGST' : ', IGST'})'
+                  : 'GST on room',
+              value: formatPaiseOf(folio.roomTaxPaise),
+            ),
+            if (folio.lineTaxPaise > 0) ...[
+              const RowDivider(),
+              _Fact(
+                label: 'GST on services',
+                value: formatPaiseOf(folio.lineTaxPaise),
+              ),
+            ],
+            if (folio.propertyTaxPaise > 0) ...[
+              const RowDivider(),
+              _Fact(
+                label: 'Hotel fees',
+                value: formatPaiseOf(folio.propertyTaxPaise),
+              ),
+            ],
+          ],
           const RowDivider(),
           _Fact(label: 'Total charges', value: formatPaiseOf(chargesPaise)),
           if (folio != null)
@@ -325,6 +357,21 @@ class _FolioPanel extends ConsumerWidget {
                     icon: const Icon(Icons.undo_outlined, size: 17),
                     label: const Text('Refund'),
                   ),
+                ),
+                const Spacer(),
+                PermissionGate(
+                  permission: P.folioAdjust,
+                  child: IconButton(
+                    tooltip: 'Discount',
+                    onPressed: () =>
+                        _FolioReasonSheet.discount(context, ref, r.id),
+                    icon: const Icon(Icons.percent_outlined, size: 19),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Folio log',
+                  onPressed: () => _FolioLogSheet.show(context, r.id),
+                  icon: const Icon(Icons.history, size: 19),
                 ),
               ],
             ),
@@ -616,6 +663,449 @@ class _Fact extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// One folio line with its tax note and, for adjusters, void / exempt.
+class _FolioLineRow extends ConsumerWidget {
+  const _FolioLineRow({required this.reservation, required this.item});
+  final Reservation reservation;
+  final FolioLineItem item;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    final canAdjust = ref.watch(permissionsProvider).has(P.folioAdjust);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: Sp.md, vertical: Sp.sm),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.description,
+                  style: AppTypography.body(
+                    size: 13,
+                    color: item.isDiscount ? c.primary : c.foreground,
+                  ),
+                ),
+                if (item.taxLabel.isNotEmpty)
+                  Text(
+                    item.taxLabel,
+                    style: AppTypography.body(
+                      size: 11,
+                      color: c.mutedForeground,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Text(
+            item.amountLabel,
+            style: AppTypography.numeric(
+              size: 13,
+              weight: FontWeight.w600,
+              color: c.foreground,
+            ),
+          ),
+          if (canAdjust && item.id != null && !item.isDiscount)
+            PopupMenuButton<String>(
+              tooltip: 'Line actions',
+              icon: Icon(Icons.more_vert, size: 17, color: c.mutedForeground),
+              onSelected: (a) {
+                if (a == 'void') {
+                  _FolioReasonSheet.voidLine(
+                    context,
+                    ref,
+                    reservation.id,
+                    item,
+                  );
+                }
+                if (a == 'exempt') {
+                  _FolioReasonSheet.taxExempt(
+                    context,
+                    ref,
+                    reservation.id,
+                    item,
+                  );
+                }
+              },
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'exempt',
+                  child: Text(
+                    item.taxExempt ? 'Remove tax exemption' : 'Tax exempt',
+                  ),
+                ),
+                const PopupMenuItem(value: 'void', child: Text('Void line')),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Discount / void / exemption all need a reason: the log is the point.
+class _FolioReasonSheet {
+  static Future<void> _run(
+    BuildContext context, {
+    required String title,
+    required String hint,
+    bool askAmount = false,
+    required Future<void> Function(int? amountPaise, String reason) action,
+  }) async {
+    final reason = TextEditingController();
+    final amount = TextEditingController();
+    final messenger = ScaffoldMessenger.of(context);
+    var busy = false;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setState) {
+          final c = context.colors;
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              Sp.lg,
+              Sp.lg,
+              Sp.lg,
+              MediaQuery.of(context).viewInsets.bottom + Sp.lg,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  title,
+                  style: AppTypography.display(size: 17, color: c.foreground),
+                ),
+                const SizedBox(height: Sp.lg),
+                if (askAmount) ...[
+                  TextField(
+                    controller: amount,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Amount (₹)'),
+                  ),
+                  const SizedBox(height: Sp.md),
+                ],
+                TextField(
+                  controller: reason,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    labelText: 'Reason',
+                    hintText: hint,
+                  ),
+                ),
+                const SizedBox(height: Sp.lg),
+                FilledButton(
+                  onPressed: busy
+                      ? null
+                      : () async {
+                          if (reason.text.trim().length < 2) return;
+                          setState(() => busy = true);
+                          try {
+                            final paise = askAmount
+                                ? ((double.tryParse(amount.text.trim()) ?? 0) *
+                                          100)
+                                      .round()
+                                : null;
+                            await action(paise, reason.text.trim());
+                            if (context.mounted) Navigator.pop(context);
+                          } on ApiException catch (e) {
+                            messenger.showSnackBar(
+                              SnackBar(content: Text(e.message)),
+                            );
+                          } finally {
+                            if (context.mounted) setState(() => busy = false);
+                          }
+                        },
+                  child: const Text('Apply'),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  static Future<void> discount(
+    BuildContext context,
+    WidgetRef ref,
+    String id,
+  ) => _run(
+    context,
+    title: 'Discount',
+    hint: 'Loyal guest, service recovery…',
+    askAmount: true,
+    action: (paise, reason) => ref
+        .read(reservationActionsProvider)
+        .folioDiscount(id, amountPaise: paise ?? 0, reason: reason),
+  );
+
+  static Future<void> voidLine(
+    BuildContext context,
+    WidgetRef ref,
+    String id,
+    FolioLineItem item,
+  ) => _run(
+    context,
+    title: 'Void “${item.description}”',
+    hint: 'Posted in error, guest disputed…',
+    action: (_, reason) => ref
+        .read(reservationActionsProvider)
+        .folioVoidLine(id, item.id!, reason: reason),
+  );
+
+  static Future<void> taxExempt(
+    BuildContext context,
+    WidgetRef ref,
+    String id,
+    FolioLineItem item,
+  ) => _run(
+    context,
+    title: item.taxExempt
+        ? 'Remove tax exemption'
+        : 'Tax exempt “${item.description}”',
+    hint: 'Diplomatic guest, SEZ unit…',
+    action: (_, reason) => ref
+        .read(reservationActionsProvider)
+        .folioTaxExempt(id, item.id!, exempt: !item.taxExempt, reason: reason),
+  );
+}
+
+class _FolioLogSheet {
+  static Future<void> show(
+    BuildContext context,
+    String id,
+  ) => showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    builder: (_) => Consumer(
+      builder: (context, ref, _) {
+        final c = context.colors;
+        final events = ref.watch(folioEventsProvider(id));
+        return Padding(
+          padding: const EdgeInsets.all(Sp.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Folio log',
+                style: AppTypography.display(size: 17, color: c.foreground),
+              ),
+              const SizedBox(height: Sp.md),
+              Flexible(
+                child: events.when(
+                  loading: () => const ListSkeleton(rows: 3),
+                  error: (e, _) => ErrorState(
+                    error: e,
+                    onRetry: () => ref.invalidate(folioEventsProvider(id)),
+                  ),
+                  data: (list) => list.isEmpty
+                      ? const EmptyState(
+                          title: 'Nothing changed on this folio yet',
+                          icon: Icons.history,
+                        )
+                      : ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: list.length,
+                          separatorBuilder: (_, _) => const RowDivider(),
+                          itemBuilder: (_, i) {
+                            final e = list[i];
+                            final reason = e.payload['reason'];
+                            return ListTile(
+                              dense: true,
+                              title: Text(e.label),
+                              subtitle: Text(
+                                '${reason ?? ''}${reason == null ? '' : ' · '}${Fmt.dayMonth(e.createdAt)}',
+                                style: AppTypography.body(
+                                  size: 11.5,
+                                  color: c.mutedForeground,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
+/// Lock the booking to its room, or swap rooms with another booking.
+class _RoomPlacementActions extends ConsumerWidget {
+  const _RoomPlacementActions({required this.reservation});
+  final Reservation reservation;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final r = reservation;
+    final c = context.colors;
+    return PermissionGate(
+      permission: P.reservationAllocate,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: Sp.md, vertical: Sp.sm),
+        child: Row(
+          children: [
+            Icon(
+              r.roomLocked ? Icons.lock_outline : Icons.lock_open_outlined,
+              size: 16,
+              color: r.roomLocked ? c.primary : c.mutedForeground,
+            ),
+            const SizedBox(width: Sp.sm),
+            Expanded(
+              child: Text(
+                r.roomLocked
+                    ? 'Locked to this room'
+                    : 'May be moved by auto-allocation',
+                style: AppTypography.body(size: 12, color: c.mutedForeground),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                try {
+                  await ref
+                      .read(reservationActionsProvider)
+                      .lockRoom(r.id, !r.roomLocked);
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        r.roomLocked
+                            ? 'Room unlocked'
+                            : 'Locked to room ${r.roomNumber}',
+                      ),
+                    ),
+                  );
+                } on ApiException catch (e) {
+                  messenger.showSnackBar(SnackBar(content: Text(e.message)));
+                }
+              },
+              child: Text(r.roomLocked ? 'Unlock' : 'Lock'),
+            ),
+            TextButton(
+              onPressed: r.roomLocked
+                  ? null
+                  : () => _SwapSheet.show(context, ref, r),
+              child: const Text('Swap'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Pick another booking of the same type that is in a room, and swap.
+class _SwapSheet {
+  static Future<void> show(
+    BuildContext context,
+    WidgetRef ref,
+    Reservation r,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      builder: (_) => Consumer(
+        builder: (context, ref, _) {
+          final c = context.colors;
+          final all = ref.watch(reservationsProvider);
+          return Padding(
+            padding: const EdgeInsets.all(Sp.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Swap rooms with…',
+                  style: AppTypography.display(size: 17, color: c.foreground),
+                ),
+                Text(
+                  'Same room type, both in a room, neither locked.',
+                  style: AppTypography.body(size: 12, color: c.mutedForeground),
+                ),
+                const SizedBox(height: Sp.md),
+                Flexible(
+                  child: all.when(
+                    loading: () => const ListSkeleton(rows: 3),
+                    error: (e, _) => ErrorState(error: e),
+                    data: (list) {
+                      final candidates = list
+                          .where(
+                            (o) =>
+                                o.id != r.id &&
+                                o.roomTypeId == r.roomTypeId &&
+                                o.roomId != null &&
+                                !o.roomLocked &&
+                                (o.status == ReservationStatus.confirmed ||
+                                    o.status == ReservationStatus.checkedIn),
+                          )
+                          .toList();
+                      if (candidates.isEmpty) {
+                        return const EmptyState(
+                          title: 'No booking to swap with',
+                          icon: Icons.swap_horiz,
+                        );
+                      }
+                      return ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: candidates.length,
+                        separatorBuilder: (_, _) => const RowDivider(),
+                        itemBuilder: (_, i) {
+                          final o = candidates[i];
+                          return ListTile(
+                            title: Text(
+                              '${o.guestName} · Room ${o.roomNumber}',
+                            ),
+                            subtitle: Text(
+                              o.stayLine,
+                              style: AppTypography.body(
+                                size: 11.5,
+                                color: c.mutedForeground,
+                              ),
+                            ),
+                            onTap: () async {
+                              try {
+                                await ref
+                                    .read(reservationActionsProvider)
+                                    .swapRooms(r.id, o.id);
+                                if (context.mounted) Navigator.pop(context);
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Swapped with ${o.guestName}',
+                                    ),
+                                  ),
+                                );
+                              } on ApiException catch (e) {
+                                messenger.showSnackBar(
+                                  SnackBar(content: Text(e.message)),
+                                );
+                              }
+                            },
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

@@ -61,6 +61,14 @@ class P {
   static const roomTypeDelete = 'roomtype.delete';
   static const keyCardIssue = 'keycard.issue';
   static const rateRead = 'rate.read';
+  // Property configuration, the rates grid, folio adjustments, allocation.
+  static const propertySettingsRead = 'property.settings.read';
+  static const propertySettingsUpdate = 'property.settings.update';
+  static const ratesRead = 'rates.read';
+  static const ratesUpdate = 'rates.update';
+  static const folioRead = 'folio.read';
+  static const folioAdjust = 'folio.adjust';
+  static const reservationAllocate = 'reservation.allocate';
 
   // ----------------------------------------------------------- operations --
   static const housekeepingRead = 'housekeeping.read';

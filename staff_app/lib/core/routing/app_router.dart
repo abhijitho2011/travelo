@@ -56,6 +56,9 @@ import '../../features/rooms/presentation/bulk_rooms_screen.dart';
 import '../../features/rooms/presentation/room_type_workspace_screen.dart';
 import '../../features/rooms/presentation/units_screen.dart';
 import '../../features/rooms/presentation/rooms_screen.dart';
+import '../../features/property_settings/presentation/property_settings_screen.dart';
+import '../../features/property_settings/presentation/catalogue_screens.dart';
+import '../../features/rates/presentation/rates_grid_screen.dart';
 import '../../features/sales/presentation/sales_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/sales/presentation/lead_detail_screen.dart';
@@ -203,6 +206,32 @@ final routerProvider = Provider<GoRouter>((ref) {
           // the literal paths win — go_router matches in declaration order,
           // and the pattern would otherwise swallow both.
           GoRoute(path: Routes.rooms, builder: (_, _) => const RoomsScreen()),
+
+          // Property configuration + the rates grid (management)
+          GoRoute(
+            path: Routes.propertySettings,
+            builder: (_, _) => const PropertySettingsScreen(),
+          ),
+          GoRoute(
+            path: Routes.propertyTaxes,
+            builder: (_, _) => const TaxesScreen(),
+          ),
+          GoRoute(
+            path: Routes.propertyPolicies,
+            builder: (_, _) => const PoliciesScreen(),
+          ),
+          GoRoute(
+            path: Routes.propertyAddons,
+            builder: (_, _) => const AddonsScreen(),
+          ),
+          GoRoute(
+            path: Routes.propertySources,
+            builder: (_, _) => const BookingSourcesScreen(),
+          ),
+          GoRoute(
+            path: Routes.rates,
+            builder: (_, _) => const RatesGridScreen(),
+          ),
           // Room-first: adding a room opens the full workspace, where the
           // room's own specifications, photos and rates live. There is no
           // separate "create the type first" step.

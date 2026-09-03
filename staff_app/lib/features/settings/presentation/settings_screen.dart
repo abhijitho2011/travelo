@@ -17,6 +17,8 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
     final canAddRooms = ref.watch(canProvider(P.roomCreate));
+    final canConfigure = ref.watch(canProvider(P.propertySettingsRead));
+    final canSeeRates = ref.watch(canProvider(P.ratesRead));
 
     return PageBody(
       children: [
@@ -47,6 +49,38 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 onTap: () => context.go(Routes.support),
               ),
+              if (canConfigure) ...[
+                const RowDivider(),
+                ListTile(
+                  leading: const Icon(Icons.tune_outlined, size: 20),
+                  title: const Text('Property settings'),
+                  subtitle: const Text(
+                    'Tax, invoice, policies, add-ons, sources',
+                  ),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: c.mutedForeground,
+                  ),
+                  onTap: () => context.go(Routes.propertySettings),
+                ),
+              ],
+              if (canSeeRates) ...[
+                const RowDivider(),
+                ListTile(
+                  leading: const Icon(Icons.grid_on_outlined, size: 20),
+                  title: const Text('Rates & inventory'),
+                  subtitle: const Text(
+                    'Price, availability and restrictions by day',
+                  ),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: c.mutedForeground,
+                  ),
+                  onTap: () => context.go(Routes.rates),
+                ),
+              ],
               if (canAddRooms) ...[
                 const RowDivider(),
                 ListTile(
