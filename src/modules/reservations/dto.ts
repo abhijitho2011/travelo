@@ -106,6 +106,9 @@ export class CreateReservationDto {
 
   @IsOptional() @IsString() @Length(0, 1000) companyAddress?: string;
 
+  /** Bill the stay to a corporate account; the folio settles by CORPORATE. */
+  @IsOptional() @IsUUID() corporateAccountId?: string;
+
   /**
    * Book straight into CONFIRMED. A walk-in at the desk is never a soft hold —
    * making reception press "create" then "confirm" for every arrival is the
@@ -159,6 +162,8 @@ export class UpdateReservationDto {
   @IsOptional() @IsString() @Length(15, 15) companyGstin?: string;
 
   @IsOptional() @IsString() @Length(0, 1000) companyAddress?: string;
+
+  @IsOptional() @IsUUID() corporateAccountId?: string | null;
 }
 
 export class AssignRoomDto {

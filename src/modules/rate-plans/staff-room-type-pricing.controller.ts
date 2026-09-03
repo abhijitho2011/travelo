@@ -18,6 +18,8 @@ import {
 import { CurrentStaff, AuthenticatedStaff } from '../staff-auth/current-staff.decorator';
 import { AuditService } from '../audit/audit.service';
 import { RatePlansService } from './rate-plans.service';
+import { RevenueEngineService } from './revenue-engine.service';
+import { RunRulesDto } from './dto';
 import { CreateFeeDto, CreatePricingRuleDto, UpdateFeeDto, UpdatePricingRuleDto } from './dto';
 
 /**
@@ -39,6 +41,7 @@ import { CreateFeeDto, CreatePricingRuleDto, UpdateFeeDto, UpdatePricingRuleDto 
 export class StaffRoomTypePricingController {
   constructor(
     private readonly ratePlans: RatePlansService,
+    private readonly engine: RevenueEngineService,
     private readonly audit: AuditService,
   ) {}
 
@@ -106,6 +109,33 @@ export class StaffRoomTypePricingController {
   }
 
   // ---------- Dynamic pricing rules ----------
+
+  /** Run the rules for this type now (or preview what they would do). */
+  @Post(':roomTypeId/pricing-rules/run')
+  @RequireStaffPermissions('rates.update')
+  async runRules(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('roomTypeId') roomTypeId: string,
+    @Body() dto: RunRulesDto,
+  ) {
+    const res = await this.engine.run(me.propertyId, {
+      roomTypeId,
+      days: dto.days,
+      dryRun: dto.dryRun,
+    });
+    if (!dto.dryRun) {
+      await this.audit.record({
+        action: 'staff.pricing_rules.run',
+        entity: 'room_type',
+        entityId: roomTypeId,
+        after: { priced: res.daysPriced, reverted: res.daysReverted },
+        actorId: me.id,
+        actorEmail: me.email,
+        actorRole: me.role,
+      });
+    }
+    return res;
+  }
 
   @Get(':roomTypeId/pricing-rules')
   @RequireStaffPermissions('roomtype.read')

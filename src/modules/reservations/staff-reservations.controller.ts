@@ -1,4 +1,5 @@
 import {
+  Optional,
   Body,
   Controller,
   Get,
@@ -23,6 +24,8 @@ import { DeskService } from './desk.service';
 import { ReservationsService } from './reservations.service';
 import { ReservationErrors } from './reservation-errors';
 import { FolioService } from '../folio/folio.service';
+import { CashService } from '../cash/cash.service';
+import { DirectBillingService } from '../direct-billing/direct-billing.service';
 import { FolioReceiptService } from '../folio/folio-receipt.service';
 import { ReportsService } from './reports.service';
 import {
@@ -73,6 +76,9 @@ export class StaffReservationsController {
     private readonly desk: DeskService,
     private readonly audit: AuditService,
     private readonly receipts: FolioReceiptService,
+    // Side-ledgers. Optional so the surface spec's bare module still resolves.
+    @Optional() private readonly cash?: CashService,
+    @Optional() private readonly directBilling?: DirectBillingService,
   ) {}
 
   @Get()
@@ -469,6 +475,27 @@ export class StaffReservationsController {
       },
       me.id,
     );
+    // Cash goes into the drawer; a corporate settlement charges the account.
+    if (dto.method === 'CASH') {
+      await this.cash?.record({
+        propertyId: me.propertyId,
+        kind: 'FOLIO_CASH',
+        amountPaise: dto.amountPaise,
+        reservationId: id,
+        recordedBy: me.id,
+      });
+    } else if (dto.method === 'CORPORATE') {
+      const stay = await this.reservations.requireReservation(me.propertyId, id);
+      if (!stay.corporateAccountId) throw ReservationErrors.corporateAccountRequired();
+      await this.directBilling?.charge({
+        propertyId: me.propertyId,
+        accountId: stay.corporateAccountId,
+        amountPaise: dto.amountPaise,
+        reservationId: id,
+        reference: stay.reservationNumber,
+        recordedBy: me.id,
+      });
+    }
     await this.audit.record({
       action: 'staff.folio.payment',
       entity: 'reservation',

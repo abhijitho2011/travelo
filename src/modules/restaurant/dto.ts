@@ -127,6 +127,27 @@ export class SettleOrderDto {
   @IsIn(restaurantPaymentMethodValues) method!: (typeof restaurantPaymentMethodValues)[number];
   /** Required when method is ROOM_CHARGE — the in-house reservation to bill. */
   @IsOptional() @IsUUID() reservationId?: string;
+  /** Required when method is CORPORATE — the account to bill. */
+  @IsOptional() @IsUUID() corporateAccountId?: string;
+  /** Partial settlement: pay this much now. Omitted = the whole balance. */
+  @IsOptional() @IsInt() @Min(1) @Max(100_000_000) amountPaise?: number;
+  @IsOptional() @IsString() @Length(0, 120) reference?: string;
+  @IsOptional() @IsString() @Length(0, 500) remarks?: string;
+}
+
+export class OrderDiscountDto {
+  /** Paise off the bill, before service charge and tax. */
+  @IsInt() @Min(0) @Max(100_000_000) amountPaise!: number;
+  @IsString() @Length(2, 200) reason!: string;
+}
+
+export class BulkMenuItemsDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(500)
+  @ValidateNested({ each: true })
+  @Type(() => CreateMenuItemDto)
+  items!: CreateMenuItemDto[];
 }
 
 export class CancelOrderDto {

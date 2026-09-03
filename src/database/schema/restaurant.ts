@@ -155,7 +155,13 @@ export const menuItems = pgTable(
 export const restaurantOrderStatusValues = ['OPEN', 'BILLED', 'PAID', 'CANCELLED'] as const;
 export type RestaurantOrderStatus = (typeof restaurantOrderStatusValues)[number];
 
-export const restaurantPaymentMethodValues = ['CASH', 'CARD', 'UPI', 'ROOM_CHARGE'] as const;
+export const restaurantPaymentMethodValues = [
+  'CASH',
+  'CARD',
+  'UPI',
+  'ROOM_CHARGE',
+  'CORPORATE',
+] as const;
 export type RestaurantPaymentMethod = (typeof restaurantPaymentMethodValues)[number];
 
 export const restaurantOrders = pgTable(
@@ -181,8 +187,15 @@ export const restaurantOrders = pgTable(
     guestCount: integer('guest_count').notNull().default(1),
     /** All paise. Zero until the bill is run, then frozen from item snapshots. */
     subtotalPaise: integer('subtotal_paise').notNull().default(0),
+    discountPaise: integer('discount_paise').notNull().default(0),
+    discountReason: varchar('discount_reason', { length: 200 }),
+    serviceChargePaise: integer('service_charge_paise').notNull().default(0),
     taxPaise: integer('tax_paise').notNull().default(0),
     totalPaise: integer('total_paise').notNull().default(0),
+    /** Sum of partial settlements so far. PAID when it reaches total. */
+    paidPaise: integer('paid_paise').notNull().default(0),
+    remarks: varchar('remarks', { length: 500 }),
+    corporateAccountId: uuid('corporate_account_id'),
     paymentMethod: varchar('payment_method', {
       length: 16,
     }).$type<RestaurantPaymentMethod>(),
@@ -301,3 +314,25 @@ export const menuItemRecipes = pgTable(
 );
 
 export type MenuItemRecipe = typeof menuItemRecipes.$inferSelect;
+
+/** One payment against an order — partial settlement leaves several. */
+export const restaurantOrderPayments = pgTable(
+  'restaurant_order_payments',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    orderId: uuid('order_id')
+      .notNull()
+      .references(() => restaurantOrders.id, { onDelete: 'cascade' }),
+    propertyId: uuid('property_id').notNull(),
+    method: varchar('method', { length: 16 }).notNull().$type<RestaurantPaymentMethod>(),
+    amountPaise: integer('amount_paise').notNull(),
+    reference: varchar('reference', { length: 120 }),
+    remarks: varchar('remarks', { length: 500 }),
+    collectedBy: uuid('collected_by'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ orderIdx: index('restaurant_order_payments_order_idx').on(t.orderId) }),
+);
+export type RestaurantOrderPayment = typeof restaurantOrderPayments.$inferSelect;

@@ -114,6 +114,12 @@ export const RestaurantErrors = {
       HttpStatus.CONFLICT,
     ),
 
+  corporateAccountRequired: () =>
+    restaurantError(
+      'CORPORATE_ACCOUNT_REQUIRED',
+      'Choose the corporate account to bill',
+      HttpStatus.BAD_REQUEST,
+    ),
   reservationRequired: () =>
     restaurantError(
       'RESERVATION_REQUIRED',

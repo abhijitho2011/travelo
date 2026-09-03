@@ -1,7 +1,8 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import {
+  coupons,
   addonServices,
   bookingSources,
   propertyPolicies,
@@ -19,6 +20,8 @@ import {
   UpdatePolicyDto,
   UpdatePropertySettingsDto,
   UpdateTaxDto,
+  CouponInputDto,
+  UpdateCouponDto,
 } from './dto';
 
 /**
@@ -354,5 +357,103 @@ export class PropertyConfigService {
       .set({ deletedAt: new Date() })
       .where(eq(bookingSources.id, id));
     return { id, deleted: true };
+  }
+
+  // -------------------------------------------------------------- coupons --
+
+  listCoupons(propertyId: string) {
+    return this.db
+      .select()
+      .from(coupons)
+      .where(and(eq(coupons.propertyId, propertyId), isNull(coupons.deletedAt)))
+      .orderBy(asc(coupons.code));
+  }
+
+  async createCoupon(propertyId: string, dto: CouponInputDto) {
+    const [row] = await this.db
+      .insert(coupons)
+      .values({ propertyId, ...dto, code: dto.code.toUpperCase() })
+      .returning();
+    return row;
+  }
+
+  async updateCoupon(propertyId: string, id: string, dto: UpdateCouponDto) {
+    await this.requireCoupon(propertyId, id);
+    const [row] = await this.db.update(coupons).set(dto).where(eq(coupons.id, id)).returning();
+    return row;
+  }
+
+  async deleteCoupon(propertyId: string, id: string) {
+    await this.requireCoupon(propertyId, id);
+    await this.db.update(coupons).set({ deletedAt: new Date() }).where(eq(coupons.id, id));
+    return { id, deleted: true };
+  }
+
+  private async requireCoupon(propertyId: string, id: string) {
+    const [row] = await this.db
+      .select({ id: coupons.id })
+      .from(coupons)
+      .where(and(eq(coupons.id, id), eq(coupons.propertyId, propertyId), isNull(coupons.deletedAt)))
+      .limit(1);
+    if (!row)
+      throw new NotFoundException({ error: 'COUPON_NOT_FOUND', message: 'Coupon not found' });
+  }
+
+  /**
+   * Validate a code for a stay: active, in its dates, min nights met, uses
+   * left. Returns the discount in paise on `subtotalPaise`, or a reason.
+   */
+  async redeemableCoupon(
+    propertyId: string,
+    code: string,
+    stay: { checkIn: string; nights: number; subtotalPaise: number },
+  ): Promise<{
+    coupon: typeof coupons.$inferSelect | null;
+    discountPaise: number;
+    reason: string | null;
+  }> {
+    const [c] = await this.db
+      .select()
+      .from(coupons)
+      .where(
+        and(
+          eq(coupons.propertyId, propertyId),
+          sql`upper(${coupons.code}) = ${code.toUpperCase()}`,
+          isNull(coupons.deletedAt),
+        ),
+      )
+      .limit(1);
+    if (!c || !c.isActive)
+      return { coupon: null, discountPaise: 0, reason: 'That code is not valid' };
+    if (c.validFrom && stay.checkIn < c.validFrom)
+      return { coupon: c, discountPaise: 0, reason: 'That code is not valid yet' };
+    if (c.validTo && stay.checkIn > c.validTo)
+      return { coupon: c, discountPaise: 0, reason: 'That code has expired' };
+    if (c.minNights && stay.nights < c.minNights)
+      return {
+        coupon: c,
+        discountPaise: 0,
+        reason: `That code needs a stay of ${c.minNights} nights`,
+      };
+    if (c.maxUses && c.uses >= c.maxUses)
+      return { coupon: c, discountPaise: 0, reason: 'That code has been used up' };
+    const discount =
+      c.kind === 'PERCENT'
+        ? Math.round((stay.subtotalPaise * c.value) / 10_000)
+        : Math.min(c.value, stay.subtotalPaise);
+    return { coupon: c, discountPaise: discount, reason: null };
+  }
+
+  /** Count a use. Guarded so a burst cannot exceed maxUses. */
+  async consumeCoupon(id: string): Promise<void> {
+    await this.db
+      .update(coupons)
+      .set({ uses: sql`${coupons.uses} + 1` })
+      .where(
+        and(
+          eq(coupons.id, id),
+          sql`(${coupons.maxUses} is null or ${coupons.uses} < ${coupons.maxUses})`,
+        ),
+      );
   }
 }

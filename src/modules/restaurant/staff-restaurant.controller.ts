@@ -24,6 +24,8 @@ import { TablesService } from './tables.service';
 import { MenuService } from './menu.service';
 import { OrdersService } from './orders.service';
 import {
+  BulkMenuItemsDto,
+  OrderDiscountDto,
   AddOrderItemsDto,
   CancelOrderDto,
   CreateCategoryDto,
@@ -203,6 +205,24 @@ export class StaffRestaurantMenuController {
   }
 
   // --- items ---
+
+  /** Bulk menu upload: many items at once, each validated like a single one. */
+  @Post('items/bulk')
+  @RequireStaffPermissions('menu.manage')
+  async bulkItems(@CurrentStaff() me: AuthenticatedStaff, @Body() dto: BulkMenuItemsDto) {
+    const created = [];
+    for (const item of dto.items) created.push(await this.menu.createItem(me.propertyId, item));
+    await this.audit.record({
+      action: 'staff.restaurant.menu.bulk_uploaded',
+      entity: 'menu_item',
+      entityId: me.propertyId,
+      after: { count: created.length },
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return { created: created.length, items: created };
+  }
 
   @Post('items')
   @RequireStaffPermissions('menu.manage')
@@ -428,6 +448,27 @@ export class StaffRestaurantOrdersController {
       entity: 'restaurant_order',
       entityId: id,
       after: { totalPaise: row.totalPaise, taxPaise: row.taxPaise },
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return row;
+  }
+
+  /** A discount with a reason. Order-level; the bill recomputes. */
+  @Post(':id/discount')
+  @RequireStaffPermissions('bill.settle')
+  async discount(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @Body() dto: OrderDiscountDto,
+  ) {
+    const row = await this.orders.applyDiscount(me.propertyId, id, dto);
+    await this.audit.record({
+      action: 'staff.restaurant.order.discounted',
+      entity: 'restaurant_order',
+      entityId: id,
+      after: { amountPaise: dto.amountPaise, reason: dto.reason },
       actorId: me.id,
       actorEmail: me.email,
       actorRole: me.role,

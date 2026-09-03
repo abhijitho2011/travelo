@@ -114,6 +114,8 @@ export interface BillLine {
 
 export interface BillTotals {
   subtotalPaise: number;
+  discountPaise: number;
+  serviceChargePaise: number;
   taxPaise: number;
   totalPaise: number;
 }
@@ -123,12 +125,27 @@ export interface BillTotals {
  * excluded. Tax is a flat percentage of the subtotal, rounded to the nearest
  * paise; total is subtotal + tax. All integer paise in, integer paise out.
  */
-export function computeBill(lines: readonly BillLine[], taxPercent: number): BillTotals {
-  const subtotalPaise = lines
+export function computeBill(
+  lines: readonly BillLine[],
+  taxPercent: number,
+  opts: { discountPaise?: number; serviceChargeBp?: number } = {},
+): BillTotals {
+  const gross = lines
     .filter((l) => countsTowardsBill(l.kotStatus))
     .reduce((sum, l) => sum + l.pricePaiseSnapshot * l.qty, 0);
-  const taxPaise = Math.round((subtotalPaise * taxPercent) / 100);
-  return { subtotalPaise, taxPaise, totalPaise: subtotalPaise + taxPaise };
+  // Discount comes off first and never below zero; service charge and tax
+  // are computed on what the guest actually pays for the food.
+  const discountPaise = Math.min(Math.max(0, opts.discountPaise ?? 0), gross);
+  const subtotalPaise = gross - discountPaise;
+  const serviceChargePaise = Math.round((subtotalPaise * (opts.serviceChargeBp ?? 0)) / 10_000);
+  const taxPaise = Math.round(((subtotalPaise + serviceChargePaise) * taxPercent) / 100);
+  return {
+    subtotalPaise,
+    discountPaise,
+    serviceChargePaise,
+    taxPaise,
+    totalPaise: subtotalPaise + serviceChargePaise + taxPaise,
+  };
 }
 
 // ---------- Order number ----------

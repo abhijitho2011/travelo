@@ -13,6 +13,8 @@ import { DeskService } from './desk.service';
 import { ReservationsService } from './reservations.service';
 import { ReportsService } from './reports.service';
 import { FolioModule } from '../folio/folio.module';
+import { CashModule } from '../cash/cash.module';
+import { DirectBillingModule } from '../direct-billing/direct-billing.module';
 import { RatesModule } from '../rates/rates.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
@@ -34,6 +36,8 @@ import { NotificationsModule } from '../notifications/notifications.module';
     FolioModule,
     NotificationsModule,
     RatesModule,
+    CashModule,
+    DirectBillingModule,
   ],
   controllers: [
     StaffReservationsController,

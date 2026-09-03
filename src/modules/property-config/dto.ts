@@ -163,3 +163,27 @@ export class UpdateBookingSourceDto {
   @IsOptional() @IsBoolean() isActive?: boolean;
   @IsOptional() @IsInt() @Min(0) sortOrder?: number;
 }
+
+export class CouponInputDto {
+  @IsString() @Length(2, 40) @Matches(/^[A-Za-z0-9_-]+$/) code!: string;
+  @IsOptional() @IsString() @Length(0, 200) description?: string;
+  @IsOptional() @IsIn(['PERCENT', 'FIXED']) kind?: 'PERCENT' | 'FIXED';
+  /** Basis points for PERCENT; paise for FIXED. */
+  @IsInt() @Min(1) @Max(100_000_000) value!: number;
+  @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) validFrom?: string;
+  @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) validTo?: string;
+  @IsOptional() @IsInt() @Min(1) @Max(365) minNights?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(1_000_000) maxUses?: number;
+  @IsOptional() @IsBoolean() isActive?: boolean;
+}
+
+export class UpdateCouponDto {
+  @IsOptional() @IsString() @Length(0, 200) description?: string;
+  @IsOptional() @IsIn(['PERCENT', 'FIXED']) kind?: 'PERCENT' | 'FIXED';
+  @IsOptional() @IsInt() @Min(1) @Max(100_000_000) value?: number;
+  @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) validFrom?: string | null;
+  @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) validTo?: string | null;
+  @IsOptional() @IsInt() @Min(1) @Max(365) minNights?: number | null;
+  @IsOptional() @IsInt() @Min(1) @Max(1_000_000) maxUses?: number | null;
+  @IsOptional() @IsBoolean() isActive?: boolean;
+}

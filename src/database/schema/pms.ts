@@ -81,6 +81,10 @@ export const propertySettings = pgTable('property_settings', {
     .default({})
     .$type<NotificationPrefs>(),
   currency: varchar('currency', { length: 8 }).notNull().default('INR'),
+  /** No rule may price a room below this. */
+  minRoomPricePaise: integer('min_room_price_paise'),
+  /** Basis points auto-added to every restaurant bill. */
+  restaurantServiceChargeBp: integer('restaurant_service_charge_bp').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -347,3 +351,153 @@ export type BookingSource = typeof bookingSources.$inferSelect;
 export type FolioEvent = typeof folioEvents.$inferSelect;
 export type RateInventoryDay = typeof rateInventoryDays.$inferSelect;
 export type RateChange = typeof rateChangeLog.$inferSelect;
+
+// -------------------------------------------------------------- coupons ----
+
+export const couponKindValues = ['PERCENT', 'FIXED'] as const;
+
+/** Promotions the booking page honours. PERCENT = basis points; FIXED = paise off the stay. */
+export const coupons = pgTable(
+  'coupons',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    propertyId: uuid('property_id')
+      .notNull()
+      .references(() => properties.id, { onDelete: 'cascade' }),
+    code: varchar('code', { length: 40 }).notNull(),
+    description: varchar('description', { length: 200 }),
+    kind: varchar('kind', { length: 8 })
+      .notNull()
+      .default('PERCENT')
+      .$type<(typeof couponKindValues)[number]>(),
+    value: integer('value').notNull(),
+    validFrom: date('valid_from'),
+    validTo: date('valid_to'),
+    minNights: integer('min_nights'),
+    maxUses: integer('max_uses'),
+    uses: integer('uses').notNull().default(0),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (t) => ({
+    propertyCodeUnique: uniqueIndex('coupons_property_code_unique')
+      .on(t.propertyId, sql`upper(${t.code})`)
+      .where(sql`deleted_at is null`),
+  }),
+);
+
+// ---------------------------------------------------- direct billing ----
+
+export const corporateAccounts = pgTable(
+  'corporate_accounts',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    propertyId: uuid('property_id')
+      .notNull()
+      .references(() => properties.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 160 }).notNull(),
+    gstin: varchar('gstin', { length: 15 }),
+    contactName: varchar('contact_name', { length: 120 }),
+    contactPhone: varchar('contact_phone', { length: 32 }),
+    contactEmail: varchar('contact_email', { length: 254 }),
+    address: text('address'),
+    creditLimitPaise: integer('credit_limit_paise'),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (t) => ({ propertyIdx: index('corporate_accounts_property_idx').on(t.propertyId) }),
+);
+
+export const ledgerKindValues = ['CHARGE', 'PAYMENT'] as const;
+
+/** Append-only. Balance = CHARGE − PAYMENT. */
+export const corporateLedger = pgTable(
+  'corporate_ledger',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => corporateAccounts.id, { onDelete: 'cascade' }),
+    propertyId: uuid('property_id').notNull(),
+    kind: varchar('kind', { length: 8 }).notNull().$type<(typeof ledgerKindValues)[number]>(),
+    amountPaise: integer('amount_paise').notNull(),
+    reservationId: uuid('reservation_id'),
+    orderId: uuid('order_id'),
+    reference: varchar('reference', { length: 120 }),
+    note: varchar('note', { length: 500 }),
+    recordedBy: uuid('recorded_by'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ accountIdx: index('corporate_ledger_account_idx').on(t.accountId, t.createdAt) }),
+);
+
+// ------------------------------------------------ cash tracker / shifts ----
+
+export const staffShifts = pgTable(
+  'staff_shifts',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    propertyId: uuid('property_id').notNull(),
+    staffId: uuid('staff_id').notNull(),
+    openedAt: timestamp('opened_at', { withTimezone: true }).notNull().defaultNow(),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+    openingCashPaise: integer('opening_cash_paise').notNull().default(0),
+    declaredCashPaise: integer('declared_cash_paise'),
+    expectedCashPaise: integer('expected_cash_paise'),
+    note: varchar('note', { length: 500 }),
+  },
+  (t) => ({
+    propertyOpenIdx: index('staff_shifts_property_open_idx').on(t.propertyId, t.closedAt),
+  }),
+);
+
+export const cashEntryKindValues = [
+  'FOLIO_CASH',
+  'POS_CASH',
+  'CASH_IN',
+  'WITHDRAWAL',
+  'TOP_UP',
+  'EXPENSE',
+] as const;
+export type CashEntryKind = (typeof cashEntryKindValues)[number];
+
+/** Every cash movement. Running cash-in-hand is a signed sum. */
+export const cashEntries = pgTable(
+  'cash_entries',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    propertyId: uuid('property_id').notNull(),
+    shiftId: uuid('shift_id'),
+    kind: varchar('kind', { length: 16 }).notNull().$type<CashEntryKind>(),
+    /** Positive; direction comes from `kind`. */
+    amountPaise: integer('amount_paise').notNull(),
+    reservationId: uuid('reservation_id'),
+    orderId: uuid('order_id'),
+    expenseId: uuid('expense_id'),
+    note: varchar('note', { length: 500 }),
+    recordedBy: uuid('recorded_by'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    propertyCreatedIdx: index('cash_entries_property_created_idx').on(t.propertyId, t.createdAt),
+  }),
+);
+
+export type Coupon = typeof coupons.$inferSelect;
+export type CorporateAccount = typeof corporateAccounts.$inferSelect;
+export type CorporateLedgerEntry = typeof corporateLedger.$inferSelect;
+export type StaffShift = typeof staffShifts.$inferSelect;
+export type CashEntry = typeof cashEntries.$inferSelect;

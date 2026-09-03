@@ -54,6 +54,8 @@ import { ExportModule } from './modules/export/export.module';
 import { WorkersModule } from './modules/workers/workers.module';
 import { PropertyConfigModule } from './modules/property-config/property-config.module';
 import { BookingEngineModule } from './modules/booking-engine/booking-engine.module';
+import { CashModule } from './modules/cash/cash.module';
+import { DirectBillingModule } from './modules/direct-billing/direct-billing.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { RequestContextMiddleware } from './common/middleware/request-context.middleware';
@@ -161,6 +163,8 @@ import { ScheduleModule } from '@nestjs/schedule';
     WorkersModule,
     PropertyConfigModule,
     BookingEngineModule,
+    CashModule,
+    DirectBillingModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

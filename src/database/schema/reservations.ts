@@ -132,6 +132,8 @@ export const reservations = pgTable(
     companyName: varchar('company_name', { length: 160 }),
     companyGstin: varchar('company_gstin', { length: 15 }),
     companyAddress: text('company_address'),
+    /** Billed to a corporate account; the folio settles by CORPORATE. */
+    corporateAccountId: uuid('corporate_account_id'),
     checkinTime: varchar('checkin_time', { length: 5 }),
     checkoutTime: varchar('checkout_time', { length: 5 }),
     createdBy: uuid('created_by').references(() => hotelStaff.id, { onDelete: 'set null' }),

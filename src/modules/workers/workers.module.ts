@@ -3,6 +3,7 @@ import { and, eq, isNull, lte, sql, type SQL } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import { loadEnv } from '../../config/env';
 import {
+  pricingRules,
   announcements,
   backgroundJobs,
   dailyPlatformMetrics,
@@ -31,6 +32,8 @@ import { AuditModule } from '../audit/audit.module';
 import { StaffJwtGuard } from '../staff-auth/staff-jwt.guard';
 import { StaffPermissionsGuard } from '../staff-auth/staff-permissions.guard';
 import { StaffNightAuditController } from './staff-night-audit.controller';
+import { RevenueEngineService } from '../rate-plans/revenue-engine.service';
+import { RatePlansModule } from '../rate-plans/rate-plans.module';
 
 @Injectable()
 export class SubscriptionLifecycleWorker {
@@ -558,6 +561,39 @@ export class HoldExpiryWorker {
   }
 }
 
+/**
+ * Applies pricing rules to the rates grid for every property that has any
+ * enabled — hourly, so an occupancy-based rule reacts within the hour, and
+ * a switched-off rule auto-reverts within the hour.
+ */
+@Injectable()
+export class RevenueRuleWorker {
+  private readonly logger = new Logger(RevenueRuleWorker.name);
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Database,
+    private readonly engine: RevenueEngineService,
+  ) {}
+
+  async run(): Promise<{ properties: number; priced: number; reverted: number }> {
+    const rows = await this.db
+      .selectDistinct({ propertyId: pricingRules.propertyId })
+      .from(pricingRules)
+      .where(and(eq(pricingRules.enabled, true), isNull(pricingRules.deletedAt)));
+    let priced = 0;
+    let reverted = 0;
+    for (const r of rows) {
+      try {
+        const res = await this.engine.run(r.propertyId);
+        priced += res.daysPriced;
+        reverted += res.daysReverted;
+      } catch (err) {
+        this.logger.error(`Revenue rules failed for ${r.propertyId}`, err as Error);
+      }
+    }
+    return { properties: rows.length, priced, reverted };
+  }
+}
+
 export class RetentionWorker {
   private readonly logger = new Logger(RetentionWorker.name);
   constructor(@Inject(DRIZZLE) private readonly db: Database) {}
@@ -607,7 +643,14 @@ export class WorkerSchedulerService {
     private readonly nightAudit: NightAuditWorker,
     private readonly retention: RetentionWorker,
     private readonly holds: HoldExpiryWorker,
+    private readonly revenue: RevenueRuleWorker,
   ) {}
+
+  /** Pricing rules react within the hour; switched-off rules revert within the hour. */
+  @Cron(CronExpression.EVERY_HOUR)
+  runRevenueRules(): Promise<void> {
+    return this.guard('revenue-rules', () => this.revenue.run());
+  }
 
   /** Unpaid enquiry holds lapse on the minute they said they would. */
   @Cron(CronExpression.EVERY_5_MINUTES)
@@ -694,6 +737,7 @@ export class WorkerSchedulerService {
     JwtModule.register({}),
     SharedAuthModule,
     AuditModule,
+    RatePlansModule,
   ],
   controllers: [StaffNightAuditController],
   providers: [
@@ -708,6 +752,7 @@ export class WorkerSchedulerService {
     NightAuditWorker,
     RetentionWorker,
     HoldExpiryWorker,
+    RevenueRuleWorker,
   ],
   exports: [
     ChannexSyncWorker,
@@ -718,6 +763,7 @@ export class WorkerSchedulerService {
     NightAuditWorker,
     RetentionWorker,
     HoldExpiryWorker,
+    RevenueRuleWorker,
   ],
 })
 export class WorkersModule {}

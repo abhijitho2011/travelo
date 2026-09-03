@@ -220,6 +220,9 @@ export const pricingRules = pgTable(
       .default('PERCENT')
       .$type<AdjustmentKind>(),
     adjustmentValue: integer('adjustment_value').notNull(),
+    /** Optional label — 'Weekend uplift', 'Diwali'. */
+    name: varchar('name', { length: 80 }),
+    lastRunAt: timestamp('last_run_at', { withTimezone: true }),
     enabled: boolean('enabled').notNull().default(true),
     /** Higher wins when two rules fire on the same night. */
     priority: integer('priority').notNull().default(0),

@@ -35,6 +35,7 @@ describe('WorkerSchedulerService', () => {
       nightAudit as never,
       retention as never,
       { run: async () => ({ expired: 0 }) } as never,
+      { run: async () => ({ properties: 0, priced: 0, reverted: 0 }) } as never,
     );
     return {
       svc,

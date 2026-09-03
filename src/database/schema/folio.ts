@@ -97,7 +97,14 @@ export const folioLineItems = pgTable(
 export const folioPaymentDirectionValues = ['PAYMENT', 'REFUND'] as const;
 export type FolioPaymentDirection = (typeof folioPaymentDirectionValues)[number];
 
-export const folioPaymentMethodValues = ['CASH', 'CARD', 'UPI', 'BANK', 'ONLINE'] as const;
+export const folioPaymentMethodValues = [
+  'CASH',
+  'CARD',
+  'UPI',
+  'BANK',
+  'ONLINE',
+  'CORPORATE',
+] as const;
 export type FolioPaymentMethod = (typeof folioPaymentMethodValues)[number];
 
 export const folioPayments = pgTable(

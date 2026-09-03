@@ -83,6 +83,15 @@ export const ReservationErrors = {
       HttpStatus.CONFLICT,
     ),
 
+  corporateAccountRequired: () =>
+    reservationError(
+      'CORPORATE_ACCOUNT_REQUIRED',
+
+      'This stay is not billed to a corporate account',
+
+      HttpStatus.BAD_REQUEST,
+    ),
+
   folioLineNotFound: () =>
     reservationError(
       'FOLIO_LINE_NOT_FOUND',

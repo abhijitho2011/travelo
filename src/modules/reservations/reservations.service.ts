@@ -733,6 +733,7 @@ export class ReservationsService {
       companyName: r.companyName,
       companyGstin: r.companyGstin,
       companyAddress: r.companyAddress,
+      corporateAccountId: r.corporateAccountId,
       checkinTime: r.checkinTime,
       checkoutTime: r.checkoutTime,
       checkedInAt: r.checkedInAt,
@@ -909,6 +910,7 @@ export class ReservationsService {
               companyName: dto.companyName ?? null,
               companyGstin: dto.companyGstin ?? null,
               companyAddress: dto.companyAddress ?? null,
+              corporateAccountId: dto.corporateAccountId ?? null,
               createdBy: actorStaffId,
             })
             .returning();
@@ -979,6 +981,7 @@ export class ReservationsService {
     if (dto.companyName !== undefined) patch.companyName = dto.companyName;
     if (dto.companyGstin !== undefined) patch.companyGstin = dto.companyGstin;
     if (dto.companyAddress !== undefined) patch.companyAddress = dto.companyAddress;
+    if (dto.corporateAccountId !== undefined) patch.corporateAccountId = dto.corporateAccountId;
     if (dto.checkIn !== undefined) patch.checkIn = dto.checkIn;
     if (dto.checkOut !== undefined) patch.checkOut = dto.checkOut;
 

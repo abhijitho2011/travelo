@@ -16,6 +16,8 @@ import { OrdersService } from './orders.service';
 import { RecipesService } from './recipes.service';
 import { StaffRecipesController } from './staff-recipes.controller';
 import { FolioModule } from '../folio/folio.module';
+import { CashModule } from '../cash/cash.module';
+import { DirectBillingModule } from '../direct-billing/direct-billing.module';
 import { EntitlementsModule } from '../entitlements/entitlements.module';
 import { FeatureGuard } from '../../common/guards/feature.guard';
 
@@ -26,7 +28,14 @@ import { FeatureGuard } from '../../common/guards/feature.guard';
  * settlement path; nothing here mutates a booking.
  */
 @Module({
-  imports: [JwtModule.register({}), SharedAuthModule, FolioModule, EntitlementsModule],
+  imports: [
+    JwtModule.register({}),
+    SharedAuthModule,
+    FolioModule,
+    EntitlementsModule,
+    CashModule,
+    DirectBillingModule,
+  ],
   controllers: [
     StaffRecipesController,
     StaffRestaurantTablesController,

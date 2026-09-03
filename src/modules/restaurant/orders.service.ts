@@ -1,8 +1,10 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Optional, Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { and, asc, desc, eq, gte, inArray, ne, sql, SQL } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import {
+  propertySettings,
+  restaurantOrderPayments,
   menuItems,
   menuItemRecipes,
   orderItems,
@@ -15,6 +17,7 @@ import {
   type RestaurantPaymentMethod,
 } from '../../database/schema';
 import {
+  OrderDiscountDto,
   AddOrderItemsDto,
   CancelOrderDto,
   CreateOrderDto,
@@ -34,6 +37,8 @@ import {
 } from './restaurant-rules';
 import { TablesService, type Tx } from './tables.service';
 import { FolioService } from '../folio/folio.service';
+import { DirectBillingService } from '../direct-billing/direct-billing.service';
+import { CashService } from '../cash/cash.service';
 import { ItemsService } from '../inventory/items.service';
 
 const MAX_LIMIT = 200;
@@ -68,6 +73,8 @@ export class OrdersService {
     private readonly config: ConfigService,
     private readonly tables: TablesService,
     private readonly folio: FolioService,
+    @Optional() private readonly directBilling?: DirectBillingService,
+    @Optional() private readonly cash?: CashService,
   ) {}
 
   private taxPercent(): number {
@@ -385,12 +392,17 @@ export class OrdersService {
       const active = lines.filter((l) => countsTowardsBill(l.kotStatus));
       if (active.length === 0) throw RestaurantErrors.emptyBill();
 
-      const totals = computeBill(lines, this.taxPercent());
+      const totals = computeBill(lines, this.taxPercent(), {
+        discountPaise: order.discountPaise,
+        serviceChargeBp: await this.serviceChargeBp(propertyId, tx),
+      });
       await tx
         .update(restaurantOrders)
         .set({
           status: 'BILLED',
           subtotalPaise: totals.subtotalPaise,
+          discountPaise: totals.discountPaise,
+          serviceChargePaise: totals.serviceChargePaise,
           taxPaise: totals.taxPaise,
           totalPaise: totals.totalPaise,
           billedAt: new Date(),
@@ -469,6 +481,12 @@ export class OrdersService {
     }
   }
 
+  /**
+   * Settle, in full or in part. Every payment is its own row; the order is
+   * PAID once the rows cover the total. ROOM_CHARGE posts the whole bill to
+   * the guest folio (never partial — a folio line is the bill). CORPORATE
+   * charges the account's ledger. CASH is recorded in the cash tracker.
+   */
   async settle(
     propertyId: string,
     orderId: string,
@@ -479,14 +497,20 @@ export class OrdersService {
       const tx = trx as unknown as Tx;
       const order = await this.requireOrder(propertyId, orderId, tx);
       if (order.status !== 'BILLED') throw RestaurantErrors.orderNotBilled();
-      assertOrderTransition(order.status, 'PAID');
+      // Rows older than partial settlement carry no paid figure yet. A zero
+      // bill (everything cancelled, comped) still settles — to PAID, at zero.
+      const paidSoFar = order.paidPaise ?? 0;
+      const remaining = Math.max(0, order.totalPaise - paidSoFar);
 
-      let reservationId: string | null = null;
+      let reservationId: string | null = order.reservationId ?? null;
+      let corporateAccountId: string | null = order.corporateAccountId ?? null;
+      let amount = Math.min(dto.amountPaise ?? remaining, remaining);
+
       if (dto.method === 'ROOM_CHARGE') {
         if (!dto.reservationId) throw RestaurantErrors.reservationRequired();
         // The room charge must land on a guest actually in-house at THIS
         // property. Anything else — wrong hotel, not yet arrived, already
-        // departed — is refused. Folio posting is deferred; we store the link.
+        // departed — is refused.
         const [res] = await tx
           .select({ id: reservations.id, status: reservations.status })
           .from(reservations)
@@ -496,24 +520,44 @@ export class OrdersService {
           .limit(1);
         if (!res || res.status !== 'CHECKED_IN') throw RestaurantErrors.reservationNotInHouse();
         reservationId = res.id;
+        amount = remaining; // a folio line is the whole bill
       }
+      if (dto.method === 'CORPORATE') {
+        if (!dto.corporateAccountId) throw RestaurantErrors.corporateAccountRequired();
+        corporateAccountId = dto.corporateAccountId;
+        amount = remaining;
+      }
+
+      await tx.insert(restaurantOrderPayments).values({
+        orderId,
+        propertyId,
+        method: dto.method as RestaurantPaymentMethod,
+        amountPaise: amount,
+        reference: dto.reference ?? null,
+        remarks: dto.remarks ?? null,
+        collectedBy: settledByStaffId,
+      });
+      const paid = paidSoFar + amount;
+      const settled = paid >= order.totalPaise;
 
       await tx
         .update(restaurantOrders)
         .set({
-          status: 'PAID',
+          status: settled ? 'PAID' : 'BILLED',
+          paidPaise: paid,
           paymentMethod: dto.method as RestaurantPaymentMethod,
           reservationId,
+          corporateAccountId,
+          remarks: dto.remarks ?? order.remarks,
           settledBy: settledByStaffId,
-          paidAt: new Date(),
+          paidAt: settled ? new Date() : null,
           updatedAt: new Date(),
         })
         .where(eq(restaurantOrders.id, orderId));
 
-      // ROOM_CHARGE now POSTS to the guest folio, so the amount rides the stay
-      // balance and is collected at checkout. Idempotent by (source, orderId):
-      // a retried settle never double-charges. Deferred no longer.
-      if (reservationId) {
+      // ROOM_CHARGE POSTS to the guest folio, so the amount rides the stay
+      // balance and is collected at checkout. Idempotent by (source, orderId).
+      if (dto.method === 'ROOM_CHARGE' && reservationId) {
         await this.folio.postCharge(
           {
             reservationId,
@@ -528,17 +572,85 @@ export class OrdersService {
           tx,
         );
       }
-      // Deplete stock for anything with a recipe. Best-effort: a sold dish is
-      // never blocked by inventory tracking, so a line that would drive stock
-      // negative is skipped and logged rather than failing the settle.
-      await this.depleteStock(tx, propertyId, orderId, settledByStaffId);
+      // The two side-ledgers are optional collaborators: a property without
+      // them wired still settles, it just does not track cash or credit.
+      if (dto.method === 'CORPORATE' && corporateAccountId) {
+        await this.directBilling?.charge(
+          {
+            propertyId,
+            accountId: corporateAccountId,
+            amountPaise: amount,
+            orderId,
+            reference: order.orderNumber,
+            recordedBy: settledByStaffId,
+          },
+          tx,
+        );
+      }
+      if (dto.method === 'CASH') {
+        await this.cash?.record(
+          {
+            propertyId,
+            kind: 'POS_CASH',
+            amountPaise: amount,
+            orderId,
+            recordedBy: settledByStaffId,
+            note: order.orderNumber,
+          },
+          tx,
+        );
+      }
 
-      // Settling frees the table back to OPEN for the next cover.
-      if (order.tableId) await TablesService.setStatus(tx, order.tableId, 'OPEN');
+      if (settled) {
+        // Deplete stock for anything with a recipe. Best-effort: a sold dish is
+        // never blocked by inventory tracking.
+        await this.depleteStock(tx, propertyId, orderId, settledByStaffId);
+        // Settling frees the table back to OPEN for the next cover.
+        if (order.tableId) await TablesService.setStatus(tx, order.tableId, 'OPEN');
+      }
 
       const refreshed = await this.requireOrder(propertyId, orderId, tx);
       return this.hydrate(refreshed, tx);
     });
+  }
+
+  /** A discount on an open or billed order; the bill is re-computed on billing. */
+  async applyDiscount(propertyId: string, orderId: string, dto: OrderDiscountDto) {
+    return this.db.transaction(async (trx) => {
+      const tx = trx as unknown as Tx;
+      const order = await this.requireOrder(propertyId, orderId, tx);
+      if (order.status === 'PAID' || order.status === 'CANCELLED')
+        throw RestaurantErrors.orderNotBilled();
+      const patch: Partial<typeof restaurantOrders.$inferInsert> = {
+        discountPaise: dto.amountPaise,
+        discountReason: dto.reason,
+        updatedAt: new Date(),
+      };
+      if (order.status === 'BILLED') {
+        const lines = await this.itemsFor(orderId, tx);
+        const totals = computeBill(lines, this.taxPercent(), {
+          discountPaise: dto.amountPaise,
+          serviceChargeBp: await this.serviceChargeBp(propertyId, tx),
+        });
+        Object.assign(patch, {
+          subtotalPaise: totals.subtotalPaise,
+          serviceChargePaise: totals.serviceChargePaise,
+          taxPaise: totals.taxPaise,
+          totalPaise: totals.totalPaise,
+        });
+      }
+      await tx.update(restaurantOrders).set(patch).where(eq(restaurantOrders.id, orderId));
+      return this.hydrate(await this.requireOrder(propertyId, orderId, tx), tx);
+    });
+  }
+
+  private async serviceChargeBp(propertyId: string, tx: Tx): Promise<number> {
+    const [row] = await tx
+      .select({ bp: propertySettings.restaurantServiceChargeBp })
+      .from(propertySettings)
+      .where(eq(propertySettings.propertyId, propertyId))
+      .limit(1);
+    return row?.bp ?? 0;
   }
 
   // ---------- Cancel (manager void) ----------

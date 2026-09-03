@@ -27,6 +27,8 @@ import {
   UpdatePolicyDto,
   UpdatePropertySettingsDto,
   UpdateTaxDto,
+  CouponInputDto,
+  UpdateCouponDto,
 } from './dto';
 import { PropertyConfigService } from './property-config.service';
 
@@ -285,6 +287,59 @@ export class StaffPropertyConfigController {
     await this.audit.record({
       action: 'staff.property.source.deleted',
       entity: 'booking_source',
+      entityId: id,
+      ...this.actor(me),
+    });
+    return res;
+  }
+
+  // -------------------------------------------------------------- coupons --
+
+  @Get('coupons')
+  @RequireStaffPermissions('property.settings.read')
+  coupons(@CurrentStaff() me: AuthenticatedStaff) {
+    return this.config.listCoupons(me.propertyId);
+  }
+
+  @Post('coupons')
+  @RequireStaffPermissions('property.settings.update')
+  async createCoupon(@CurrentStaff() me: AuthenticatedStaff, @Body() dto: CouponInputDto) {
+    const row = await this.config.createCoupon(me.propertyId, dto);
+    await this.audit.record({
+      action: 'staff.property.coupon.created',
+      entity: 'coupon',
+      entityId: row.id,
+      after: row,
+      ...this.actor(me),
+    });
+    return row;
+  }
+
+  @Patch('coupons/:id')
+  @RequireStaffPermissions('property.settings.update')
+  async updateCoupon(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @Body() dto: UpdateCouponDto,
+  ) {
+    const row = await this.config.updateCoupon(me.propertyId, id, dto);
+    await this.audit.record({
+      action: 'staff.property.coupon.updated',
+      entity: 'coupon',
+      entityId: id,
+      after: dto,
+      ...this.actor(me),
+    });
+    return row;
+  }
+
+  @Delete('coupons/:id')
+  @RequireStaffPermissions('property.settings.update')
+  async deleteCoupon(@CurrentStaff() me: AuthenticatedStaff, @Param('id') id: string) {
+    const res = await this.config.deleteCoupon(me.propertyId, id);
+    await this.audit.record({
+      action: 'staff.property.coupon.deleted',
+      entity: 'coupon',
       entityId: id,
       ...this.actor(me),
     });

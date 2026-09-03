@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  Max,
   IsBoolean,
   IsIn,
   IsInt,
@@ -117,6 +118,7 @@ export class UpdateFeeDto {
 // ---------- Pricing rules ----------
 
 export class CreatePricingRuleDto {
+  @IsOptional() @IsString() @Length(1, 80) name?: string;
   @IsIn(pricingTriggerValues as unknown as string[]) trigger!: PricingTrigger;
   @IsOptional()
   @IsIn(pricingComparatorValues as unknown as string[])
@@ -132,6 +134,7 @@ export class CreatePricingRuleDto {
 }
 
 export class UpdatePricingRuleDto {
+  @IsOptional() @IsString() @Length(1, 80) name?: string;
   @IsOptional() @IsIn(pricingTriggerValues as unknown as string[]) trigger?: PricingTrigger;
   @IsOptional()
   @IsIn(pricingComparatorValues as unknown as string[])
@@ -143,4 +146,9 @@ export class UpdatePricingRuleDto {
   @IsOptional() @IsInt() adjustmentValue?: number;
   @IsOptional() @IsBoolean() enabled?: boolean;
   @IsOptional() @IsInt() priority?: number;
+}
+
+export class RunRulesDto {
+  @IsOptional() @IsInt() @Min(1) @Max(400) days?: number;
+  @IsOptional() @IsBoolean() dryRun?: boolean;
 }

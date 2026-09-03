@@ -237,6 +237,19 @@ export class BookingEngineService {
       });
     }
 
+    if (dto.couponCode) {
+      const pre = await this.config.redeemableCoupon(propertyId, dto.couponCode, {
+        checkIn: dto.checkIn,
+        nights: nightsBetween(dto.checkIn, dto.checkOut),
+        subtotalPaise: chosen.totalPaise,
+      });
+      if (!pre.coupon || pre.reason) {
+        throw new BadRequestException({
+          error: 'COUPON_INVALID',
+          message: pre.reason ?? 'That code is not valid',
+        });
+      }
+    }
     const holds = (settings.holdExpiryMinutes ?? 0) > 0;
     const created = await this.reservations.create(
       propertyId,
@@ -286,6 +299,34 @@ export class BookingEngineService {
         sourceType: 'ADDON',
         sourceId: `${created.id}:${a.id}`,
       });
+    }
+
+    // A coupon is a discount line on the folio, reasoned with its code, and
+    // counted against the code's uses. An invalid code refuses the booking
+    // rather than silently charging full price to a guest who expected less.
+    if (dto.couponCode) {
+      const nights = nightsBetween(dto.checkIn, dto.checkOut);
+      const verdict = await this.config.redeemableCoupon(propertyId, dto.couponCode, {
+        checkIn: dto.checkIn,
+        nights,
+        subtotalPaise: chosen.totalPaise,
+      });
+      if (!verdict.coupon || verdict.reason) {
+        throw new BadRequestException({
+          error: 'COUPON_INVALID',
+          message: verdict.reason ?? 'That code is not valid',
+        });
+      }
+      if (verdict.discountPaise > 0) {
+        await this.folio.applyDiscount({
+          reservationId: created.id,
+          propertyId,
+          amountPaise: verdict.discountPaise,
+          reason: `Coupon ${verdict.coupon.code}`,
+          actorStaffId: null,
+        });
+        await this.config.consumeCoupon(verdict.coupon.id);
+      }
     }
 
     const summary = await this.folio.summary(created.id);

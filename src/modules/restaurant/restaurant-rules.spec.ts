@@ -146,7 +146,13 @@ describe('computeBill — from snapshots, cancelled excluded', () => {
 
   it('is zero across the board when every line is cancelled', () => {
     const bill = computeBill([{ pricePaiseSnapshot: 5_000, qty: 2, kotStatus: 'CANCELLED' }], 5);
-    expect(bill).toEqual({ subtotalPaise: 0, taxPaise: 0, totalPaise: 0 });
+    expect(bill).toEqual({
+      subtotalPaise: 0,
+      discountPaise: 0,
+      serviceChargePaise: 0,
+      taxPaise: 0,
+      totalPaise: 0,
+    });
   });
 });
 
@@ -155,5 +161,24 @@ describe('order number formatting', () => {
     expect(formatOrderNumber(1)).toBe('ORD-00001');
     expect(formatOrderNumber(42)).toBe('ORD-00042');
     expect(formatOrderNumber(123_456)).toBe('ORD-123456');
+  });
+});
+
+describe('computeBill — discount and service charge', () => {
+  const lines = [
+    { pricePaiseSnapshot: 40_000, qty: 2, kotStatus: 'SERVED' },
+    { pricePaiseSnapshot: 20_000, qty: 1, kotStatus: 'CANCELLED' },
+  ] as never;
+
+  it('discount comes off first, service charge and tax on what is paid', () => {
+    const b = computeBill(lines, 5, { discountPaise: 10_000, serviceChargeBp: 1000 });
+    expect(b.subtotalPaise).toBe(70_000); // 80k - 10k; cancelled line ignored
+    expect(b.serviceChargePaise).toBe(7_000); // 10%
+    expect(b.taxPaise).toBe(3_850); // 5% of 77,000
+    expect(b.totalPaise).toBe(80_850);
+  });
+
+  it('a discount larger than the bill zeroes it, never negative', () => {
+    expect(computeBill(lines, 5, { discountPaise: 999_999 }).totalPaise).toBe(0);
   });
 });
