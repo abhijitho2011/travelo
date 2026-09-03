@@ -279,6 +279,14 @@ class RoleConfig {
 
   /// The room inventory. Every role the server grants `room.read` carries this
   /// entry; the gate on the item, not a role list, is what decides who sees it.
+  /// Night-audit report set + performance. reports.read: GM, AGM, Accounts.
+  static const _reportsMore = NavItem(
+    label: 'Reports',
+    icon: Icons.insights_outlined,
+    route: Routes.reports,
+    requires: [P.reportsRead],
+  );
+
   static const _roomsMore = NavItem(
     label: 'Rooms',
     icon: Icons.meeting_room_outlined,
@@ -390,6 +398,7 @@ class RoleConfig {
         ),
       ],
       moreMenu: const [
+        _reportsMore,
         _roomsMore,
         NavItem(
           label: 'Housekeeping',
@@ -489,6 +498,7 @@ class RoleConfig {
         ),
       ],
       moreMenu: const [
+        _reportsMore,
         _roomsMore,
         NavItem(
           label: 'Housekeeping',
@@ -711,7 +721,7 @@ class RoleConfig {
       Icons.account_balance_outlined,
       built: true,
       requires: [P.financeRead],
-      more: const [_bookingsMore],
+      more: const [_reportsMore, _bookingsMore],
       // The expense register, reached from the dashboard.
       extraRoutes: const {Routes.accountsExpenses},
     ),
@@ -765,6 +775,7 @@ class RoleConfig {
         ),
       ],
       moreMenu: const [
+        _reportsMore,
         _roomsMore,
         _inventoryMore,
         _lostFoundMore,

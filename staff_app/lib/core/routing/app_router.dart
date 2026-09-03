@@ -59,6 +59,7 @@ import '../../features/rooms/presentation/rooms_screen.dart';
 import '../../features/property_settings/presentation/property_settings_screen.dart';
 import '../../features/property_settings/presentation/catalogue_screens.dart';
 import '../../features/rates/presentation/rates_grid_screen.dart';
+import '../../features/reports/presentation/reports_screen.dart';
 import '../../features/sales/presentation/sales_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/sales/presentation/lead_detail_screen.dart';
@@ -231,6 +232,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: Routes.rates,
             builder: (_, _) => const RatesGridScreen(),
+          ),
+          GoRoute(
+            path: Routes.reports,
+            builder: (_, _) => const ReportsScreen(),
           ),
           // Room-first: adding a room opens the full workspace, where the
           // room's own specifications, photos and rates live. There is no

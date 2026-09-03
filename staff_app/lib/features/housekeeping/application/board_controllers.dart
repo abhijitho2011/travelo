@@ -61,6 +61,24 @@ class BoardActions {
 
   final Ref ref;
 
+  Future<int> markAllClean() async {
+    final n = await ref.read(boardRepositoryProvider).markAllClean();
+    _refresh();
+    return n;
+  }
+
+  Future<int> bulkStatus(
+    List<String> roomIds,
+    String status, {
+    String? note,
+  }) async {
+    final n = await ref
+        .read(boardRepositoryProvider)
+        .bulkStatus(roomIds, status, note: note);
+    _refresh();
+    return n;
+  }
+
   Future<void> assign(String taskId, String staffId) async {
     await ref.read(boardRepositoryProvider).assign(taskId, staffId);
     _refresh();

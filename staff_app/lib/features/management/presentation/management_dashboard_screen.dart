@@ -8,6 +8,8 @@ import '../../../core/providers.dart';
 import '../../../core/routing/routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_typography.dart';
+import '../../rooms/data/room_models.dart' show formatPaise;
 import '../../../core/utils/formatting.dart';
 import '../../../core/widgets/cards.dart';
 import '../../../core/widgets/primitives.dart';
@@ -78,8 +80,18 @@ class ManagementDashboardScreen extends ConsumerWidget {
             error: e,
             onRetry: () => ref.invalidate(gmDashboardProvider),
           ),
-          data: (data) =>
-              data == null ? const SizedBox.shrink() : _LiveFigures(data: data),
+          data: (data) => data == null
+              ? const SizedBox.shrink()
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _LiveFigures(data: data),
+                    gapMd,
+                    _AvailableTonight(items: data.availableByType),
+                    gapMd,
+                    _RecentBookings(items: data.recentBookings),
+                  ],
+                ),
         ),
 
         overview.when(
@@ -222,7 +234,121 @@ class _LiveFigures extends ConsumerWidget {
           value: Fmt.count(data.pendingApprovals),
           hint: 'staff accounts',
         ),
+        if (ref.watch(canProvider(P.revenueRead)) &&
+            data.monthToDate.closedDays > 0) ...[
+          KpiCard(
+            label: 'ADR',
+            value: formatPaise(data.monthToDate.adrPaise),
+            hint: 'MTD, ${data.monthToDate.closedDays} closed days',
+          ),
+          KpiCard(
+            label: 'RevPAR',
+            value: formatPaise(data.monthToDate.revparPaise),
+            hint: '${data.monthToDate.occupancyPct}% occupancy MTD',
+          ),
+        ],
       ],
+    );
+  }
+}
+
+/// Rooms free tonight per type, with the price they sell at.
+class _AvailableTonight extends StatelessWidget {
+  const _AvailableTonight({required this.items});
+  final List<AvailableByType> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Panel(
+      title: 'Available tonight',
+      padBody: false,
+      child: Column(
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            if (i > 0) const RowDivider(),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: Sp.md,
+                vertical: Sp.sm,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      items[i].name,
+                      style: AppTypography.body(size: 13, color: c.foreground),
+                    ),
+                  ),
+                  Text(
+                    '${items[i].available}/${items[i].total}',
+                    style: AppTypography.numeric(
+                      size: 13,
+                      weight: FontWeight.w700,
+                      color: items[i].available == 0
+                          ? c.destructive
+                          : c.foreground,
+                    ),
+                  ),
+                  const SizedBox(width: Sp.md),
+                  Text(
+                    formatPaise(items[i].basePricePaise),
+                    style: AppTypography.body(
+                      size: 12,
+                      color: c.mutedForeground,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The newest bookings across every source.
+class _RecentBookings extends StatelessWidget {
+  const _RecentBookings({required this.items});
+  final List<RecentBooking> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Panel(
+      title: 'Newest bookings',
+      padBody: false,
+      child: Column(
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            if (i > 0) const RowDivider(),
+            ListTile(
+              dense: true,
+              title: Text(
+                '${items[i].guestName} · ${items[i].roomTypeName ?? ''}',
+              ),
+              subtitle: Text(
+                '${items[i].reservationNumber} · '
+                '${items[i].source.toLowerCase().replaceAll('_', ' ')} · '
+                '${items[i].status.toLowerCase().replaceAll('_', ' ')}',
+                style: AppTypography.body(size: 11, color: c.mutedForeground),
+              ),
+              trailing: Text(
+                formatPaise(items[i].totalPaise),
+                style: AppTypography.numeric(
+                  size: 12.5,
+                  weight: FontWeight.w600,
+                  color: c.foreground,
+                ),
+              ),
+              onTap: () => context.go(Routes.reservation(items[i].id)),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

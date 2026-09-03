@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import '../data/board_repository.dart';
+import '../../../core/providers.dart';
+import '../../../core/permissions/permission_keys.dart';
+import '../../../core/networking/api_exception.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -28,6 +33,7 @@ class HousekeepingBoardScreen extends ConsumerWidget {
           title: 'Room board',
           icon: Icons.dashboard_customize_outlined,
         ),
+        const _BoardActionsRow(),
         board.when(
           loading: () => const ListSkeleton(rows: 4, height: 88),
           error: (e, _) => ErrorState(
@@ -254,6 +260,84 @@ class _AreaTaskTile extends ConsumerWidget {
             ),
           ),
           StatusBadge(tone: tone, label: statusLabel, dense: true),
+        ],
+      ),
+    );
+  }
+}
+
+/// Mark-all-clean and the charter export. Both gated: the first changes
+/// every room's state in one tap, the second is the supervisor's print-out.
+class _BoardActionsRow extends ConsumerWidget {
+  const _BoardActionsRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final canStatus = ref.watch(permissionsProvider).has(P.roomStatusUpdate);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Sp.md),
+      child: Wrap(
+        spacing: Sp.sm,
+        runSpacing: Sp.sm,
+        children: [
+          if (canStatus)
+            FilledButton.tonalIcon(
+              onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                final ok = await showDialog<bool>(
+                  context: context,
+                  builder: (d) => AlertDialog(
+                    title: const Text('Mark every room clean?'),
+                    content: const Text(
+                      'Every dirty, cleaning or inspected room becomes ready. Occupied and out-of-order rooms are left alone.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(d, false),
+                        child: const Text('Cancel'),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.pop(d, true),
+                        child: const Text('Mark all clean'),
+                      ),
+                    ],
+                  ),
+                );
+                if (ok != true) return;
+                try {
+                  final n = await ref.read(boardActionsProvider).markAllClean();
+                  messenger.showSnackBar(
+                    SnackBar(content: Text('$n room(s) marked ready')),
+                  );
+                } on ApiException catch (e) {
+                  messenger.showSnackBar(SnackBar(content: Text(e.message)));
+                }
+              },
+              icon: const Icon(Icons.cleaning_services_outlined, size: 16),
+              label: const Text('Mark all clean'),
+            ),
+          OutlinedButton.icon(
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              try {
+                final csv = await ref
+                    .read(boardRepositoryProvider)
+                    .charterCsv();
+                await Clipboard.setData(ClipboardData(text: csv));
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Housekeeping charter copied as CSV — paste it into a sheet to print.',
+                    ),
+                  ),
+                );
+              } on ApiException catch (e) {
+                messenger.showSnackBar(SnackBar(content: Text(e.message)));
+              }
+            },
+            icon: const Icon(Icons.print_outlined, size: 16),
+            label: const Text('Export charter'),
+          ),
         ],
       ),
     );

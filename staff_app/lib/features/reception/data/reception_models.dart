@@ -579,6 +579,9 @@ class GmDashboard {
     this.inHouse = 0,
     this.monthRevenuePaise = 0,
     this.pendingApprovals = 0,
+    this.monthToDate = const MonthToDate(),
+    this.recentBookings = const <RecentBooking>[],
+    this.availableByType = const <AvailableByType>[],
   });
 
   final String? date;
@@ -594,6 +597,9 @@ class GmDashboard {
   /// count whole. Good enough for a tile, never for accounts.
   final int monthRevenuePaise;
   final int pendingApprovals;
+  final MonthToDate monthToDate;
+  final List<RecentBooking> recentBookings;
+  final List<AvailableByType> availableByType;
 
   String get monthRevenueLabel => formatPaise(monthRevenuePaise);
 
@@ -612,6 +618,96 @@ class GmDashboard {
     pendingApprovals: _int(
       _pick(json, ['pendingApprovals', 'pending_approvals']),
     ),
+    monthToDate: json['monthToDate'] is Map
+        ? MonthToDate.fromJson(json['monthToDate'] as Map)
+        : const MonthToDate(),
+    recentBookings: (json['recentBookings'] as List? ?? const [])
+        .whereType<Map>()
+        .map(RecentBooking.fromJson)
+        .toList(),
+    availableByType: (json['availableByType'] as List? ?? const [])
+        .whereType<Map>()
+        .map(AvailableByType.fromJson)
+        .toList(),
+  );
+}
+
+/// Month-to-date performance from the night-audit snapshots.
+@immutable
+class MonthToDate {
+  const MonthToDate({
+    this.closedDays = 0,
+    this.revenuePaise = 0,
+    this.occupancyPct = 0,
+    this.adrPaise = 0,
+    this.revparPaise = 0,
+  });
+  final int closedDays;
+  final int revenuePaise;
+  final int occupancyPct;
+  final int adrPaise;
+  final int revparPaise;
+  factory MonthToDate.fromJson(Map j) => MonthToDate(
+    closedDays: _int(j['closedDays']),
+    revenuePaise: _int(j['revenuePaise']),
+    occupancyPct: _int(j['occupancyPct']),
+    adrPaise: _int(j['adrPaise']),
+    revparPaise: _int(j['revparPaise']),
+  );
+}
+
+@immutable
+class RecentBooking {
+  const RecentBooking({
+    required this.id,
+    required this.reservationNumber,
+    required this.guestName,
+    required this.status,
+    required this.source,
+    this.roomTypeName,
+    this.totalPaise = 0,
+    this.createdAt,
+  });
+  final String id;
+  final String reservationNumber;
+  final String guestName;
+  final String status;
+  final String source;
+  final String? roomTypeName;
+  final int totalPaise;
+  final DateTime? createdAt;
+  factory RecentBooking.fromJson(Map j) => RecentBooking(
+    id: '${j['id']}',
+    reservationNumber: _str(j['reservationNumber']) ?? '',
+    guestName: _str(j['guestName']) ?? '',
+    status: _str(j['status']) ?? '',
+    source: _str(j['source']) ?? '',
+    roomTypeName: _str(j['roomTypeName']),
+    totalPaise: _int(j['totalPaise']),
+    createdAt: _date(j['createdAt']),
+  );
+}
+
+@immutable
+class AvailableByType {
+  const AvailableByType({
+    required this.roomTypeId,
+    required this.name,
+    required this.available,
+    required this.total,
+    required this.basePricePaise,
+  });
+  final String roomTypeId;
+  final String name;
+  final int available;
+  final int total;
+  final int basePricePaise;
+  factory AvailableByType.fromJson(Map j) => AvailableByType(
+    roomTypeId: '${j['roomTypeId']}',
+    name: _str(j['name']) ?? '',
+    available: _int(j['available']),
+    total: _int(j['total']),
+    basePricePaise: _int(j['basePricePaise']),
   );
 }
 

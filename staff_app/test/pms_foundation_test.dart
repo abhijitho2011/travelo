@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tavelo_staff/features/property_settings/data/property_settings_models.dart';
 import 'package:tavelo_staff/features/rates/data/rates_models.dart';
 import 'package:tavelo_staff/features/reception/data/reception_models.dart';
+import 'package:tavelo_staff/features/reports/data/reports_models.dart';
 
 void main() {
   group('Folio — tax-inclusive', () {
@@ -250,6 +251,71 @@ void main() {
         }).chargeLabel,
         '50% of the stay',
       );
+    });
+  });
+
+  group('Dashboard performance', () {
+    test(
+      'month-to-date ADR/RevPAR and the feeds parse; an older server yields empties',
+      () {
+        final d = GmDashboard.fromJson({
+          'occupancy': 61.5,
+          'monthToDate': {
+            'closedDays': 12,
+            'revenuePaise': 3600000,
+            'occupancyPct': 62,
+            'adrPaise': 300000,
+            'revparPaise': 186000,
+          },
+          'recentBookings': [
+            {
+              'id': 'r1',
+              'reservationNumber': 'RES-9',
+              'guestName': 'Asha',
+              'status': 'PENDING',
+              'source': 'BOOKING_ENGINE',
+              'totalPaise': 650000,
+            },
+          ],
+          'availableByType': [
+            {
+              'roomTypeId': 't1',
+              'name': 'Deluxe',
+              'available': 2,
+              'total': 5,
+              'basePricePaise': 300000,
+            },
+          ],
+        });
+        expect(d.monthToDate.adrPaise, 300000);
+        expect(d.recentBookings.single.source, 'BOOKING_ENGINE');
+        expect(d.availableByType.single.available, 2);
+
+        final old = GmDashboard.fromJson(const {'occupancy': 10});
+        expect(old.monthToDate.closedDays, 0);
+        expect(old.recentBookings, isEmpty);
+      },
+    );
+  });
+
+  group('Night audit', () {
+    test('a closed day carries its derived ADR and RevPAR', () {
+      final d = NightAuditDay.fromJson({
+        'businessDate': '2026-09-01',
+        'arrivals': 3,
+        'departures': 2,
+        'inHouse': 8,
+        'roomsAvailable': 10,
+        'roomsSold': 8,
+        'occupancyPct': 80,
+        'noShows': 1,
+        'revenuePaise': 2400000,
+        'adrPaise': 300000,
+        'revparPaise': 240000,
+      });
+      expect(d.occupancyPct, 80);
+      expect(d.adrPaise, 300000);
+      expect(d.revparPaise, 240000);
     });
   });
 }

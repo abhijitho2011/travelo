@@ -74,6 +74,35 @@ class BoardRepository {
     }
   }
 
+  /// Every dirty, cleaning or inspected room becomes READY — the end of the round.
+  Future<int> markAllClean() async {
+    final data = await _api.post('/rooms/status/mark-all-clean', body: {});
+    return data is Map ? (data['updated'] as int? ?? 0) : 0;
+  }
+
+  /// One status for many rooms at once.
+  Future<int> bulkStatus(
+    List<String> roomIds,
+    String status, {
+    String? note,
+  }) async {
+    final data = await _api.post(
+      '/rooms/status/bulk',
+      body: {
+        'ids': roomIds,
+        'status': status,
+        if (note != null && note.isNotEmpty) 'note': note,
+      },
+    );
+    return data is Map ? (data['updated'] as int? ?? 0) : 0;
+  }
+
+  /// The printable charter, as CSV text.
+  Future<String> charterCsv() async {
+    final data = await _api.get('/housekeeping/charter.csv');
+    return data is String ? data : '$data';
+  }
+
   Future<void> assign(String taskId, String staffId) => _api.post(
     '/housekeeping/tasks/$taskId/assign',
     body: {'staffId': staffId},

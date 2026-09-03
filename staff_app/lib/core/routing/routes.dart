@@ -137,4 +137,5 @@ class Routes {
   static const propertyAddons = '/property-settings/addons';
   static const propertySources = '/property-settings/booking-sources';
   static const rates = '/rates';
+  static const reports = '/reports';
 }
