@@ -21,9 +21,14 @@ import { CurrentStaff, AuthenticatedStaff } from '../staff-auth/current-staff.de
 import { AuditService } from '../audit/audit.service';
 import { DeskService } from './desk.service';
 import { ReservationsService } from './reservations.service';
+import { ReservationErrors } from './reservation-errors';
+import { FolioService } from '../folio/folio.service';
 import { FolioReceiptService } from '../folio/folio-receipt.service';
 import { ReportsService } from './reports.service';
 import {
+  FolioTaxExemptDto,
+  FolioReasonDto,
+  FolioDiscountDto,
   AutoAllocateDto,
   SwapRoomsDto,
   LockRoomDto,
@@ -64,6 +69,7 @@ import {
 export class StaffReservationsController {
   constructor(
     private readonly reservations: ReservationsService,
+    private readonly folioService: FolioService,
     private readonly desk: DeskService,
     private readonly audit: AuditService,
     private readonly receipts: FolioReceiptService,
@@ -346,6 +352,103 @@ export class StaffReservationsController {
    * advance at booking, a mid-stay top-up, a partial settlement. Idempotent by
    * key so a tablet double-tap never charges twice.
    */
+  /** A discount: its own negative, tax-free line with a reason — never an edit. */
+  @Post(':id/folio/discount')
+  @RequireStaffPermissions('folio.adjust')
+  async folioDiscount(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @Body() dto: FolioDiscountDto,
+  ) {
+    await this.reservations.requireReservation(me.propertyId, id);
+    const line = await this.folioService.applyDiscount({
+      reservationId: id,
+      propertyId: me.propertyId,
+      amountPaise: dto.amountPaise,
+      reason: dto.reason,
+      actorStaffId: me.id,
+    });
+    await this.audit.record({
+      action: 'staff.folio.discount_applied',
+      entity: 'reservation',
+      entityId: id,
+      after: { lineId: line.id, amountPaise: line.amountPaise, reason: dto.reason },
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return line;
+  }
+
+  /** Voids a line: kept for the record, excluded from every total. */
+  @Post(':id/folio/lines/:lineId/void')
+  @RequireStaffPermissions('folio.adjust')
+  async folioVoid(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @Param('lineId') lineId: string,
+    @Body() dto: FolioReasonDto,
+  ) {
+    await this.reservations.requireReservation(me.propertyId, id);
+    const line = await this.folioService.voidLine({
+      reservationId: id,
+      propertyId: me.propertyId,
+      lineId,
+      reason: dto.reason,
+      actorStaffId: me.id,
+    });
+    if (!line) throw ReservationErrors.folioLineNotFound();
+    await this.audit.record({
+      action: 'staff.folio.line_voided',
+      entity: 'reservation',
+      entityId: id,
+      after: { lineId, reason: dto.reason },
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return line;
+  }
+
+  /** Grants or withdraws a tax exemption on one line. */
+  @Post(':id/folio/lines/:lineId/tax-exempt')
+  @RequireStaffPermissions('folio.adjust')
+  async folioTaxExempt(
+    @CurrentStaff() me: AuthenticatedStaff,
+    @Param('id') id: string,
+    @Param('lineId') lineId: string,
+    @Body() dto: FolioTaxExemptDto,
+  ) {
+    await this.reservations.requireReservation(me.propertyId, id);
+    const line = await this.folioService.setLineTaxExempt({
+      reservationId: id,
+      propertyId: me.propertyId,
+      lineId,
+      exempt: dto.exempt,
+      reason: dto.reason,
+      actorStaffId: me.id,
+    });
+    if (!line) throw ReservationErrors.folioLineNotFound();
+    await this.audit.record({
+      action: dto.exempt ? 'staff.folio.tax_exempted' : 'staff.folio.tax_exemption_removed',
+      entity: 'reservation',
+      entityId: id,
+      after: { lineId, reason: dto.reason },
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return line;
+  }
+
+  /** The folio's own log — who changed what on the bill, and when. */
+  @Get(':id/folio/events')
+  @RequireStaffPermissions('folio.read')
+  async folioEvents(@CurrentStaff() me: AuthenticatedStaff, @Param('id') id: string) {
+    await this.reservations.requireReservation(me.propertyId, id);
+    return this.folioService.events(id);
+  }
+
   @Post(':id/payments')
   @RequireStaffPermissions('payment.collect')
   async collectPayment(

@@ -21,6 +21,7 @@ import {
 import { DeskService } from './desk.service';
 import { ReservationsService } from './reservations.service';
 import { FolioReceiptService } from '../folio/folio-receipt.service';
+import { FolioService } from '../folio/folio.service';
 
 /**
  * The reservations surface: where its URLs land, and who the real guard lets
@@ -48,6 +49,7 @@ describe('reservations surface route mounting', () => {
         { provide: ReservationsService, useValue: {} },
         { provide: DeskService, useValue: {} },
         { provide: FolioReceiptService, useValue: {} },
+        { provide: FolioService, useValue: {} },
         { provide: AuditService, useValue: { record: async () => undefined } },
         { provide: PermissionsService, useValue: {} },
         { provide: JwtService, useValue: {} },

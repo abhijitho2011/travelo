@@ -83,6 +83,13 @@ export const ReservationErrors = {
       HttpStatus.CONFLICT,
     ),
 
+  folioLineNotFound: () =>
+    reservationError(
+      'FOLIO_LINE_NOT_FOUND',
+      'That folio line does not exist or is already voided',
+      HttpStatus.NOT_FOUND,
+    ),
+
   /** A rate restriction refused the stay — stop-sell, CTA/CTD, min/max stay. */
   restricted: (date: string, reason: string) =>
     reservationError('STAY_RESTRICTED', `${reason} on ${date}`, HttpStatus.CONFLICT),

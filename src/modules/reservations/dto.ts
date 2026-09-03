@@ -264,3 +264,16 @@ export class AutoAllocateDto {
   @Matches(ISO_DATE, { message: `to ${DATE_MESSAGE}` }) to!: string;
   @IsOptional() @IsBoolean() dryRun?: boolean;
 }
+
+export class FolioReasonDto {
+  @IsString() @Length(2, 200) reason!: string;
+}
+
+export class FolioDiscountDto extends FolioReasonDto {
+  /** Positive paise; stored as a negative line. */
+  @IsInt() @Min(1) @Max(100_000_000) amountPaise!: number;
+}
+
+export class FolioTaxExemptDto extends FolioReasonDto {
+  @IsBoolean() exempt!: boolean;
+}
