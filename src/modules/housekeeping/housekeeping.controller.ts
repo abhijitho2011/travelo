@@ -1,4 +1,5 @@
 import {
+  Res,
   Body,
   Controller,
   Get,
@@ -8,6 +9,7 @@ import {
   UseGuards,
   VERSION_NEUTRAL,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { StaffJwtGuard } from '../staff-auth/staff-jwt.guard';
 import {
@@ -71,6 +73,53 @@ export class StaffHousekeepingController {
    * The room board in one call. Declared BEFORE `tasks/:id` is irrelevant (a
    * different prefix) but kept near the other reads.
    */
+  /**
+   * The housekeeping charter: every room, its status and its open task, as a
+   * CSV the supervisor prints for the trolley. `@Res` bypasses the JSON
+   * envelope, as the other exports do.
+   */
+  @Get('charter.csv')
+  @RequireStaffPermissions('housekeeping.read')
+  async charter(@CurrentStaff() me: AuthenticatedStaff, @Res() res: Response) {
+    const board = (await this.housekeeping.board(me.propertyId)) as {
+      groups: Record<
+        string,
+        {
+          number: string;
+          floor?: string | null;
+          status: string;
+          task?: { status?: string; assigneeName?: string | null; notes?: string | null } | null;
+        }[]
+      >;
+    };
+    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const lines = ['Room,Floor,Status,Task,Assigned to,Notes'];
+    const rooms = Object.values(board.groups ?? {})
+      .flat()
+      .sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
+    for (const r of rooms) {
+      lines.push(
+        [
+          r.number,
+          r.floor ?? '',
+          r.status,
+          r.task?.status ?? '',
+          r.task?.assigneeName ?? '',
+          r.task?.notes ?? '',
+        ]
+          .map(esc)
+          .join(','),
+      );
+    }
+    res
+      .type('text/csv')
+      .setHeader(
+        'Content-Disposition',
+        `attachment; filename="housekeeping-charter-${new Date().toISOString().slice(0, 10)}.csv"`,
+      )
+      .send(lines.join('\n'));
+  }
+
   @Get('board')
   @RequireStaffPermissions('housekeeping.read')
   board(@CurrentStaff() me: AuthenticatedStaff) {

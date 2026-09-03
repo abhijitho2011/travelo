@@ -402,3 +402,9 @@ export class SetPropertyAmenitiesDto {
   @IsUUID('4', { each: true })
   amenityIds!: string[];
 }
+
+export class BulkRoomStatusDto {
+  @IsArray() @ArrayNotEmpty() @ArrayMaxSize(500) @IsUUID('4', { each: true }) ids!: string[];
+  @IsIn(roomStatusValues) status!: (typeof roomStatusValues)[number];
+  @IsOptional() @IsString() @Length(0, 2000) note?: string;
+}

@@ -546,6 +546,40 @@ export class RoomsService {
    * renumber a floor or move a room to a pricier type. So this route asks for
    * `room.status.update` and touches ONLY the status column.
    */
+  /**
+   * One status for many rooms at once — "mark all clean" after the morning
+   * round, or a whole floor out of order for painting. Rooms at another
+   * property are silently absent from the result rather than refused: a bulk
+   * act is not the place to leak which ids exist elsewhere.
+   */
+  async bulkSetStatus(propertyId: string, ids: string[], status: RoomStatus, note?: string) {
+    if (ids.length === 0) return { updated: 0, items: [] };
+    const patch: Partial<typeof rooms.$inferInsert> = { status, updatedAt: new Date() };
+    if (note !== undefined && note !== '') patch.notes = note;
+    const updated = await this.db
+      .update(rooms)
+      .set(patch)
+      .where(and(eq(rooms.propertyId, propertyId), inArray(rooms.id, ids), isNull(rooms.deletedAt)))
+      .returning();
+    return { updated: updated.length, items: await this.hydrate(updated) };
+  }
+
+  /** Every DIRTY / CLEANING / INSPECTED room becomes READY — the end of the round. */
+  async markAllClean(propertyId: string) {
+    const updated = await this.db
+      .update(rooms)
+      .set({ status: 'READY', updatedAt: new Date() })
+      .where(
+        and(
+          eq(rooms.propertyId, propertyId),
+          isNull(rooms.deletedAt),
+          inArray(rooms.status, ['DIRTY', 'CLEANING', 'INSPECTED'] as RoomStatus[]),
+        ),
+      )
+      .returning();
+    return { updated: updated.length, items: await this.hydrate(updated) };
+  }
+
   async setStatus(propertyId: string, id: string, status: RoomStatus, note?: string) {
     const before = await this.requireRoom(propertyId, id);
     const patch: Partial<typeof rooms.$inferInsert> = { status, updatedAt: new Date() };

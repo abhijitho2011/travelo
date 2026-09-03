@@ -1,7 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, gt, gte, inArray, isNull, lt, lte, ne, sql } from 'drizzle-orm';
+import { desc, and, asc, eq, gt, gte, inArray, isNull, lt, lte, ne, sql } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import {
+  propertyDailySnapshots,
   hotelStaff,
   reservations,
   rooms,
@@ -11,7 +12,7 @@ import {
 } from '../../database/schema';
 import { AvailabilityQueryDto } from './dto';
 import { ReservationsService } from './reservations.service';
-import { assertDateOrder, monthBounds, today, type IsoDate } from './reservation-rules';
+import { addDays, assertDateOrder, monthBounds, today, type IsoDate } from './reservation-rules';
 
 /**
  * The two aggregate reads the apps open on: the reception desk board and the
@@ -256,7 +257,82 @@ export class DeskService {
       /** See `monthRevenuePaise` — a touching-the-month approximation. */
       monthRevenuePaise: await this.monthRevenuePaise(ids, day),
       pendingApprovals: pendingApprovals?.count ?? 0,
+      // Performance, month to date, from the night-audit snapshots — the
+      // closed days, so the numbers are the ones the reports will show.
+      monthToDate: await this.monthToDate(propertyId, day),
+      recentBookings: await this.recentBookings(propertyId),
+      availableByType: await this.availableByType(propertyId, day),
     };
+  }
+
+  /** ADR = room revenue / rooms sold; RevPAR = room revenue / rooms available. */
+  private async monthToDate(propertyId: string, day: IsoDate) {
+    const monthStart = `${day.slice(0, 7)}-01`;
+    const rows = await this.db
+      .select({
+        revenue: sql<number>`coalesce(sum(${propertyDailySnapshots.revenuePaise}),0)::int`,
+        sold: sql<number>`coalesce(sum(${propertyDailySnapshots.roomsSold}),0)::int`,
+        available: sql<number>`coalesce(sum(${propertyDailySnapshots.roomsAvailable}),0)::int`,
+        days: sql<number>`count(*)::int`,
+      })
+      .from(propertyDailySnapshots)
+      .where(
+        and(
+          eq(propertyDailySnapshots.propertyId, propertyId),
+          gte(propertyDailySnapshots.businessDate, monthStart),
+          lte(propertyDailySnapshots.businessDate, day),
+        ),
+      );
+    const r = rows[0] ?? { revenue: 0, sold: 0, available: 0, days: 0 };
+    return {
+      from: monthStart,
+      to: day,
+      closedDays: Number(r.days),
+      revenuePaise: Number(r.revenue),
+      roomNightsSold: Number(r.sold),
+      roomNightsAvailable: Number(r.available),
+      occupancyPct:
+        Number(r.available) > 0 ? Math.round((Number(r.sold) / Number(r.available)) * 100) : 0,
+      adrPaise: Number(r.sold) > 0 ? Math.round(Number(r.revenue) / Number(r.sold)) : 0,
+      revparPaise:
+        Number(r.available) > 0 ? Math.round(Number(r.revenue) / Number(r.available)) : 0,
+    };
+  }
+
+  /** The newest bookings across every source — the desk's live feed. */
+  private async recentBookings(propertyId: string, limit = 8) {
+    const rows = await this.db
+      .select({
+        id: reservations.id,
+        reservationNumber: reservations.reservationNumber,
+        guestName: reservations.guestName,
+        status: reservations.status,
+        source: reservations.source,
+        checkIn: reservations.checkIn,
+        checkOut: reservations.checkOut,
+        totalPaise: reservations.totalPaise,
+        createdAt: reservations.createdAt,
+        roomTypeName: roomTypes.name,
+      })
+      .from(reservations)
+      .leftJoin(roomTypes, eq(reservations.roomTypeId, roomTypes.id))
+      .where(and(eq(reservations.propertyId, propertyId), isNull(reservations.deletedAt)))
+      .orderBy(desc(reservations.createdAt))
+      .limit(limit);
+    return rows;
+  }
+
+  /** Rooms free tonight per type, with the price they sell at. */
+  private async availableByType(propertyId: string, day: IsoDate) {
+    const tomorrow = addDays(day, 1);
+    const a = await this.availability(propertyId, { checkIn: day, checkOut: tomorrow });
+    return a.items.map((i) => ({
+      roomTypeId: i.roomTypeId,
+      name: i.name,
+      available: i.availableRooms,
+      total: i.totalRooms,
+      basePricePaise: i.baseRate,
+    }));
   }
 
   // ---------- Availability, for the create form ----------

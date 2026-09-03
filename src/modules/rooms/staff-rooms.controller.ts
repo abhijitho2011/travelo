@@ -31,6 +31,7 @@ import {
   type UploadedRoomTypePhoto,
 } from './room-type-photos.service';
 import {
+  BulkRoomStatusDto,
   BulkCreateRoomsDto,
   CreateRoomDto,
   ReorderRoomTypePhotosDto,
@@ -337,6 +338,40 @@ export class StaffRoomsController {
    * ability to edit it. The DTO's @IsIn already rejects a status outside the
    * eight-state set, so an invalid transition never reaches the database.
    */
+  /** Bulk status. Declared before `:id/status` so "status" is never read as an id. */
+  @Post('status/bulk')
+  @RequireStaffPermissions('room.status.update')
+  async bulkStatus(@CurrentStaff() me: AuthenticatedStaff, @Body() dto: BulkRoomStatusDto) {
+    const res = await this.rooms.bulkSetStatus(me.propertyId, dto.ids, dto.status, dto.note);
+    await this.audit.record({
+      action: 'staff.room.status_bulk_updated',
+      entity: 'room',
+      entityId: me.propertyId,
+      after: { ids: dto.ids, status: dto.status, updated: res.updated },
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return res;
+  }
+
+  /** One tap at the end of the housekeeping round. */
+  @Post('status/mark-all-clean')
+  @RequireStaffPermissions('room.status.update')
+  async markAllClean(@CurrentStaff() me: AuthenticatedStaff) {
+    const res = await this.rooms.markAllClean(me.propertyId);
+    await this.audit.record({
+      action: 'staff.room.marked_all_clean',
+      entity: 'room',
+      entityId: me.propertyId,
+      after: { updated: res.updated },
+      actorId: me.id,
+      actorEmail: me.email,
+      actorRole: me.role,
+    });
+    return res;
+  }
+
   @Post(':id/status')
   @RequireStaffPermissions('room.status.update')
   async setStatus(

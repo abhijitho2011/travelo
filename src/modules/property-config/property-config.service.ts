@@ -56,6 +56,21 @@ export class PropertyConfigService {
     return created;
   }
 
+  /** The settings row behind a public booking-page slug, if the page is on. */
+  async settingsBySlug(slug: string): Promise<PropertySettings | null> {
+    const [row] = await this.db
+      .select()
+      .from(propertySettings)
+      .where(
+        and(
+          eq(propertySettings.bookingEngineSlug, slug),
+          eq(propertySettings.bookingEngineEnabled, true),
+        ),
+      )
+      .limit(1);
+    return row ?? null;
+  }
+
   async updateSettings(propertyId: string, dto: UpdatePropertySettingsDto) {
     await this.settings(propertyId); // ensure the row exists
     if (dto.bookingEngineSlug) {

@@ -25,6 +25,12 @@ import {
 } from '../notifications/notification-delivery.service';
 import { inAppRecipient } from '../notifications/channels/channel.interface';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { JwtModule } from '@nestjs/jwt';
+import { SharedAuthModule } from '../shared-auth/shared-auth.module';
+import { AuditModule } from '../audit/audit.module';
+import { StaffJwtGuard } from '../staff-auth/staff-jwt.guard';
+import { StaffPermissionsGuard } from '../staff-auth/staff-permissions.guard';
+import { StaffNightAuditController } from './staff-night-audit.controller';
 
 @Injectable()
 export class SubscriptionLifecycleWorker {
@@ -681,8 +687,18 @@ export class WorkerSchedulerService {
 }
 
 @Module({
-  imports: [IntegrationsModule, NotificationsModule, BillingModule],
+  imports: [
+    IntegrationsModule,
+    NotificationsModule,
+    BillingModule,
+    JwtModule.register({}),
+    SharedAuthModule,
+    AuditModule,
+  ],
+  controllers: [StaffNightAuditController],
   providers: [
+    StaffJwtGuard,
+    StaffPermissionsGuard,
     WorkerSchedulerService,
     ChannexSyncWorker,
     SubscriptionLifecycleWorker,

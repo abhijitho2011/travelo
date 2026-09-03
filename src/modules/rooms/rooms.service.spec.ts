@@ -466,3 +466,50 @@ describe('room-first inventory', () => {
     expect(db.updates.filter((u) => u.table === 'room_types')).toEqual([]);
   });
 });
+
+describe('bulk room status', () => {
+  it('marks every dirty, cleaning or inspected room READY in one statement', async () => {
+    const db = mockDb({
+      update: {
+        rooms: [
+          roomRow({ status: 'READY' }),
+          roomRow({ id: 'room-2', number: '302', status: 'READY' }),
+        ],
+      },
+      select: {
+        room_types: [[typeRow]],
+        amenities: [[]],
+        room_photos: [[]],
+        room_type_photos: [[]],
+      },
+    });
+    const res = await svc(db).markAllClean(MY_PROPERTY);
+    expect(res.updated).toBe(2);
+    const write = db.updates.find((u) => u.table === 'rooms');
+    expect(write?.values).toMatchObject({ status: 'READY' });
+    expect(sqlText(db.wheresFor('rooms')[0] ?? write?.where?.[0])).toBeDefined();
+  });
+
+  it('bulk status only touches this property’s rooms', async () => {
+    const db = mockDb({
+      update: { rooms: [roomRow({ status: 'OUT_OF_ORDER' })] },
+      select: {
+        room_types: [[typeRow]],
+        amenities: [[]],
+        room_photos: [[]],
+        room_type_photos: [[]],
+      },
+    });
+    const res = await svc(db).bulkSetStatus(
+      MY_PROPERTY,
+      ['room-1', 'room-x'],
+      'OUT_OF_ORDER',
+      'Painting',
+    );
+    expect(res.updated).toBe(1);
+    expect(db.updates.find((u) => u.table === 'rooms')?.values).toMatchObject({
+      status: 'OUT_OF_ORDER',
+      notes: 'Painting',
+    });
+  });
+});
