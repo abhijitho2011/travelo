@@ -113,12 +113,13 @@ void main() {
       }
     });
 
-    test('the five the schema documents are all present', () {
+    test('the six the schema documents are all present', () {
       expect(ReservationSource.values.map((s) => s.wire).toList(), [
         'WALK_IN',
         'PHONE',
         'EMAIL',
         'OTA',
+        'BOOKING_ENGINE',
         'OTHER',
       ]);
     });
