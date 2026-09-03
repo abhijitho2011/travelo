@@ -43,6 +43,8 @@ class PropertySettings {
     this.currency = 'INR',
     this.minRoomPricePaise,
     this.restaurantServiceChargeBp = 0,
+    this.guestInstructions,
+    this.reviewUrl,
   });
 
   final String? gstin;
@@ -69,6 +71,8 @@ class PropertySettings {
 
   /// Basis points auto-added to every restaurant bill.
   final int restaurantServiceChargeBp;
+  final String? guestInstructions;
+  final String? reviewUrl;
 
   factory PropertySettings.fromJson(Map j) => PropertySettings(
     gstin: _str(j['gstin']),
@@ -97,6 +101,8 @@ class PropertySettings {
     currency: _str(j['currency']) ?? 'INR',
     minRoomPricePaise: _intOrNull(j['minRoomPricePaise']),
     restaurantServiceChargeBp: _int(j['restaurantServiceChargeBp']),
+    guestInstructions: _str(j['guestInstructions']),
+    reviewUrl: _str(j['reviewUrl']),
   );
 }
 

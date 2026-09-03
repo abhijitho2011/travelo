@@ -144,4 +144,9 @@ class Routes {
       '/accounts/corporate/$id';
   static const rates = '/rates';
   static const reports = '/reports';
+  static const reportBuilder = '/reports/custom';
+  static const conversations = '/conversations';
+  static const conversationPattern = '/conversations/:id';
+  static String conversation(String id) => '/conversations/$id';
+  static const reviews = '/reviews';
 }

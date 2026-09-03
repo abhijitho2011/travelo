@@ -163,12 +163,15 @@ void main() {
       expect(r.status, 'AVAILABLE');
     });
 
-    test('keeps a non-numeric floor verbatim — "G" and "LG" are real floors', () {
-      expect(Room.fromJson({'floor': 'G'}).floor, 'G');
-      expect(Room.fromJson({'floor': 'LG'}).floor, 'LG');
-      // A numeric floor arrives as a string, but a stray int must not throw.
-      expect(Room.fromJson({'floor': 3}).floor, '3');
-    });
+    test(
+      'keeps a non-numeric floor verbatim — "G" and "LG" are real floors',
+      () {
+        expect(Room.fromJson({'floor': 'G'}).floor, 'G');
+        expect(Room.fromJson({'floor': 'LG'}).floor, 'LG');
+        // A numeric floor arrives as a string, but a stray int must not throw.
+        expect(Room.fromJson({'floor': 3}).floor, '3');
+      },
+    );
 
     test('accepts snake_case keys', () {
       final r = Room.fromJson({
@@ -240,8 +243,11 @@ void main() {
           isTrue,
           reason: 'the catalogue seeds "$name" but nothing maps it',
         );
-        expect(amenityIcon(name), isNot(Icons.check_circle_outline),
-            reason: '"$name" fell through to the fallback');
+        expect(
+          amenityIcon(name),
+          isNot(Icons.check_circle_outline),
+          reason: '"$name" fell through to the fallback',
+        );
       }
     });
 
@@ -295,15 +301,21 @@ void main() {
     });
   });
 
-
   group('OwnerNotification', () {
     test('reads readAt so a delivered notification is not unread forever', () {
       expect(
-        OwnerNotification.fromJson({'id': 'n1', 'title': 'Renewal due', 'readAt': null}).read,
+        OwnerNotification.fromJson({
+          'id': 'n1',
+          'title': 'Renewal due',
+          'readAt': null,
+        }).read,
         isFalse,
       );
       expect(
-        OwnerNotification.fromJson({'id': 'n2', 'readAt': '2026-08-30T10:00:00Z'}).read,
+        OwnerNotification.fromJson({
+          'id': 'n2',
+          'readAt': '2026-08-30T10:00:00Z',
+        }).read,
         isTrue,
       );
     });

@@ -17,7 +17,8 @@ class TokenStore {
     await _storage.write(key: _kRefresh, value: refresh);
   }
 
-  Future<String?> access() async => _accessCache ??= await _storage.read(key: _kAccess);
+  Future<String?> access() async =>
+      _accessCache ??= await _storage.read(key: _kAccess);
 
   Future<String?> refresh() => _storage.read(key: _kRefresh);
 

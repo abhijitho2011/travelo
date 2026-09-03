@@ -19,6 +19,7 @@ import '../../management/presentation/approvals_screen.dart'
 import '../../rooms/presentation/room_widgets.dart'
     show FieldNote, FormErrorNote;
 import '../application/reception_controllers.dart';
+import '../../guest_comms/application/guest_comms_controllers.dart';
 import '../data/reception_models.dart';
 import '../data/reception_repository.dart';
 import 'folio_payment_sheet.dart';
@@ -181,6 +182,8 @@ class _ReservationDetailScreenState
                 ),
 
                 // The folio is money: only a role holding payment.read sees it.
+                _GuestLinkPanel(reservation: r),
+                gapMd,
                 PermissionGate(
                   permission: P.paymentRead,
                   child: Padding(
@@ -1106,6 +1109,140 @@ class _SwapSheet {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// The guest's contactless link: send it, see what they did with it.
+class _GuestLinkPanel extends ConsumerWidget {
+  const _GuestLinkPanel({required this.reservation});
+  final Reservation reservation;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    final r = reservation;
+    if (r.status == ReservationStatus.cancelled ||
+        r.status == ReservationStatus.noShow ||
+        r.status == ReservationStatus.checkedOut) {
+      return const SizedBox.shrink();
+    }
+    final status = ref.watch(guestLinkProvider(r.id)).valueOrNull;
+    String line;
+    if (status == null || !status.sent) {
+      line = 'Not sent yet';
+    } else if (status.checkoutRequestedAt != null) {
+      line =
+          'Guest asked to check out ${Fmt.dayMonth(status.checkoutRequestedAt)}';
+    } else if (status.checkinSubmittedAt != null) {
+      line = 'Checked in online ${Fmt.dayMonth(status.checkinSubmittedAt)}';
+    } else if (status.openedAt != null) {
+      line = 'Opened ${Fmt.dayMonth(status.openedAt)}';
+    } else {
+      line = 'Sent ${Fmt.dayMonth(status.sentAt)} · not opened yet';
+    }
+    return Panel(
+      title: 'Guest link',
+      padBody: false,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: Sp.md,
+              vertical: Sp.sm,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  status?.checkoutRequestedAt != null
+                      ? Icons.logout
+                      : Icons.link,
+                  size: 16,
+                  color: status?.checkoutRequestedAt != null
+                      ? c.warning
+                      : c.mutedForeground,
+                ),
+                const SizedBox(width: Sp.sm),
+                Expanded(
+                  child: Text(
+                    line,
+                    style: AppTypography.body(size: 12.5, color: c.foreground),
+                  ),
+                ),
+                PermissionGate(
+                  permission: P.reservationUpdate,
+                  child: TextButton(
+                    onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      try {
+                        final res = await ref
+                            .read(guestCommsActionsProvider)
+                            .sendGuestLink(r.id);
+                        final to = res['sentTo'] is Map
+                            ? (res['sentTo'] as Map)
+                            : const {};
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Link sent to ${[to['phone'], to['email']].where((e) => e != null).join(' and ')}',
+                            ),
+                          ),
+                        );
+                      } on ApiException catch (e) {
+                        messenger.showSnackBar(
+                          SnackBar(content: Text(e.message)),
+                        );
+                      }
+                    },
+                    child: Text(status?.sent == true ? 'Re-send' : 'Send link'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (status?.idProofUrl != null || status?.photoUrl != null) ...[
+            const RowDivider(),
+            Padding(
+              padding: const EdgeInsets.all(Sp.md),
+              child: Row(
+                children: [
+                  if (status!.photoUrl != null) ...[
+                    ClipRRect(
+                      borderRadius: R.rMd,
+                      child: Image.network(
+                        status.photoUrl!,
+                        width: 72,
+                        height: 72,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) =>
+                            const SizedBox(width: 72, height: 72),
+                      ),
+                    ),
+                    const SizedBox(width: Sp.md),
+                  ],
+                  if (status.idProofUrl != null)
+                    TextButton.icon(
+                      onPressed: () => showDialog<void>(
+                        context: context,
+                        builder: (_) => Dialog(
+                          child: InteractiveViewer(
+                            child: Image.network(
+                              status.idProofUrl!,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                      ),
+                      icon: const Icon(Icons.badge_outlined, size: 16),
+                      label: const Text('View ID proof'),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

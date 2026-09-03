@@ -61,6 +61,9 @@ import '../../features/property_settings/presentation/catalogue_screens.dart';
 import '../../features/rates/presentation/rates_grid_screen.dart';
 import '../../features/reports/presentation/reports_screen.dart';
 import '../../features/accounts/presentation/ledger_screens.dart';
+import '../../features/guest_comms/presentation/conversations_screen.dart';
+import '../../features/guest_comms/presentation/reviews_screen.dart';
+import '../../features/guest_comms/presentation/report_builder_screen.dart';
 import '../../features/sales/presentation/sales_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/sales/presentation/lead_detail_screen.dart';
@@ -138,7 +141,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // ------------------------------------------------- inside the shell ---
       ShellRoute(
-        builder: (_, _, child) => AppShell(child: child),
+        builder: (_, _, child) => AppShell.bind(AppShell(child: child)),
         routes: [
           // Management (built)
           GoRoute(
@@ -255,6 +258,24 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: Routes.reports,
             builder: (_, _) => const ReportsScreen(),
+          ),
+          GoRoute(
+            path: Routes.reportBuilder,
+            builder: (_, _) => const ReportBuilderScreen(),
+          ),
+          GoRoute(
+            path: Routes.conversations,
+            builder: (_, _) => const ConversationsScreen(),
+          ),
+          GoRoute(
+            path: Routes.conversationPattern,
+            builder: (_, state) => ConversationThreadScreen(
+              conversationId: state.pathParameters['id']!,
+            ),
+          ),
+          GoRoute(
+            path: Routes.reviews,
+            builder: (_, _) => const ReviewsScreen(),
           ),
           // Room-first: adding a room opens the full workspace, where the
           // room's own specifications, photos and rates live. There is no

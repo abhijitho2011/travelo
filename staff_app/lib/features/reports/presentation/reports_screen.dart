@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/routing/routes.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/networking/api_exception.dart';
@@ -67,6 +69,11 @@ class ReportsScreen extends ConsumerWidget {
           eyebrow: 'Management',
           title: 'Reports',
           actions: [
+            OutlinedButton.icon(
+              onPressed: () => context.go(Routes.reportBuilder),
+              icon: const Icon(Icons.table_chart_outlined, size: 16),
+              label: const Text('Custom'),
+            ),
             PermissionGate(
               permission: P.reportsExport,
               child: OutlinedButton.icon(

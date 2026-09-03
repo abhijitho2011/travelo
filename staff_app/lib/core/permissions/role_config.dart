@@ -280,6 +280,20 @@ class RoleConfig {
   /// The room inventory. Every role the server grants `room.read` carries this
   /// entry; the gate on the item, not a role list, is what decides who sees it.
   /// Night-audit report set + performance. reports.read: GM, AGM, Accounts.
+  static const _conversationsMore = NavItem(
+    label: 'Conversations',
+    icon: Icons.forum_outlined,
+    route: Routes.conversations,
+    requires: [P.conversationRead],
+  );
+
+  static const _reviewsMore = NavItem(
+    label: 'Reviews',
+    icon: Icons.reviews_outlined,
+    route: Routes.reviews,
+    requires: [P.reviewRead],
+  );
+
   static const _reportsMore = NavItem(
     label: 'Reports',
     icon: Icons.insights_outlined,
@@ -370,6 +384,7 @@ class RoleConfig {
         // Reached from Settings; guarded by their own permissions.
         Routes.propertySettings,
         Routes.rates,
+        Routes.reportBuilder,
       },
       bottomNav: const [
         NavItem(
@@ -399,6 +414,8 @@ class RoleConfig {
       ],
       moreMenu: const [
         _reportsMore,
+        _conversationsMore,
+        _reviewsMore,
         _roomsMore,
         NavItem(
           label: 'Housekeeping',
@@ -470,6 +487,7 @@ class RoleConfig {
         // Reached from Settings; guarded by their own permissions.
         Routes.propertySettings,
         Routes.rates,
+        Routes.reportBuilder,
       },
       bottomNav: const [
         NavItem(
@@ -499,6 +517,8 @@ class RoleConfig {
       ],
       moreMenu: const [
         _reportsMore,
+        _conversationsMore,
+        _reviewsMore,
         _roomsMore,
         NavItem(
           label: 'Housekeeping',
@@ -610,7 +630,12 @@ class RoleConfig {
       // The desk sees the board and may move a room's status; it holds none of
       // room.create/update/delete, so every other control on that screen gates
       // itself away without this config saying a word about it.
-      moreMenu: const [_roomsMore, ..._commonMore],
+      moreMenu: const [
+        _conversationsMore,
+        _reviewsMore,
+        _roomsMore,
+        ..._commonMore,
+      ],
     ),
 
     // ======================= Room attendant (BUILT) =======================
@@ -776,6 +801,8 @@ class RoleConfig {
       ],
       moreMenu: const [
         _reportsMore,
+        _conversationsMore,
+        _reviewsMore,
         _roomsMore,
         _inventoryMore,
         _lostFoundMore,

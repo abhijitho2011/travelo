@@ -69,6 +69,10 @@ class P {
   static const folioRead = 'folio.read';
   static const folioAdjust = 'folio.adjust';
   static const reservationAllocate = 'reservation.allocate';
+  static const conversationRead = 'conversation.read';
+  static const conversationSend = 'conversation.send';
+  static const reviewRead = 'review.read';
+  static const reviewRespond = 'review.respond';
 
   // ----------------------------------------------------------- operations --
   static const housekeepingRead = 'housekeeping.read';

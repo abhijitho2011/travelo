@@ -81,10 +81,7 @@ class SubscriptionScreen extends ConsumerWidget {
             gapSection,
           ],
           _PlanCard(sub: s),
-          if (s.isBlocked || s.isWarning) ...[
-            gapSection,
-            _RenewCard(sub: s),
-          ],
+          if (s.isBlocked || s.isWarning) ...[gapSection, _RenewCard(sub: s)],
           gapSection,
           const SectionHeader(
             title: 'Hotels in your plan',
@@ -223,10 +220,7 @@ class _PlanCard extends StatelessWidget {
           const SizedBox(height: 10),
           FactRow(label: 'Billing cycle', value: _cycleLabel(sub.billingCycle)),
           const SizedBox(height: 10),
-          FactRow(
-            label: 'Auto-renew',
-            value: sub.autoRenew ? 'On' : 'Off',
-          ),
+          FactRow(label: 'Auto-renew', value: sub.autoRenew ? 'On' : 'Off'),
         ],
       ),
     );
@@ -421,7 +415,10 @@ class _InvoiceRow extends StatelessWidget {
 Future<void> _openInvoice(BuildContext context, Invoice invoice) async {
   final url = invoice.documentUrl;
   if (url == null) return;
-  final ok = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  final ok = await launchUrl(
+    Uri.parse(url),
+    mode: LaunchMode.externalApplication,
+  );
   if (!ok && context.mounted) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Could not open the invoice PDF.')),
@@ -447,8 +444,9 @@ class _RenewCardState extends ConsumerState<_RenewCard> {
     setState(() => _busy = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final order =
-          await ref.read(ownerRepositoryProvider).createSubscriptionOrder();
+      final order = await ref
+          .read(ownerRepositoryProvider)
+          .createSubscriptionOrder();
       if (!mounted) return;
       // Cashfree hands back a hosted-checkout session; Razorpay a key+order for
       // its widget. When a hosted session URL is available we open it; either

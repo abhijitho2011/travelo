@@ -15,10 +15,10 @@ class ApiException implements Exception {
   });
 
   factory ApiException.network() => const ApiException(
-        code: 'NETWORK',
-        message: "We couldn't reach Tavelo right now.",
-        isNetwork: true,
-      );
+    code: 'NETWORK',
+    message: "We couldn't reach Tavelo right now.",
+    isNetwork: true,
+  );
 
   @override
   String toString() => 'ApiException($code, $status): $message';

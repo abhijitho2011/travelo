@@ -20,8 +20,10 @@ const double _kLabelWidth = 116;
 
 /// First date on the chart, date-only and local. Keyed by property so two
 /// hotels opened in turn do not inherit each other's scroll position in time.
-final ownerCalendarStartProvider =
-    StateProvider.family<DateTime, String>((ref, propertyId) {
+final ownerCalendarStartProvider = StateProvider.family<DateTime, String>((
+  ref,
+  propertyId,
+) {
   final now = DateTime.now();
   return DateTime(now.year, now.month, now.day);
 });
@@ -57,39 +59,40 @@ int _compareRoomNumber(String a, String b) {
 
 final ownerCalendarProvider = FutureProvider.autoDispose
     .family<OwnerCalendarData, String>((ref, propertyId) async {
-  final start = ref.watch(ownerCalendarStartProvider(propertyId));
-  final end = start.add(const Duration(days: kOwnerCalendarWindowDays));
-  final repo = ref.watch(ownerRepositoryProvider);
+      final start = ref.watch(ownerCalendarStartProvider(propertyId));
+      final end = start.add(const Duration(days: kOwnerCalendarWindowDays));
+      final repo = ref.watch(ownerRepositoryProvider);
 
-  final rooms = await repo.propertyRooms(propertyId);
-  final reservations = await repo.propertyReservations(
-    propertyId,
-    from: start,
-    to: end,
-  );
+      final rooms = await repo.propertyRooms(propertyId);
+      final reservations = await repo.propertyReservations(
+        propertyId,
+        from: start,
+        to: end,
+      );
 
-  final sorted = [...rooms]..sort((a, b) {
-    final byType = a.roomTypeName.compareTo(b.roomTypeName);
-    return byType != 0 ? byType : _compareRoomNumber(a.number, b.number);
-  });
+      final sorted = [...rooms]
+        ..sort((a, b) {
+          final byType = a.roomTypeName.compareTo(b.roomTypeName);
+          return byType != 0 ? byType : _compareRoomNumber(a.number, b.number);
+        });
 
-  final byRoom = <String, List<CalendarReservation>>{};
-  final unassigned = <CalendarReservation>[];
-  for (final r in reservations) {
-    if (r.roomId.isNotEmpty) {
-      (byRoom[r.roomId] ??= <CalendarReservation>[]).add(r);
-    } else {
-      unassigned.add(r);
-    }
-  }
+      final byRoom = <String, List<CalendarReservation>>{};
+      final unassigned = <CalendarReservation>[];
+      for (final r in reservations) {
+        if (r.roomId.isNotEmpty) {
+          (byRoom[r.roomId] ??= <CalendarReservation>[]).add(r);
+        } else {
+          unassigned.add(r);
+        }
+      }
 
-  return OwnerCalendarData(
-    rooms: sorted,
-    byRoom: byRoom,
-    unassigned: unassigned,
-    windowStart: start,
-  );
-});
+      return OwnerCalendarData(
+        rooms: sorted,
+        byRoom: byRoom,
+        unassigned: unassigned,
+        windowStart: start,
+      );
+    });
 
 /// Reservation status → the app's shared status palette. Owners and the front
 /// desk read the same colours, so nothing is invented locally here.
@@ -165,10 +168,12 @@ class _PropertyCalendarScreenState
     if (_syncing || !to.hasClients || !from.hasClients) return;
     if ((to.offset - from.offset).abs() < 0.5) return;
     _syncing = true;
-    to.jumpTo(from.offset.clamp(
-      to.position.minScrollExtent,
-      to.position.maxScrollExtent,
-    ));
+    to.jumpTo(
+      from.offset.clamp(
+        to.position.minScrollExtent,
+        to.position.maxScrollExtent,
+      ),
+    );
     _syncing = false;
   }
 
@@ -341,7 +346,11 @@ class _Legend extends StatelessWidget {
 
 /// One row of the chart: either a room lane or the unassigned lane.
 class _Lane {
-  const _Lane({required this.label, required this.sublabel, required this.stays});
+  const _Lane({
+    required this.label,
+    required this.sublabel,
+    required this.stays,
+  });
   final String label;
   final String sublabel;
   final List<CalendarReservation> stays;
@@ -381,7 +390,9 @@ class _Chart extends StatelessWidget {
           final t = r.roomTypeName.isEmpty ? 'Rooms' : r.roomTypeName;
           return t == type;
         }).length;
-        blocks.add(_GroupHeader(label: type, count: runCount, width: gridWidth));
+        blocks.add(
+          _GroupHeader(label: type, count: runCount, width: gridWidth),
+        );
       }
       blocks.add(
         _LaneRow(
@@ -678,9 +689,8 @@ class _LaneRow extends StatelessWidget {
 /// changing a booking is the front desk's job, in the staff app.
 void _showDetail(BuildContext context, CalendarReservation s) {
   final c = context.colors;
-  String fmt(DateTime? d) => d == null
-      ? '—'
-      : '${d.day} ${_kMonths[d.month - 1]} ${d.year}';
+  String fmt(DateTime? d) =>
+      d == null ? '—' : '${d.day} ${_kMonths[d.month - 1]} ${d.year}';
 
   showModalBottomSheet<void>(
     context: context,

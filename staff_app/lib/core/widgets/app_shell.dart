@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../realtime/realtime_client.dart';
+
 import '../notifications/notifications_controller.dart';
 import '../permissions/role_config.dart';
 import '../providers.dart';
@@ -21,6 +23,10 @@ import 'tavelo_sidebar.dart';
 /// the user's permissions.
 class AppShell extends ConsumerWidget {
   const AppShell({super.key, required this.child});
+
+  /// The shell only exists while someone is signed in, so binding the live
+  /// socket to its lifetime connects on login and drops on sign-out.
+  static Widget bind(Widget child) => _RealtimeBinder(child: child);
 
   final Widget child;
 
@@ -449,4 +455,32 @@ class _MoreSheet extends StatelessWidget {
       ),
     );
   }
+}
+
+class _RealtimeBinder extends ConsumerStatefulWidget {
+  const _RealtimeBinder({required this.child});
+  final Widget child;
+  @override
+  ConsumerState<_RealtimeBinder> createState() => _RealtimeBinderState();
+}
+
+class _RealtimeBinderState extends ConsumerState<_RealtimeBinder> {
+  late final RealtimeClient _client = ref.read(realtimeClientProvider);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _client.connect();
+    });
+  }
+
+  @override
+  void dispose() {
+    _client.disconnect();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

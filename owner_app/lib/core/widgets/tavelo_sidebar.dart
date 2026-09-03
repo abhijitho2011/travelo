@@ -132,7 +132,8 @@ class _SidebarRowState extends State<_SidebarRow> {
     final c = context.colors;
     final active = widget.active;
     final Color bg = active
-        ? c.accent // #E9F5F0 selected tint
+        ? c
+              .accent // #E9F5F0 selected tint
         : (_hover ? c.muted : Colors.transparent);
     final Color fg = active ? c.primary : c.mutedForeground;
 
@@ -160,7 +161,9 @@ class _SidebarRowState extends State<_SidebarRow> {
                     style: AppTypography.body(
                       size: 13.5,
                       weight: active ? FontWeight.w600 : FontWeight.w500,
-                      color: active ? c.primary : c.foreground.withValues(alpha: 0.82),
+                      color: active
+                          ? c.primary
+                          : c.foreground.withValues(alpha: 0.82),
                     ),
                   ),
                 ),

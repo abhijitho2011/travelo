@@ -26,6 +26,7 @@ class PortfolioScreen extends ConsumerWidget {
       onRefresh: () async {
         ref.invalidate(propertiesProvider);
         ref.invalidate(portfolioProvider);
+        ref.invalidate(portfolioPerformanceProvider);
         await ref.read(authControllerProvider.notifier).refreshMe();
       },
       children: [
@@ -78,6 +79,7 @@ class _PortfolioBody extends ConsumerWidget {
             occupancy: s.occupancy,
           ),
         ),
+        if (properties.length > 1) ...[gapSection, const _PerformanceSection()],
         gapSection,
         SectionHeader(
           title: 'Your hotels',
@@ -96,6 +98,140 @@ class _PortfolioBody extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// Hotels side by side: who is earning the room-night, who is not, and
+/// where the bookings came from. Only shown when there is more than one hotel
+/// to compare.
+class _PerformanceSection extends ConsumerWidget {
+  const _PerformanceSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final perf = ref.watch(portfolioPerformanceProvider);
+    final money = NumberFormat.compactCurrency(
+      locale: 'en_IN',
+      symbol: '₹',
+      decimalDigits: 0,
+    );
+    return perf.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (p) {
+        if (p.properties.isEmpty) return const SizedBox.shrink();
+        final sourceTotal = p.sources.fold<int>(0, (a, s) => a + s.roomsSold);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SectionHeader(
+              title: 'Across the group',
+              icon: Icons.insights_outlined,
+              trailing: Text(
+                'Last ${p.months} months',
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+            ),
+            SoftCard(
+              padding: EdgeInsets.zero,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  columnSpacing: 20,
+                  columns: const [
+                    DataColumn(label: Text('Hotel')),
+                    DataColumn(label: Text('Revenue'), numeric: true),
+                    DataColumn(label: Text('Occupancy'), numeric: true),
+                    DataColumn(label: Text('ADR'), numeric: true),
+                    DataColumn(label: Text('RevPAR'), numeric: true),
+                  ],
+                  rows: [
+                    for (final h in p.properties)
+                      DataRow(
+                        cells: [
+                          DataCell(
+                            Row(
+                              children: [
+                                if (h.name == p.topName)
+                                  const Padding(
+                                    padding: EdgeInsets.only(right: 4),
+                                    child: Icon(Icons.trending_up, size: 14),
+                                  ),
+                                if (h.name == p.lowName)
+                                  const Padding(
+                                    padding: EdgeInsets.only(right: 4),
+                                    child: Icon(Icons.trending_down, size: 14),
+                                  ),
+                                Text(h.name),
+                              ],
+                            ),
+                          ),
+                          DataCell(Text(money.format(h.revenuePaise / 100))),
+                          DataCell(Text('${h.occupancyPct}%')),
+                          DataCell(Text(money.format(h.adrPaise / 100))),
+                          DataCell(Text(money.format(h.revparPaise / 100))),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            if (p.sources.isNotEmpty && sourceTotal > 0) ...[
+              const SizedBox(height: Sp.md),
+              SoftCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Where bookings came from',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: Sp.sm),
+                    for (final s in p.sources) ...[
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 120,
+                            child: Text(
+                              _sourceLabel(s.source),
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: s.roomsSold / sourceTotal,
+                                minHeight: 8,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: Sp.sm),
+                          Text(
+                            '${s.roomsSold} · ${money.format(s.revenuePaise / 100)}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  static String _sourceLabel(String s) => switch (s) {
+    'WALK_IN' => 'Walk-in',
+    'PHONE' => 'Phone',
+    'OTA' => 'OTA',
+    'BOOKING_ENGINE' => 'Booking page',
+    'CORPORATE' => 'Corporate',
+    _ => s.replaceAll('_', ' ').toLowerCase(),
+  };
 }
 
 class _StatGrid extends StatelessWidget {

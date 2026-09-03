@@ -74,7 +74,10 @@ class DefaultFirebaseOptions {
   // google-services.json / GoogleService-Info.plist.
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: _apiKey,
-    appId: String.fromEnvironment('FIREBASE_ANDROID_APP_ID', defaultValue: _appId),
+    appId: String.fromEnvironment(
+      'FIREBASE_ANDROID_APP_ID',
+      defaultValue: _appId,
+    ),
     messagingSenderId: _senderId,
     projectId: _projectId,
     storageBucket: _storageBucket,

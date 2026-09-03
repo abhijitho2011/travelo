@@ -42,6 +42,8 @@ class _PropertySettingsScreenState
   final _terms = TextEditingController();
   final _floor = TextEditingController();
   final _serviceCharge = TextEditingController();
+  final _instructions = TextEditingController();
+  final _reviewUrl = TextEditingController();
   bool _pricesIncludeTax = false;
   bool _showGstin = true;
   bool _showHsn = true;
@@ -82,6 +84,8 @@ class _PropertySettingsScreenState
     _hold.text = s.holdExpiryMinutes?.toString() ?? '';
     _slug.text = s.bookingEngineSlug ?? '';
     _terms.text = s.bookingTerms ?? '';
+    _instructions.text = s.guestInstructions ?? '';
+    _reviewUrl.text = s.reviewUrl ?? '';
     _floor.text = s.minRoomPricePaise == null
         ? ''
         : (s.minRoomPricePaise! ~/ 100).toString();
@@ -126,6 +130,9 @@ class _PropertySettingsScreenState
         if (_slug.text.trim().isNotEmpty)
           'bookingEngineSlug': _slug.text.trim(),
         'bookingTerms': _terms.text.trim(),
+        'guestInstructions': _instructions.text.trim(),
+        if (_reviewUrl.text.trim().isNotEmpty)
+          'reviewUrl': _reviewUrl.text.trim(),
         'minRoomPricePaise': _floor.text.trim().isEmpty
             ? null
             : (int.tryParse(_floor.text.trim()) ?? 0) * 100,

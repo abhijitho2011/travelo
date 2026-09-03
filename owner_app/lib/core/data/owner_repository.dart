@@ -18,6 +18,13 @@ class OwnerRepository {
     return PortfolioSummary.fromJson(d);
   }
 
+  Future<PortfolioPerformance> portfolioPerformance({int months = 6}) async {
+    final d =
+        await _api.get('/portfolio/performance', query: {'months': '$months'})
+            as Map;
+    return PortfolioPerformance.fromJson(d);
+  }
+
   Future<List<Property>> properties() async {
     final d = await _api.get('/properties');
     final list = d is Map ? (d['items'] ?? d['data'] ?? []) : d;
@@ -73,11 +80,16 @@ class OwnerRepository {
     String propertyId,
     String staffId,
     Map<String, dynamic> body,
-  ) =>
-      _api.patch('/properties/$propertyId/staff/$staffId', body: body);
+  ) => _api.patch('/properties/$propertyId/staff/$staffId', body: body);
 
-  Future<void> setStaffStatus(String propertyId, String staffId, String status) =>
-      _api.post('/properties/$propertyId/staff/$staffId/status', body: {'status': status});
+  Future<void> setStaffStatus(
+    String propertyId,
+    String staffId,
+    String status,
+  ) => _api.post(
+    '/properties/$propertyId/staff/$staffId/status',
+    body: {'status': status},
+  );
 
   Future<void> deleteStaff(String propertyId, String staffId) =>
       _api.delete('/properties/$propertyId/staff/$staffId');
@@ -158,7 +170,8 @@ class OwnerRepository {
     final d = await _api.get('/reference/locations') as Map;
     final states = (d['states'] ?? d) as Map;
     return states.map(
-      (k, v) => MapEntry(k.toString(), (v as List).map((e) => e.toString()).toList()),
+      (k, v) =>
+          MapEntry(k.toString(), (v as List).map((e) => e.toString()).toList()),
     );
   }
 
@@ -222,10 +235,13 @@ class OwnerRepository {
   // ---------- Support ----------
 
   Future<List<SupportTicket>> tickets({String? status, String? q}) async {
-    final d = await _api.get('/support/tickets', query: {
-      if (status != null && status.isNotEmpty) 'status': status,
-      if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
-    });
+    final d = await _api.get(
+      '/support/tickets',
+      query: {
+        if (status != null && status.isNotEmpty) 'status': status,
+        if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
+      },
+    );
     final list = d is Map ? (d['items'] ?? []) : d;
     return (list as List).map((e) => SupportTicket.fromJson(e as Map)).toList();
   }
@@ -234,7 +250,9 @@ class OwnerRepository {
       SupportTicket.fromJson(await _api.get('/support/tickets/$id') as Map);
 
   Future<SupportTicket> createTicket(Map<String, dynamic> body) async =>
-      SupportTicket.fromJson(await _api.post('/support/tickets', body: body) as Map);
+      SupportTicket.fromJson(
+        await _api.post('/support/tickets', body: body) as Map,
+      );
 
   Future<void> replyToTicket(String id, String body) =>
       _api.post('/support/tickets/$id/messages', body: {'body': body});
@@ -272,35 +290,37 @@ final propertiesProvider = FutureProvider.autoDispose<List<Property>>(
   (ref) => ref.watch(ownerRepositoryProvider).properties(),
 );
 
-final staffProvider =
-    FutureProvider.autoDispose.family<List<StaffMember>, String>(
-  (ref, propertyId) => ref.watch(ownerRepositoryProvider).staff(propertyId),
-);
+final staffProvider = FutureProvider.autoDispose
+    .family<List<StaffMember>, String>(
+      (ref, propertyId) => ref.watch(ownerRepositoryProvider).staff(propertyId),
+    );
 
 /// All three are keyed on the property id, so opening a second hotel never
 /// shows the first one's inventory while its own request is in flight.
-final propertyAmenitiesProvider =
-    FutureProvider.autoDispose.family<PropertyAmenities, String>(
-  (ref, propertyId) =>
-      ref.watch(ownerRepositoryProvider).propertyAmenities(propertyId),
-);
+final propertyAmenitiesProvider = FutureProvider.autoDispose
+    .family<PropertyAmenities, String>(
+      (ref, propertyId) =>
+          ref.watch(ownerRepositoryProvider).propertyAmenities(propertyId),
+    );
 
-final propertyRoomTypesProvider =
-    FutureProvider.autoDispose.family<List<RoomType>, String>(
-  (ref, propertyId) =>
-      ref.watch(ownerRepositoryProvider).propertyRoomTypes(propertyId),
-);
+final propertyRoomTypesProvider = FutureProvider.autoDispose
+    .family<List<RoomType>, String>(
+      (ref, propertyId) =>
+          ref.watch(ownerRepositoryProvider).propertyRoomTypes(propertyId),
+    );
 
-final propertyRoomsProvider =
-    FutureProvider.autoDispose.family<List<Room>, String>(
-  (ref, propertyId) => ref.watch(ownerRepositoryProvider).propertyRooms(propertyId),
-);
+final propertyRoomsProvider = FutureProvider.autoDispose
+    .family<List<Room>, String>(
+      (ref, propertyId) =>
+          ref.watch(ownerRepositoryProvider).propertyRooms(propertyId),
+    );
 
 /// The property's photos (each carries a short-lived presigned `url`).
-final propertyPhotosProvider =
-    FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>(
-  (ref, propertyId) => ref.watch(ownerRepositoryProvider).propertyPhotos(propertyId),
-);
+final propertyPhotosProvider = FutureProvider.autoDispose
+    .family<List<Map<String, dynamic>>, String>(
+      (ref, propertyId) =>
+          ref.watch(ownerRepositoryProvider).propertyPhotos(propertyId),
+    );
 
 final ownerAccountProvider = FutureProvider.autoDispose<OwnerAccount>(
   (ref) => ref.watch(ownerRepositoryProvider).profile(),
@@ -321,13 +341,13 @@ final invoicesProvider = FutureProvider.autoDispose<List<Invoice>>(
 );
 
 /// Ticket list, filtered by status ('' means all).
-final ticketsProvider =
-    FutureProvider.autoDispose.family<List<SupportTicket>, String>(
-  (ref, status) => ref.watch(ownerRepositoryProvider).tickets(status: status),
-);
+final ticketsProvider = FutureProvider.autoDispose
+    .family<List<SupportTicket>, String>(
+      (ref, status) =>
+          ref.watch(ownerRepositoryProvider).tickets(status: status),
+    );
 
-final ticketProvider =
-    FutureProvider.autoDispose.family<SupportTicket, String>(
+final ticketProvider = FutureProvider.autoDispose.family<SupportTicket, String>(
   (ref, id) => ref.watch(ownerRepositoryProvider).ticket(id),
 );
 
@@ -390,15 +410,22 @@ class OwnerNotificationsController extends AsyncNotifier<OwnerInbox> {
 
 final ownerNotificationsProvider =
     AsyncNotifierProvider<OwnerNotificationsController, OwnerInbox>(
-  OwnerNotificationsController.new,
-);
+      OwnerNotificationsController.new,
+    );
 
 /// Unread count for the top-bar bell badge.
 final ownerUnreadCountProvider = Provider<int>((ref) {
   return ref.watch(ownerNotificationsProvider).value?.unread ?? 0;
 });
 
-final propertyOperationsProvider =
-    FutureProvider.autoDispose.family<Map<String, dynamic>, String>(
-  (ref, propertyId) => ref.watch(ownerRepositoryProvider).propertyOperations(propertyId),
-);
+final propertyOperationsProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, String>(
+      (ref, propertyId) =>
+          ref.watch(ownerRepositoryProvider).propertyOperations(propertyId),
+    );
+
+/// Group view — how the hotels compare over the last six months.
+final portfolioPerformanceProvider =
+    FutureProvider.autoDispose<PortfolioPerformance>(
+      (ref) => ref.watch(ownerRepositoryProvider).portfolioPerformance(),
+    );

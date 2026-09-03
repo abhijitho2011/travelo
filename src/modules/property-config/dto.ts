@@ -7,6 +7,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUrl,
   Length,
   Matches,
   Max,
@@ -76,6 +77,16 @@ export class UpdatePropertySettingsDto {
   @IsOptional() hotelierNotifications?: Record<string, Record<string, boolean>>;
 
   @IsOptional() @IsString() @Length(3, 8) currency?: string;
+
+  /** Revenue-engine floor in paise; null removes the floor. */
+  @IsOptional() @IsInt() @Min(0) @Max(100_000_000) minRoomPricePaise?: number | null;
+  /** Restaurant service charge in basis points (1000 = 10%). */
+  @IsOptional() @IsInt() @Min(0) @Max(5_000) restaurantServiceChargeBp?: number;
+
+  /** Shown on the guest's stay link: Wi-Fi, parking, how to find us. */
+  @IsOptional() @IsString() @Length(0, 5000) guestInstructions?: string;
+  /** Where the post-stay review request sends the guest. */
+  @IsOptional() @IsUrl({ require_protocol: true }) @Length(0, 512) reviewUrl?: string | null;
 }
 
 export class TaxInputDto {

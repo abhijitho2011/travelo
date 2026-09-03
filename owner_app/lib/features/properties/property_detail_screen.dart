@@ -209,10 +209,7 @@ class _Header extends StatelessWidget {
                 label: '${p.roomCount} ${p.roomCount == 1 ? 'room' : 'rooms'}',
               ),
               if (p.contactPhone.isNotEmpty)
-                MetaPill(
-                  icon: Icons.phone_outlined,
-                  label: p.contactPhone,
-                ),
+                MetaPill(icon: Icons.phone_outlined, label: p.contactPhone),
             ],
           ),
         ],
@@ -625,12 +622,20 @@ class _PhotosState extends ConsumerState<_Photos> {
     setState(() => _busy = true);
     try {
       for (final img in imgs) {
-        await ref.read(ownerRepositoryProvider).uploadPropertyPhoto(widget.propertyId, img);
+        await ref
+            .read(ownerRepositoryProvider)
+            .uploadPropertyPhoto(widget.propertyId, img);
       }
       ref.invalidate(propertyPhotosProvider(widget.propertyId));
-      ref.invalidate(propertiesProvider); // cover photo / completeness may change
+      ref.invalidate(
+        propertiesProvider,
+      ); // cover photo / completeness may change
     } on ApiException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(e.message.isEmpty ? 'Upload failed.' : e.message)));
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(e.message.isEmpty ? 'Upload failed.' : e.message),
+        ),
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -643,18 +648,30 @@ class _PhotosState extends ConsumerState<_Photos> {
       builder: (ctx) => AlertDialog(
         title: const Text('Delete this photo?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
         ],
       ),
     );
     if (ok != true) return;
     try {
-      await ref.read(ownerRepositoryProvider).deletePropertyPhoto(widget.propertyId, photoId);
+      await ref
+          .read(ownerRepositoryProvider)
+          .deletePropertyPhoto(widget.propertyId, photoId);
       ref.invalidate(propertyPhotosProvider(widget.propertyId));
       ref.invalidate(propertiesProvider);
     } on ApiException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(e.message.isEmpty ? 'Delete failed.' : e.message)));
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(e.message.isEmpty ? 'Delete failed.' : e.message),
+        ),
+      );
     }
   }
 
@@ -668,19 +685,29 @@ class _PhotosState extends ConsumerState<_Photos> {
         Row(
           children: [
             const Expanded(
-              child: SectionHeader(title: 'Photos', icon: Icons.photo_library_outlined),
+              child: SectionHeader(
+                title: 'Photos',
+                icon: Icons.photo_library_outlined,
+              ),
             ),
             TextButton.icon(
               onPressed: _busy ? null : _add,
               icon: _busy
-                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                   : const Icon(Icons.add_a_photo_outlined, size: 18),
               label: const Text('Add'),
             ),
           ],
         ),
         async.when(
-          loading: () => const SizedBox(height: 110, child: Center(child: CircularProgressIndicator())),
+          loading: () => const SizedBox(
+            height: 110,
+            child: Center(child: CircularProgressIndicator()),
+          ),
           error: (_, __) => Text(
             'Could not load photos.',
             style: AppTypography.body(size: 13, color: c.mutedForeground),
@@ -712,8 +739,11 @@ class _PhotosState extends ConsumerState<_Photos> {
                                 width: 150,
                                 height: 110,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) =>
-                                    Container(width: 150, height: 110, color: c.muted),
+                                errorBuilder: (_, __, ___) => Container(
+                                  width: 150,
+                                  height: 110,
+                                  color: c.muted,
+                                ),
                               ),
                       ),
                       Positioned(
@@ -727,7 +757,11 @@ class _PhotosState extends ConsumerState<_Photos> {
                             onTap: () => _delete('${p['id']}'),
                             child: const Padding(
                               padding: EdgeInsets.all(4),
-                              child: Icon(Icons.close, size: 16, color: Colors.white),
+                              child: Icon(
+                                Icons.close,
+                                size: 16,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ),
@@ -760,8 +794,14 @@ Future<void> _confirmArchive(
         'Contact Tavelo to restore it.',
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Archive')),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Archive'),
+        ),
       ],
     ),
   );
@@ -773,11 +813,12 @@ Future<void> _confirmArchive(
     if (context.mounted) context.go('/properties');
   } on ApiException catch (e) {
     messenger.showSnackBar(
-      SnackBar(content: Text(e.message.isEmpty ? 'Could not archive.' : e.message)),
+      SnackBar(
+        content: Text(e.message.isEmpty ? 'Could not archive.' : e.message),
+      ),
     );
   }
 }
-
 
 /// A read-only operational snapshot of the hotel for the owner: today's
 /// occupancy, arrivals/departures and in-house, plus a short history.
@@ -792,9 +833,15 @@ class _Operations extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SectionHeader(title: 'Operations today', icon: Icons.insights_outlined),
+        const SectionHeader(
+          title: 'Operations today',
+          icon: Icons.insights_outlined,
+        ),
         async.when(
-          loading: () => const SizedBox(height: 72, child: Center(child: CircularProgressIndicator())),
+          loading: () => const SizedBox(
+            height: 72,
+            child: Center(child: CircularProgressIndicator()),
+          ),
           error: (_, __) => Text(
             'Operational figures are unavailable right now.',
             style: AppTypography.body(size: 13, color: c.mutedForeground),
@@ -809,9 +856,15 @@ class _Operations extends ConsumerWidget {
                   const SizedBox(height: 10),
                   FactRow(label: 'In-house', value: '${n('inHouse')} guests'),
                   const SizedBox(height: 10),
-                  FactRow(label: 'Arrivals today', value: '${n('arrivalsToday')}'),
+                  FactRow(
+                    label: 'Arrivals today',
+                    value: '${n('arrivalsToday')}',
+                  ),
                   const SizedBox(height: 10),
-                  FactRow(label: 'Departures today', value: '${n('departuresToday')}'),
+                  FactRow(
+                    label: 'Departures today',
+                    value: '${n('departuresToday')}',
+                  ),
                   const SizedBox(height: 10),
                   FactRow(
                     label: 'Rooms occupied',

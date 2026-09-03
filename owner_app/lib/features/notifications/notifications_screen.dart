@@ -54,7 +54,8 @@ class NotificationsScreen extends ConsumerWidget {
             const EmptyState(
               icon: Icons.notifications_none_outlined,
               title: 'Nothing new',
-              hint: 'Subscription reminders and support replies will appear here.',
+              hint:
+                  'Subscription reminders and support replies will appear here.',
             )
           else
             for (final n in inbox.items) ...[
@@ -99,23 +100,26 @@ class _NotificationRow extends StatelessWidget {
               children: [
                 Text(
                   n.title,
-                  style: AppTypography.display(
-                    size: 14,
-                    color: c.foreground,
-                  ),
+                  style: AppTypography.display(size: 14, color: c.foreground),
                 ),
                 if (n.body.isNotEmpty) ...[
                   const SizedBox(height: 3),
                   Text(
                     n.body,
-                    style: AppTypography.body(size: 13, color: c.mutedForeground),
+                    style: AppTypography.body(
+                      size: 13,
+                      color: c.mutedForeground,
+                    ),
                   ),
                 ],
                 if (n.createdAt != null) ...[
                   const SizedBox(height: 6),
                   Text(
                     DateFormat('d MMM, HH:mm').format(n.createdAt!),
-                    style: AppTypography.body(size: 11, color: c.mutedForeground),
+                    style: AppTypography.body(
+                      size: 11,
+                      color: c.mutedForeground,
+                    ),
                   ),
                 ],
               ],

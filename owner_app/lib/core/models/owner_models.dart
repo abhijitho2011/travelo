@@ -6,7 +6,14 @@ double _asDouble(dynamic v) =>
     v is num ? v.toDouble() : double.tryParse('${v ?? ''}') ?? 0;
 String _asStr(dynamic v) => v?.toString() ?? '';
 
-enum OwnerAccountStatus { pending, active, suspended, blocked, deactivated, unknown }
+enum OwnerAccountStatus {
+  pending,
+  active,
+  suspended,
+  blocked,
+  deactivated,
+  unknown,
+}
 
 OwnerAccountStatus ownerStatusFrom(String? s) {
   switch ((s ?? '').toUpperCase()) {
@@ -25,7 +32,16 @@ OwnerAccountStatus ownerStatusFrom(String? s) {
   }
 }
 
-enum SubscriptionState { trial, active, expiring, gracePeriod, expired, suspended, cancelled, unknown }
+enum SubscriptionState {
+  trial,
+  active,
+  expiring,
+  gracePeriod,
+  expired,
+  suspended,
+  cancelled,
+  unknown,
+}
 
 SubscriptionState subStateFrom(String? s) {
   switch ((s ?? '').toUpperCase()) {
@@ -68,14 +84,14 @@ class OwnerProfile {
   });
 
   factory OwnerProfile.fromJson(Map j) => OwnerProfile(
-        id: _asStr(j['id']),
-        name: _asStr(j['name'] ?? j['ownerName']),
-        company: _asStr(j['company'] ?? j['organization'] ?? j['companyName']),
-        email: _asStr(j['email']),
-        phone: _asStr(j['phone'] ?? j['mobile']),
-        emailVerified: j['emailVerified'] == true,
-        status: ownerStatusFrom(_asStr(j['status'])),
-      );
+    id: _asStr(j['id']),
+    name: _asStr(j['name'] ?? j['ownerName']),
+    company: _asStr(j['company'] ?? j['organization'] ?? j['companyName']),
+    email: _asStr(j['email']),
+    phone: _asStr(j['phone'] ?? j['mobile']),
+    emailVerified: j['emailVerified'] == true,
+    status: ownerStatusFrom(_asStr(j['status'])),
+  );
 }
 
 class SubscriptionInfo {
@@ -91,12 +107,17 @@ class SubscriptionInfo {
     this.daysToExpiry,
   });
 
-  bool get isExpired => state == SubscriptionState.expired || state == SubscriptionState.suspended;
+  bool get isExpired =>
+      state == SubscriptionState.expired ||
+      state == SubscriptionState.suspended;
   bool get isWarning =>
-      state == SubscriptionState.expiring || state == SubscriptionState.gracePeriod;
+      state == SubscriptionState.expiring ||
+      state == SubscriptionState.gracePeriod;
 
   factory SubscriptionInfo.fromJson(Map j) {
-    final end = DateTime.tryParse(_asStr(j['currentPeriodEnd'] ?? j['expiresAt']));
+    final end = DateTime.tryParse(
+      _asStr(j['currentPeriodEnd'] ?? j['expiresAt']),
+    );
     int? days;
     if (end != null) days = end.difference(DateTime.now()).inDays;
     return SubscriptionInfo(
@@ -165,20 +186,101 @@ class PortfolioSummary {
   });
 
   factory PortfolioSummary.fromJson(Map j) => PortfolioSummary(
-        hotels: _asInt(j['hotels'] ?? j['propertyCount']),
-        rooms: _asInt(j['rooms'] ?? j['roomCount']),
-        revenue: _asDouble(j['revenue']),
-        occupancy: _asDouble(j['occupancy']),
-      );
+    hotels: _asInt(j['hotels'] ?? j['propertyCount']),
+    rooms: _asInt(j['rooms'] ?? j['roomCount']),
+    revenue: _asDouble(j['revenue']),
+    occupancy: _asDouble(j['occupancy']),
+  );
+}
+
+/// One hotel's last-N-months line in the group view.
+class PropertyPerformance {
+  final String id;
+  final String name;
+  final String? city;
+  final int revenuePaise;
+  final int occupancyPct;
+  final int adrPaise;
+  final int revparPaise;
+  final List<({String month, int revenuePaise, int occupancyPct})> months;
+
+  const PropertyPerformance({
+    required this.id,
+    required this.name,
+    this.city,
+    required this.revenuePaise,
+    required this.occupancyPct,
+    required this.adrPaise,
+    required this.revparPaise,
+    required this.months,
+  });
+
+  factory PropertyPerformance.fromJson(Map j) {
+    final t = (j['totals'] as Map?) ?? const {};
+    return PropertyPerformance(
+      id: '${j['id']}',
+      name: '${j['name'] ?? ''}',
+      city: j['city']?.toString(),
+      revenuePaise: _asInt(t['revenuePaise']),
+      occupancyPct: _asInt(t['occupancyPct']),
+      adrPaise: _asInt(t['adrPaise']),
+      revparPaise: _asInt(t['revparPaise']),
+      months: [
+        for (final m in (j['months'] as List? ?? const []))
+          (
+            month: '${(m as Map)['month']}',
+            revenuePaise: _asInt(m['revenuePaise']),
+            occupancyPct: _asInt(m['occupancyPct']),
+          ),
+      ],
+    );
+  }
+}
+
+/// The group dashboard: every hotel side by side, plus where bookings came from.
+class PortfolioPerformance {
+  final int months;
+  final List<PropertyPerformance> properties;
+  final String? topName;
+  final String? lowName;
+  final List<({String source, int roomsSold, int revenuePaise})> sources;
+
+  const PortfolioPerformance({
+    required this.months,
+    required this.properties,
+    this.topName,
+    this.lowName,
+    required this.sources,
+  });
+
+  factory PortfolioPerformance.fromJson(Map j) => PortfolioPerformance(
+    months: _asInt(j['months']),
+    properties: [
+      for (final p in (j['properties'] as List? ?? const []))
+        PropertyPerformance.fromJson(p as Map),
+    ],
+    topName: (j['top'] as Map?)?['name']?.toString(),
+    lowName: (j['low'] as Map?)?['name']?.toString(),
+    sources: [
+      for (final s in (j['sources'] as List? ?? const []))
+        (
+          source: '${(s as Map)['source']}',
+          roomsSold: _asInt(s['roomsSold']),
+          revenuePaise: _asInt(s['revenuePaise']),
+        ),
+    ],
+  );
 }
 
 enum StaffRole { generalManager, assistantGeneralManager }
 
 extension StaffRoleX on StaffRole {
-  String get api =>
-      this == StaffRole.generalManager ? 'GENERAL_MANAGER' : 'ASSISTANT_GENERAL_MANAGER';
-  String get label =>
-      this == StaffRole.generalManager ? 'General Manager' : 'Assistant General Manager';
+  String get api => this == StaffRole.generalManager
+      ? 'GENERAL_MANAGER'
+      : 'ASSISTANT_GENERAL_MANAGER';
+  String get label => this == StaffRole.generalManager
+      ? 'General Manager'
+      : 'Assistant General Manager';
 }
 
 class StaffMember {
@@ -215,22 +317,22 @@ class StaffMember {
   String get fullName => '$firstName $lastName'.trim();
 
   factory StaffMember.fromJson(Map j) => StaffMember(
-        id: _asStr(j['id']),
-        firstName: _asStr(j['firstName']),
-        lastName: _asStr(j['lastName']),
-        email: _asStr(j['email']),
-        mobile: _asStr(j['mobile'] ?? j['phone']),
-        address: _asStr(j['address']),
-        state: _asStr(j['state']),
-        district: _asStr(j['district']),
-        pinCode: _asStr(j['pinCode'] ?? j['pincode']),
-        role: _asStr(j['role']).toUpperCase().contains('ASSISTANT')
-            ? StaffRole.assistantGeneralManager
-            : StaffRole.generalManager,
-        status: _asStr(j['status']).isEmpty ? 'ACTIVE' : _asStr(j['status']),
-        department: _asStr(j['department']),
-        employeeId: _asStr(j['employeeId']),
-      );
+    id: _asStr(j['id']),
+    firstName: _asStr(j['firstName']),
+    lastName: _asStr(j['lastName']),
+    email: _asStr(j['email']),
+    mobile: _asStr(j['mobile'] ?? j['phone']),
+    address: _asStr(j['address']),
+    state: _asStr(j['state']),
+    district: _asStr(j['district']),
+    pinCode: _asStr(j['pinCode'] ?? j['pincode']),
+    role: _asStr(j['role']).toUpperCase().contains('ASSISTANT')
+        ? StaffRole.assistantGeneralManager
+        : StaffRole.generalManager,
+    status: _asStr(j['status']).isEmpty ? 'ACTIVE' : _asStr(j['status']),
+    department: _asStr(j['department']),
+    employeeId: _asStr(j['employeeId']),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -282,24 +384,24 @@ class OwnerAccount {
   });
 
   factory OwnerAccount.fromJson(Map j) => OwnerAccount(
-        id: _asStr(j['id']),
-        name: _asStr(j['name']),
-        company: _asStr(j['company']),
-        email: _asStr(j['email']),
-        emailVerified: j['emailVerified'] == true,
-        phone: _asStr(j['phone'] ?? j['mobile']),
-        gstNumber: _asStr(j['gstNumber']),
-        address: _asStr(j['address']),
-        pinCode: _asStr(j['pinCode']),
-        stateId: j['stateId'] as String?,
-        districtId: j['districtId'] as String?,
-        state: _asStr(j['state']),
-        district: _asStr(j['district']),
-        status: ownerStatusFrom(_asStr(j['status'])),
-        createdAt: _asDate(j['createdAt']),
-        propertiesCount: _asInt(j['propertiesCount']),
-        staffCount: _asInt(j['staffCount']),
-      );
+    id: _asStr(j['id']),
+    name: _asStr(j['name']),
+    company: _asStr(j['company']),
+    email: _asStr(j['email']),
+    emailVerified: j['emailVerified'] == true,
+    phone: _asStr(j['phone'] ?? j['mobile']),
+    gstNumber: _asStr(j['gstNumber']),
+    address: _asStr(j['address']),
+    pinCode: _asStr(j['pinCode']),
+    stateId: j['stateId'] as String?,
+    districtId: j['districtId'] as String?,
+    state: _asStr(j['state']),
+    district: _asStr(j['district']),
+    status: ownerStatusFrom(_asStr(j['status'])),
+    createdAt: _asDate(j['createdAt']),
+    propertiesCount: _asInt(j['propertiesCount']),
+    staffCount: _asInt(j['staffCount']),
+  );
 }
 
 /// One state in the admin-managed catalogue, carrying the ids the profile form
@@ -308,15 +410,19 @@ class CatalogueState {
   final String id;
   final String name;
   final List<CatalogueDistrict> districts;
-  const CatalogueState({required this.id, required this.name, required this.districts});
+  const CatalogueState({
+    required this.id,
+    required this.name,
+    required this.districts,
+  });
 
   factory CatalogueState.fromJson(Map j) => CatalogueState(
-        id: _asStr(j['id']),
-        name: _asStr(j['name']),
-        districts: ((j['districts'] ?? []) as List)
-            .map((d) => CatalogueDistrict.fromJson(d as Map))
-            .toList(),
-      );
+    id: _asStr(j['id']),
+    name: _asStr(j['name']),
+    districts: ((j['districts'] ?? []) as List)
+        .map((d) => CatalogueDistrict.fromJson(d as Map))
+        .toList(),
+  );
 }
 
 class CatalogueDistrict {
@@ -366,9 +472,11 @@ class SubscriptionDetail {
   });
 
   bool get isBlocked =>
-      state == SubscriptionState.expired || state == SubscriptionState.suspended;
+      state == SubscriptionState.expired ||
+      state == SubscriptionState.suspended;
   bool get isWarning =>
-      state == SubscriptionState.expiring || state == SubscriptionState.gracePeriod;
+      state == SubscriptionState.expiring ||
+      state == SubscriptionState.gracePeriod;
 
   /// 0..1 of the property allowance in use. An unlimited (0) plan reads as full
   /// only when it truly has no headroom.
@@ -376,23 +484,23 @@ class SubscriptionDetail {
       propertyLimit <= 0 ? 0 : (propertiesUsed / propertyLimit).clamp(0.0, 1.0);
 
   factory SubscriptionDetail.fromJson(Map j) => SubscriptionDetail(
-        id: _asStr(j['id']),
-        planName: _asStr(j['planName']),
-        description: _asStr(j['description']),
-        state: subStateFrom(_asStr(j['status'])),
-        billingCycle: _asStr(j['billingCycle']),
-        durationMonths: _asInt(j['durationMonths']),
-        monthlyPrice: _asInt(j['monthlyPrice']),
-        periodPrice: _asInt(j['periodPrice']),
-        currency: _asStr(j['currency']).isEmpty ? 'INR' : _asStr(j['currency']),
-        currentPeriodStart: _asDate(j['currentPeriodStart']),
-        currentPeriodEnd: _asDate(j['currentPeriodEnd']),
-        daysRemaining: _asInt(j['daysRemaining']),
-        propertyLimit: _asInt(j['propertyLimit']),
-        propertiesUsed: _asInt(j['propertiesUsed']),
-        features: ((j['features'] ?? []) as List).map((f) => f.toString()).toList(),
-        autoRenew: j['autoRenew'] == true,
-      );
+    id: _asStr(j['id']),
+    planName: _asStr(j['planName']),
+    description: _asStr(j['description']),
+    state: subStateFrom(_asStr(j['status'])),
+    billingCycle: _asStr(j['billingCycle']),
+    durationMonths: _asInt(j['durationMonths']),
+    monthlyPrice: _asInt(j['monthlyPrice']),
+    periodPrice: _asInt(j['periodPrice']),
+    currency: _asStr(j['currency']).isEmpty ? 'INR' : _asStr(j['currency']),
+    currentPeriodStart: _asDate(j['currentPeriodStart']),
+    currentPeriodEnd: _asDate(j['currentPeriodEnd']),
+    daysRemaining: _asInt(j['daysRemaining']),
+    propertyLimit: _asInt(j['propertyLimit']),
+    propertiesUsed: _asInt(j['propertiesUsed']),
+    features: ((j['features'] ?? []) as List).map((f) => f.toString()).toList(),
+    autoRenew: j['autoRenew'] == true,
+  );
 }
 
 class Invoice {
@@ -423,18 +531,20 @@ class Invoice {
   });
 
   factory Invoice.fromJson(Map j) => Invoice(
-        id: _asStr(j['id']),
-        invoiceNumber: _asStr(j['invoiceNumber']),
-        periodStart: _asDate(j['billingPeriodStart']),
-        periodEnd: _asDate(j['billingPeriodEnd']),
-        total: _asInt(j['total']),
-        currency: _asStr(j['currency']).isEmpty ? 'INR' : _asStr(j['currency']),
-        status: _asStr(j['status']),
-        issuedAt: _asDate(j['issuedAt']),
-        dueDate: _asDate(j['dueDate']),
-        paidAt: _asDate(j['paidAt']),
-        documentUrl: _asStr(j['documentUrl']).isEmpty ? null : _asStr(j['documentUrl']),
-      );
+    id: _asStr(j['id']),
+    invoiceNumber: _asStr(j['invoiceNumber']),
+    periodStart: _asDate(j['billingPeriodStart']),
+    periodEnd: _asDate(j['billingPeriodEnd']),
+    total: _asInt(j['total']),
+    currency: _asStr(j['currency']).isEmpty ? 'INR' : _asStr(j['currency']),
+    status: _asStr(j['status']),
+    issuedAt: _asDate(j['issuedAt']),
+    dueDate: _asDate(j['dueDate']),
+    paidAt: _asDate(j['paidAt']),
+    documentUrl: _asStr(j['documentUrl']).isEmpty
+        ? null
+        : _asStr(j['documentUrl']),
+  );
 
   bool get hasDocument => documentUrl != null;
 }
@@ -464,16 +574,17 @@ class SubscriptionOrder {
   });
 
   factory SubscriptionOrder.fromJson(Map j) => SubscriptionOrder(
-        paymentId: _asStr(j['paymentId']),
-        gateway: _asStr(j['gateway']),
-        orderId: _asStr(j['orderId']),
-        amount: _asInt(j['amount']),
-        currency: _asStr(j['currency']).isEmpty ? 'INR' : _asStr(j['currency']),
-        keyId: _asStr(j['keyId']).isEmpty ? null : _asStr(j['keyId']),
-        paymentSessionId:
-            _asStr(j['paymentSessionId']).isEmpty ? null : _asStr(j['paymentSessionId']),
-        appId: _asStr(j['appId']).isEmpty ? null : _asStr(j['appId']),
-      );
+    paymentId: _asStr(j['paymentId']),
+    gateway: _asStr(j['gateway']),
+    orderId: _asStr(j['orderId']),
+    amount: _asInt(j['amount']),
+    currency: _asStr(j['currency']).isEmpty ? 'INR' : _asStr(j['currency']),
+    keyId: _asStr(j['keyId']).isEmpty ? null : _asStr(j['keyId']),
+    paymentSessionId: _asStr(j['paymentSessionId']).isEmpty
+        ? null
+        : _asStr(j['paymentSessionId']),
+    appId: _asStr(j['appId']).isEmpty ? null : _asStr(j['appId']),
+  );
 }
 
 class SupportTicket {
@@ -505,18 +616,18 @@ class SupportTicket {
   }
 
   factory SupportTicket.fromJson(Map j) => SupportTicket(
-        id: _asStr(j['id']),
-        subject: _asStr(j['subject']),
-        priority: _asStr(j['priority']).isEmpty ? 'NORMAL' : _asStr(j['priority']),
-        status: _asStr(j['status']).isEmpty ? 'OPEN' : _asStr(j['status']),
-        propertyId: j['propertyId'] as String?,
-        propertyName: _asStr(j['propertyName']),
-        createdAt: _asDate(j['createdAt']),
-        updatedAt: _asDate(j['updatedAt']),
-        messages: ((j['messages'] ?? []) as List)
-            .map((m) => TicketMessage.fromJson(m as Map))
-            .toList(),
-      );
+    id: _asStr(j['id']),
+    subject: _asStr(j['subject']),
+    priority: _asStr(j['priority']).isEmpty ? 'NORMAL' : _asStr(j['priority']),
+    status: _asStr(j['status']).isEmpty ? 'OPEN' : _asStr(j['status']),
+    propertyId: j['propertyId'] as String?,
+    propertyName: _asStr(j['propertyName']),
+    createdAt: _asDate(j['createdAt']),
+    updatedAt: _asDate(j['updatedAt']),
+    messages: ((j['messages'] ?? []) as List)
+        .map((m) => TicketMessage.fromJson(m as Map))
+        .toList(),
+  );
 }
 
 class TicketMessage {
@@ -535,12 +646,14 @@ class TicketMessage {
   });
 
   factory TicketMessage.fromJson(Map j) => TicketMessage(
-        id: _asStr(j['id']),
-        body: _asStr(j['body']),
-        mine: j['mine'] == true,
-        authorLabel: _asStr(j['authorLabel']).isEmpty ? 'Tavelo Support' : _asStr(j['authorLabel']),
-        createdAt: _asDate(j['createdAt']),
-      );
+    id: _asStr(j['id']),
+    body: _asStr(j['body']),
+    mine: j['mine'] == true,
+    authorLabel: _asStr(j['authorLabel']).isEmpty
+        ? 'Tavelo Support'
+        : _asStr(j['authorLabel']),
+    createdAt: _asDate(j['createdAt']),
+  );
 }
 
 /// One signed-in device, from `owner_sessions`.
@@ -562,13 +675,13 @@ class OwnerSession {
   });
 
   factory OwnerSession.fromJson(Map j) => OwnerSession(
-        id: _asStr(j['id']),
-        ip: _asStr(j['ip']),
-        userAgent: _asStr(j['userAgent']),
-        createdAt: _asDate(j['createdAt']),
-        expiresAt: _asDate(j['expiresAt']),
-        current: j['current'] == true,
-      );
+    id: _asStr(j['id']),
+    ip: _asStr(j['ip']),
+    userAgent: _asStr(j['userAgent']),
+    createdAt: _asDate(j['createdAt']),
+    expiresAt: _asDate(j['expiresAt']),
+    current: j['current'] == true,
+  );
 
   /// A readable device name from the user-agent string. Deliberately coarse —
   /// enough for the owner to recognise a device, never a fingerprint.
@@ -640,16 +753,16 @@ class Amenity {
   });
 
   factory Amenity.fromJson(Map j) => Amenity(
-        id: _asStr(j['id']),
-        key: _asStr(j['key']),
-        name: _asStr(j['name']),
-        scope: _asStr(j['scope'] ?? j['amenityScope']),
-        // Room-type/room payloads carry a trimmed amenity ref with no icon, and
-        // the catalogue column is nullable — both land here as ''.
-        icon: _asStr(j['icon']),
-        sortOrder: _asInt(j['sortOrder'] ?? j['sort_order']),
-        status: _asStr(j['status']),
-      );
+    id: _asStr(j['id']),
+    key: _asStr(j['key']),
+    name: _asStr(j['name']),
+    scope: _asStr(j['scope'] ?? j['amenityScope']),
+    // Room-type/room payloads carry a trimmed amenity ref with no icon, and
+    // the catalogue column is nullable — both land here as ''.
+    icon: _asStr(j['icon']),
+    sortOrder: _asInt(j['sortOrder'] ?? j['sort_order']),
+    status: _asStr(j['status']),
+  );
 }
 
 /// What one hotel offers, together with the full catalogue to pick from. The
@@ -730,25 +843,25 @@ class RoomType {
   });
 
   factory RoomType.fromJson(Map j) => RoomType(
-        id: _asStr(j['id']),
-        propertyId: _asStr(j['propertyId'] ?? j['property_id']),
-        name: _asStr(j['name']),
-        description: _asStr(j['description']),
-        bedType: _asStr(j['bedType'] ?? j['bed_type']),
-        bedCount: _asInt(j['bedCount'] ?? j['bed_count']),
-        maxOccupancy: _asInt(j['maxOccupancy'] ?? j['max_occupancy']),
-        maxAdults: _asInt(j['maxAdults'] ?? j['max_adults']),
-        maxChildren: _asInt(j['maxChildren'] ?? j['max_children']),
-        airConditioned: (j['airConditioned'] ?? j['air_conditioned']) == true,
-        baseRate: _asInt(j['baseRate'] ?? j['base_rate']),
-        currency: _asStr(j['currency']).isEmpty ? 'INR' : _asStr(j['currency']),
-        sizeSqft: _asInt(j['sizeSqft'] ?? j['size_sqft']),
-        status: _asStr(j['status']),
-        amenities: _amenityList(j['amenities']),
-        roomCount: _asInt(j['roomCount'] ?? j['room_count']),
-        createdAt: _asDate(j['createdAt'] ?? j['created_at']),
-        updatedAt: _asDate(j['updatedAt'] ?? j['updated_at']),
-      );
+    id: _asStr(j['id']),
+    propertyId: _asStr(j['propertyId'] ?? j['property_id']),
+    name: _asStr(j['name']),
+    description: _asStr(j['description']),
+    bedType: _asStr(j['bedType'] ?? j['bed_type']),
+    bedCount: _asInt(j['bedCount'] ?? j['bed_count']),
+    maxOccupancy: _asInt(j['maxOccupancy'] ?? j['max_occupancy']),
+    maxAdults: _asInt(j['maxAdults'] ?? j['max_adults']),
+    maxChildren: _asInt(j['maxChildren'] ?? j['max_children']),
+    airConditioned: (j['airConditioned'] ?? j['air_conditioned']) == true,
+    baseRate: _asInt(j['baseRate'] ?? j['base_rate']),
+    currency: _asStr(j['currency']).isEmpty ? 'INR' : _asStr(j['currency']),
+    sizeSqft: _asInt(j['sizeSqft'] ?? j['size_sqft']),
+    status: _asStr(j['status']),
+    amenities: _amenityList(j['amenities']),
+    roomCount: _asInt(j['roomCount'] ?? j['room_count']),
+    createdAt: _asDate(j['createdAt'] ?? j['created_at']),
+    updatedAt: _asDate(j['updatedAt'] ?? j['updated_at']),
+  );
 }
 
 /// One physical room. Also read-only for owners.
@@ -787,20 +900,20 @@ class Room {
   });
 
   factory Room.fromJson(Map j) => Room(
-        id: _asStr(j['id']),
-        propertyId: _asStr(j['propertyId'] ?? j['property_id']),
-        roomTypeId: _asStr(j['roomTypeId'] ?? j['room_type_id']),
-        roomTypeName: _asStr(j['roomTypeName'] ?? j['room_type_name']),
-        bedType: _asStr(j['bedType'] ?? j['bed_type']),
-        airConditioned: (j['airConditioned'] ?? j['air_conditioned']) == true,
-        number: _asStr(j['number']),
-        floor: _asStr(j['floor']),
-        status: _asStr(j['status']),
-        notes: _asStr(j['notes']),
-        amenities: _amenityList(j['amenities']),
-        createdAt: _asDate(j['createdAt'] ?? j['created_at']),
-        updatedAt: _asDate(j['updatedAt'] ?? j['updated_at']),
-      );
+    id: _asStr(j['id']),
+    propertyId: _asStr(j['propertyId'] ?? j['property_id']),
+    roomTypeId: _asStr(j['roomTypeId'] ?? j['room_type_id']),
+    roomTypeName: _asStr(j['roomTypeName'] ?? j['room_type_name']),
+    bedType: _asStr(j['bedType'] ?? j['bed_type']),
+    airConditioned: (j['airConditioned'] ?? j['air_conditioned']) == true,
+    number: _asStr(j['number']),
+    floor: _asStr(j['floor']),
+    status: _asStr(j['status']),
+    notes: _asStr(j['notes']),
+    amenities: _amenityList(j['amenities']),
+    createdAt: _asDate(j['createdAt'] ?? j['created_at']),
+    updatedAt: _asDate(j['updatedAt'] ?? j['updated_at']),
+  );
 }
 
 /// An owner's IN_APP notification — subscription reminders, payment receipts,
@@ -823,22 +936,22 @@ class OwnerNotification {
   final bool read;
 
   OwnerNotification copyWith({bool? read}) => OwnerNotification(
-        id: id,
-        title: title,
-        body: body,
-        type: type,
-        createdAt: createdAt,
-        read: read ?? this.read,
-      );
+    id: id,
+    title: title,
+    body: body,
+    type: type,
+    createdAt: createdAt,
+    read: read ?? this.read,
+  );
 
   factory OwnerNotification.fromJson(Map j) => OwnerNotification(
-        id: _asStr(j['id']),
-        title: _asStr(j['title']).isEmpty ? 'Notification' : _asStr(j['title']),
-        body: _asStr(j['body']),
-        type: _asStr(j['type']),
-        createdAt: _asDate(j['createdAt']),
-        read: j['readAt'] != null || j['read'] == true,
-      );
+    id: _asStr(j['id']),
+    title: _asStr(j['title']).isEmpty ? 'Notification' : _asStr(j['title']),
+    body: _asStr(j['body']),
+    type: _asStr(j['type']),
+    createdAt: _asDate(j['createdAt']),
+    read: j['readAt'] != null || j['read'] == true,
+  );
 }
 
 /// One reservation as the READ-ONLY owner calendar needs it: who, when, and
@@ -880,15 +993,17 @@ class CalendarReservation {
   }
 
   factory CalendarReservation.fromJson(Map j) => CalendarReservation(
-        id: _asStr(j['id']),
-        reservationNumber: _asStr(j['reservationNumber'] ?? j['reservation_number']),
-        guestName: _asStr(j['guestName'] ?? j['guest_name']),
-        status: _asStr(j['status']).toUpperCase(),
-        checkIn: _asDateOnly(j['checkIn'] ?? j['check_in']),
-        checkOut: _asDateOnly(j['checkOut'] ?? j['check_out']),
-        roomId: _asStr(j['roomId'] ?? j['room_id']),
-        roomTypeId: _asStr(j['roomTypeId'] ?? j['room_type_id']),
-      );
+    id: _asStr(j['id']),
+    reservationNumber: _asStr(
+      j['reservationNumber'] ?? j['reservation_number'],
+    ),
+    guestName: _asStr(j['guestName'] ?? j['guest_name']),
+    status: _asStr(j['status']).toUpperCase(),
+    checkIn: _asDateOnly(j['checkIn'] ?? j['check_in']),
+    checkOut: _asDateOnly(j['checkOut'] ?? j['check_out']),
+    roomId: _asStr(j['roomId'] ?? j['room_id']),
+    roomTypeId: _asStr(j['roomTypeId'] ?? j['room_type_id']),
+  );
 }
 
 /// `check_in` / `check_out` are DATE columns, not instants. Parsing them as

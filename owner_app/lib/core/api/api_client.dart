@@ -41,7 +41,8 @@ class ApiClient {
   Future<dynamic> patch(String path, {Object? body}) =>
       _send('PATCH', path, body: body);
 
-  Future<dynamic> put(String path, {Object? body}) => _send('PUT', path, body: body);
+  Future<dynamic> put(String path, {Object? body}) =>
+      _send('PUT', path, body: body);
 
   Future<dynamic> delete(String path, {Object? body}) =>
       _send('DELETE', path, body: body);
@@ -78,7 +79,10 @@ class ApiClient {
           e.type == DioExceptionType.receiveTimeout) {
         throw ApiException.network();
       }
-      throw ApiException(code: 'TRANSPORT', message: e.message ?? 'Request failed');
+      throw ApiException(
+        code: 'TRANSPORT',
+        message: e.message ?? 'Request failed',
+      );
     }
 
     if (res.statusCode == 401 && retry) {
