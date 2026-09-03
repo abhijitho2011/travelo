@@ -1534,20 +1534,110 @@ class DynamicPricingSection extends ConsumerWidget {
             for (final (index, rule) in rows.indexed)
               _ListRow(first: index == 0, child: _ruleRow(context, ref, rule)),
           gapSm,
-          Align(
-            alignment: Alignment.centerLeft,
-            child: PermissionGate(
-              permission: P.roomTypeCreate,
-              child: TextButton.icon(
-                onPressed: () => _edit(context, ref, null),
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('Add rule'),
+          Wrap(
+            spacing: Sp.sm,
+            children: [
+              PermissionGate(
+                permission: P.roomTypeCreate,
+                child: TextButton.icon(
+                  onPressed: () => _edit(context, ref, null),
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('Add rule'),
+                ),
               ),
-            ),
+              if (rows.isNotEmpty)
+                PermissionGate(
+                  permission: P.ratesUpdate,
+                  child: TextButton.icon(
+                    onPressed: () => _runRules(context, ref, dryRun: true),
+                    icon: const Icon(Icons.visibility_outlined, size: 16),
+                    label: const Text('Preview'),
+                  ),
+                ),
+              if (rows.isNotEmpty)
+                PermissionGate(
+                  permission: P.ratesUpdate,
+                  child: TextButton.icon(
+                    onPressed: () => _runRules(context, ref),
+                    icon: const Icon(Icons.play_arrow_outlined, size: 16),
+                    label: const Text('Run rules now'),
+                  ),
+                ),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  /// Apply the rules to the next 90 nights of the grid, or preview what they
+  /// would do. The engine also runs hourly on its own.
+  Future<void> _runRules(
+    BuildContext context,
+    WidgetRef ref, {
+    bool dryRun = false,
+  }) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final res = await ref
+          .read(unitsActionsProvider)
+          .runRules(roomTypeId, dryRun: dryRun);
+      final plan = (res['plan'] as List? ?? const []).whereType<Map>().toList();
+      if (!context.mounted) return;
+      if (dryRun) {
+        await showDialog<void>(
+          context: context,
+          builder: (d) => AlertDialog(
+            title: Text(
+              '${res['daysPriced']} nights would change, ${res['daysReverted']} revert',
+            ),
+            content: SizedBox(
+              width: 360,
+              child: plan.isEmpty
+                  ? const Text(
+                      'Nothing to change — the grid already matches the rules.',
+                    )
+                  : ListView(
+                      shrinkWrap: true,
+                      children: [
+                        for (final p in plan.take(60))
+                          ListTile(
+                            dense: true,
+                            title: Text('${p['date']}'),
+                            subtitle: Text(
+                              p['ruleName'] == null
+                                  ? 'revert to base'
+                                  : '${p['ruleName']}',
+                            ),
+                            trailing: Text(
+                              p['toPaise'] == null
+                                  ? '—'
+                                  : '₹${((p['toPaise'] as num) / 100).round()}',
+                            ),
+                          ),
+                      ],
+                    ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(d),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              '${res['daysPriced']} nights priced, ${res['daysReverted']} reverted',
+            ),
+          ),
+        );
+      }
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    }
   }
 
   Widget _ruleRow(BuildContext context, WidgetRef ref, PricingRule rule) {

@@ -136,6 +136,12 @@ class Routes {
   static const propertyPolicies = '/property-settings/policies';
   static const propertyAddons = '/property-settings/addons';
   static const propertySources = '/property-settings/booking-sources';
+  static const propertyCoupons = '/property-settings/coupons';
+  static const accountsCash = '/accounts/cash';
+  static const accountsCorporate = '/accounts/corporate';
+  static const accountsCorporatePattern = '/accounts/corporate/:id';
+  static String accountsCorporateAccount(String id) =>
+      '/accounts/corporate/$id';
   static const rates = '/rates';
   static const reports = '/reports';
 }

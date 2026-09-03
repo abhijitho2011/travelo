@@ -52,4 +52,12 @@ class PropertySettingsRepository {
       _api.patch('/property/booking-sources/$id', body: b);
   Future<void> deleteSource(String id) =>
       _api.delete('/property/booking-sources/$id');
+
+  Future<List<Coupon>> coupons() async =>
+      _list(await _api.get('/property/coupons'), Coupon.fromJson);
+  Future<void> createCoupon(Map<String, dynamic> b) =>
+      _api.post('/property/coupons', body: b);
+  Future<void> updateCoupon(String id, Map<String, dynamic> b) =>
+      _api.patch('/property/coupons/$id', body: b);
+  Future<void> deleteCoupon(String id) => _api.delete('/property/coupons/$id');
 }

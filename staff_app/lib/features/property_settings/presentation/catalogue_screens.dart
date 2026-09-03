@@ -666,3 +666,95 @@ class BookingSourcesScreen extends ConsumerWidget {
     },
   );
 }
+
+// -------------------------------------------------------------- coupons ---
+
+class CouponsScreen extends ConsumerWidget {
+  const CouponsScreen({super.key});
+
+  Future<void> _edit(BuildContext context, WidgetRef ref, Coupon? cp) async {
+    final code = TextEditingController(text: cp?.code ?? '');
+    final desc = TextEditingController(text: cp?.description ?? '');
+    final value = TextEditingController(
+      text: cp == null
+          ? ''
+          : (cp.kind == 'PERCENT'
+                ? (cp.value / 100).toStringAsFixed(0)
+                : (cp.value / 100).toStringAsFixed(0)),
+    );
+    final minNights = TextEditingController(
+      text: cp?.minNights?.toString() ?? '',
+    );
+    final maxUses = TextEditingController(text: cp?.maxUses?.toString() ?? '');
+    var kind = cp?.kind ?? 'PERCENT';
+    var active = cp?.isActive ?? true;
+    final actions = ref.read(propertySettingsActionsProvider);
+    await _formSheet(
+      context,
+      title: cp == null ? 'Add coupon' : 'Edit ${cp.code}',
+      fields: (setState) => [
+        if (cp == null) _tf(code, 'Code', hint: 'WELCOME10', caps: true),
+        _tf(desc, 'Shown to guests'),
+        _dd(
+          'Discount',
+          kind,
+          const ['PERCENT', 'FIXED'],
+          (v) => v == 'PERCENT' ? 'Percent off the stay' : 'Fixed amount off',
+          (v) => setState(() => kind = v),
+        ),
+        _tf(value, kind == 'PERCENT' ? 'Percent' : 'Amount (₹)', digits: true),
+        _tf(minNights, 'Minimum nights (optional)', digits: true),
+        _tf(maxUses, 'Maximum uses (optional)', digits: true),
+        SwitchListTile.adaptive(
+          contentPadding: EdgeInsets.zero,
+          value: active,
+          onChanged: (v) => setState(() => active = v),
+          title: const Text('Active'),
+        ),
+      ],
+      onSave: () => actions.saveCoupon(cp?.id, {
+        if (cp == null) 'code': code.text.trim().toUpperCase(),
+        'description': desc.text.trim(),
+        'kind': kind,
+        'value': kind == 'PERCENT'
+            ? _percentToBp(value.text)
+            : _rupeesToPaise(value.text),
+        'minNights': minNights.text.trim().isEmpty
+            ? null
+            : int.tryParse(minNights.text.trim()),
+        'maxUses': maxUses.text.trim().isEmpty
+            ? null
+            : int.tryParse(maxUses.text.trim()),
+        'isActive': active,
+      }),
+      onDelete: cp == null ? null : () => actions.deleteCoupon(cp.id),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => _CatalogueList<Coupon>(
+    title: 'Coupons & promotions',
+    subtitle:
+        'Codes a guest can enter on the booking page. The discount lands on the folio with the code as its reason.',
+    provider: couponsProvider,
+    emptyHint: 'No coupons yet.',
+    onAdd: (ctx, r) => _edit(ctx, r, null),
+    tile: (ctx, r, cp) {
+      final c = ctx.colors;
+      return ListTile(
+        title: Text(cp.code),
+        subtitle: Text(
+          '${cp.valueLabel}${cp.minNights == null ? '' : ' · min ${cp.minNights} nights'}${cp.maxUses == null ? '' : ' · ${cp.uses}/${cp.maxUses} used'}',
+          style: AppTypography.body(size: 11.5, color: c.mutedForeground),
+        ),
+        trailing: cp.isActive
+            ? null
+            : Text(
+                'Inactive',
+                style: AppTypography.body(size: 11, color: c.mutedForeground),
+              ),
+        onTap: () => _edit(ctx, r, cp),
+      );
+    },
+  );
+}

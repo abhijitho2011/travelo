@@ -179,15 +179,42 @@ class RestaurantRepository {
     String orderId,
     PaymentMethod method, {
     String? reservationId,
+    String? corporateAccountId,
+    int? amountPaise,
+    String? remarks,
   }) async {
     final data = await _api.post(
       '/restaurant/orders/$orderId/settle',
       body: {
         'method': method.wire,
         if (reservationId != null) 'reservationId': reservationId,
+        if (corporateAccountId != null)
+          'corporateAccountId': corporateAccountId,
+        if (amountPaise != null) 'amountPaise': amountPaise,
+        if (remarks != null && remarks.isNotEmpty) 'remarks': remarks,
       },
     );
     return _one(data, RestaurantOrder.fromJson, 'order');
+  }
+
+  Future<RestaurantOrder> discount(
+    String orderId, {
+    required int amountPaise,
+    required String reason,
+  }) async {
+    final data = await _api.post(
+      '/restaurant/orders/$orderId/discount',
+      body: {'amountPaise': amountPaise, 'reason': reason},
+    );
+    return _one(data, RestaurantOrder.fromJson, 'order');
+  }
+
+  Future<int> bulkCreateItems(List<Map<String, dynamic>> items) async {
+    final data = await _api.post(
+      '/restaurant/menu/items/bulk',
+      body: {'items': items},
+    );
+    return data is Map ? (data['created'] as int? ?? 0) : 0;
   }
 
   Future<RestaurantOrder> cancelOrder(String orderId, String reason) async {

@@ -25,6 +25,10 @@ final bookingSourcesProvider = FutureProvider.autoDispose<List<BookingSource>>(
   (ref) => ref.watch(propertySettingsRepositoryProvider).sources(),
 );
 
+final couponsProvider = FutureProvider.autoDispose<List<Coupon>>(
+  (ref) => ref.watch(propertySettingsRepositoryProvider).coupons(),
+);
+
 /// Writes, each invalidating the list it changed so the screen re-reads.
 class PropertySettingsActions {
   PropertySettingsActions(this._ref);
@@ -87,6 +91,20 @@ class PropertySettingsActions {
       await _repo.updateSource(id, b);
     }
     _ref.invalidate(bookingSourcesProvider);
+  }
+
+  Future<void> saveCoupon(String? id, Map<String, dynamic> b) async {
+    if (id == null) {
+      await _repo.createCoupon(b);
+    } else {
+      await _repo.updateCoupon(id, b);
+    }
+    _ref.invalidate(couponsProvider);
+  }
+
+  Future<void> deleteCoupon(String id) async {
+    await _repo.deleteCoupon(id);
+    _ref.invalidate(couponsProvider);
   }
 
   Future<void> deleteSource(String id) async {

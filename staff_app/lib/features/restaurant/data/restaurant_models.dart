@@ -187,7 +187,8 @@ enum PaymentMethod {
   cash('CASH', 'Cash'),
   card('CARD', 'Card'),
   upi('UPI', 'UPI'),
-  roomCharge('ROOM_CHARGE', 'Room charge');
+  roomCharge('ROOM_CHARGE', 'Room charge'),
+  corporate('CORPORATE', 'Company account');
 
   const PaymentMethod(this.wire, this.label);
 
@@ -195,6 +196,7 @@ enum PaymentMethod {
   final String label;
 
   bool get isRoomCharge => this == PaymentMethod.roomCharge;
+  bool get isCorporate => this == PaymentMethod.corporate;
 
   static PaymentMethod? fromWire(String? value) {
     final w = _wire(value);
@@ -338,6 +340,9 @@ class RestaurantOrder {
     required this.guestCount,
     required this.subtotalPaise,
     required this.taxPaise,
+    this.discountPaise = 0,
+    this.serviceChargePaise = 0,
+    this.paidPaise = 0,
     required this.totalPaise,
     required this.items,
     this.tableId,
@@ -355,6 +360,11 @@ class RestaurantOrder {
   final int guestCount;
   final int subtotalPaise;
   final int taxPaise;
+  final int discountPaise;
+  final int serviceChargePaise;
+  final int paidPaise;
+  String get discountLabel => formatPaise(discountPaise);
+  int get remainingPaise => totalPaise - paidPaise;
   final int totalPaise;
   final List<OrderLine> items;
   final String? tableId;
@@ -393,6 +403,9 @@ class RestaurantOrder {
     subtotalPaise: _int(_pick(json, ['subtotalPaise', 'subtotal_paise'])),
     taxPaise: _int(_pick(json, ['taxPaise', 'tax_paise'])),
     totalPaise: _int(_pick(json, ['totalPaise', 'total_paise'])),
+    discountPaise: _int(json['discountPaise']),
+    serviceChargePaise: _int(json['serviceChargePaise']),
+    paidPaise: _int(json['paidPaise']),
     items: _mapList(_pick(json, ['items'])).map(OrderLine.fromJson).toList(),
     tableId: _str(_pick(json, ['tableId', 'table_id'])),
     tableName: _str(_pick(json, ['tableName', 'table_name'])),

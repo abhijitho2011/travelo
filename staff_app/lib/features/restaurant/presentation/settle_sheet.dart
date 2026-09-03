@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../accounts/application/accounts_controllers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/networking/api_exception.dart';
@@ -42,10 +43,13 @@ class _SettleSheetState extends ConsumerState<SettleSheet> {
   String _query = '';
   bool _busy = false;
   String? _error;
+  final _amount = TextEditingController();
+  String? _corporateId;
 
   @override
   void dispose() {
     _search.dispose();
+    _amount.dispose();
     super.dispose();
   }
 
@@ -54,6 +58,13 @@ class _SettleSheetState extends ConsumerState<SettleSheet> {
       setState(() => _error = 'Pick the in-house guest to charge the room to.');
       return;
     }
+    if (_method.isCorporate && _corporateId == null) {
+      setState(() => _error = 'Pick the company account to bill.');
+      return;
+    }
+    final partial = _amount.text.trim().isEmpty
+        ? null
+        : (int.tryParse(_amount.text.trim()) ?? 0) * 100;
     setState(() {
       _busy = true;
       _error = null;
@@ -67,6 +78,8 @@ class _SettleSheetState extends ConsumerState<SettleSheet> {
             widget.order.id,
             _method,
             reservationId: _method.isRoomCharge ? _guest!.id : null,
+            corporateAccountId: _method.isCorporate ? _corporateId : null,
+            amountPaise: partial,
           );
       navigator.pop();
       messenger.showSnackBar(
@@ -149,6 +162,30 @@ class _SettleSheetState extends ConsumerState<SettleSheet> {
                 ),
               ],
 
+              if (_method.isCorporate) ...[
+                const SizedBox(height: Sp.lg),
+                const LabelXs('Bill to company account'),
+                const SizedBox(height: Sp.sm),
+                _CorporatePicker(
+                  selected: _corporateId,
+                  onPick: (id) => setState(() {
+                    _corporateId = id;
+                    _error = null;
+                  }),
+                ),
+              ],
+              if (!_method.isRoomCharge && !_method.isCorporate) ...[
+                const SizedBox(height: Sp.lg),
+                TextField(
+                  controller: _amount,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Amount now (₹)',
+                    hintText: 'Blank = the whole balance · less = part payment',
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ],
               if (_error != null) ...[
                 const SizedBox(height: Sp.md),
                 RestaurantErrorNote(message: _error!),
@@ -157,7 +194,9 @@ class _SettleSheetState extends ConsumerState<SettleSheet> {
               FilledButton(
                 onPressed: _busy ? null : _settle,
                 child: Text(
-                  'Take ${_method.label} · ${widget.order.totalLabel}',
+                  _amount.text.trim().isEmpty
+                      ? 'Take ${_method.label} · ${widget.order.totalLabel}'
+                      : 'Take ${_method.label} · ₹${_amount.text.trim()} now',
                 ),
               ),
             ],
@@ -212,6 +251,42 @@ class _GuestPicker extends ConsumerWidget {
                   ),
               ],
             ),
+    );
+  }
+}
+
+/// The property's corporate accounts, for a CORPORATE settlement.
+class _CorporatePicker extends ConsumerWidget {
+  const _CorporatePicker({required this.selected, required this.onPick});
+  final String? selected;
+  final ValueChanged<String?> onPick;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final accounts = ref.watch(corporateAccountsProvider);
+    return accounts.when(
+      loading: () => const ListSkeleton(rows: 2, height: 44),
+      error: (e, _) => ErrorState(error: e),
+      data: (list) {
+        final active = list.where((a) => a.isActive).toList();
+        if (active.isEmpty) {
+          return const EmptyState(
+            title: 'No company accounts yet',
+            hint: 'Add one under Accounts → Company accounts.',
+            icon: Icons.business_outlined,
+          );
+        }
+        return DropdownButtonFormField<String?>(
+          initialValue: active.any((a) => a.id == selected) ? selected : null,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Company'),
+          items: [
+            for (final a in active)
+              DropdownMenuItem(value: a.id, child: Text(a.name)),
+          ],
+          onChanged: onPick,
+        );
+      },
     );
   }
 }

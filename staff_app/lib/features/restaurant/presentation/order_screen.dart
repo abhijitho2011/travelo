@@ -340,6 +340,23 @@ class _OrderActions extends ConsumerWidget {
     if (order.status.isOpen || order.status.isBilled) {
       children.add(
         PermissionGate(
+          permission: P.billSettle,
+          child: OutlinedButton.icon(
+            onPressed: () => _DiscountSheet.show(context, ref, order),
+            icon: const Icon(Icons.percent_outlined, size: 16),
+            label: Text(
+              order.discountPaise > 0
+                  ? 'Discount · ${order.discountLabel}'
+                  : 'Discount',
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (order.status.isOpen || order.status.isBilled) {
+      children.add(
+        PermissionGate(
           permission: P.orderVoid,
           child: OutlinedButton.icon(
             onPressed: () => _void(context, ref),
@@ -642,6 +659,96 @@ class _MenuPickRow extends StatelessWidget {
               ],
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// An order-level discount with a reason; the bill recomputes.
+class _DiscountSheet {
+  static Future<void> show(
+    BuildContext context,
+    WidgetRef ref,
+    RestaurantOrder order,
+  ) async {
+    final amount = TextEditingController(
+      text: order.discountPaise > 0
+          ? (order.discountPaise ~/ 100).toString()
+          : '',
+    );
+    final reason = TextEditingController();
+    final messenger = ScaffoldMessenger.of(context);
+    var busy = false;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setState) {
+          final c = context.colors;
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              Sp.lg,
+              Sp.lg,
+              Sp.lg,
+              MediaQuery.of(context).viewInsets.bottom + Sp.lg,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Discount on ${order.orderNumber}',
+                  style: AppTypography.display(size: 17, color: c.foreground),
+                ),
+                const SizedBox(height: Sp.lg),
+                TextField(
+                  controller: amount,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Amount off (₹)',
+                  ),
+                ),
+                const SizedBox(height: Sp.md),
+                TextField(
+                  controller: reason,
+                  decoration: const InputDecoration(
+                    labelText: 'Reason',
+                    hintText: 'Regular guest, complaint…',
+                  ),
+                ),
+                const SizedBox(height: Sp.lg),
+                FilledButton(
+                  onPressed: busy
+                      ? null
+                      : () async {
+                          if (reason.text.trim().length < 2) return;
+                          setState(() => busy = true);
+                          try {
+                            await ref
+                                .read(restaurantActionsProvider)
+                                .discount(
+                                  order.id,
+                                  amountPaise:
+                                      (int.tryParse(amount.text.trim()) ?? 0) *
+                                      100,
+                                  reason: reason.text.trim(),
+                                );
+                            if (context.mounted) Navigator.pop(context);
+                          } on ApiException catch (e) {
+                            messenger.showSnackBar(
+                              SnackBar(content: Text(e.message)),
+                            );
+                          } finally {
+                            if (context.mounted) setState(() => busy = false);
+                          }
+                        },
+                  child: const Text('Apply discount'),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

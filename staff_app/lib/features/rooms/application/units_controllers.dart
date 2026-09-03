@@ -92,6 +92,9 @@ final unitInventoryProvider = Provider.autoDispose
 /// Each one refreshes exactly the provider it invalidated, so a rate-plan edit
 /// never re-fetches the photo gallery.
 class UnitsActions {
+  Future<Map> runRules(String roomTypeId, {bool dryRun = false}) =>
+      _repo.runRules(roomTypeId, dryRun: dryRun);
+
   const UnitsActions(this._ref);
 
   final Ref _ref;

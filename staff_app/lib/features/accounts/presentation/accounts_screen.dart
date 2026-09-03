@@ -35,6 +35,22 @@ class AccountsScreen extends ConsumerWidget {
           subtitle: "Today's money — revenue in, expenses out.",
           actions: [
             PermissionGate(
+              permission: P.paymentRead,
+              child: OutlinedButton.icon(
+                onPressed: () => context.go(Routes.accountsCash),
+                icon: const Icon(Icons.point_of_sale_outlined, size: 16),
+                label: const Text('Cash'),
+              ),
+            ),
+            PermissionGate(
+              permission: P.folioRead,
+              child: OutlinedButton.icon(
+                onPressed: () => context.go(Routes.accountsCorporate),
+                icon: const Icon(Icons.business_outlined, size: 16),
+                label: const Text('Companies'),
+              ),
+            ),
+            PermissionGate(
               permission: P.expenseRead,
               child: FilledButton.icon(
                 onPressed: () => context.go(Routes.accountsExpenses),

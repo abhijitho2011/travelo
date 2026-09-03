@@ -41,6 +41,8 @@ class PropertySettings {
     this.brandColor,
     this.bookingTerms,
     this.currency = 'INR',
+    this.minRoomPricePaise,
+    this.restaurantServiceChargeBp = 0,
   });
 
   final String? gstin;
@@ -61,6 +63,12 @@ class PropertySettings {
   final String? brandColor;
   final String? bookingTerms;
   final String currency;
+
+  /// No pricing rule may go below this.
+  final int? minRoomPricePaise;
+
+  /// Basis points auto-added to every restaurant bill.
+  final int restaurantServiceChargeBp;
 
   factory PropertySettings.fromJson(Map j) => PropertySettings(
     gstin: _str(j['gstin']),
@@ -87,6 +95,8 @@ class PropertySettings {
     brandColor: _str(j['brandColor']),
     bookingTerms: _str(j['bookingTerms']),
     currency: _str(j['currency']) ?? 'INR',
+    minRoomPricePaise: _intOrNull(j['minRoomPricePaise']),
+    restaurantServiceChargeBp: _int(j['restaurantServiceChargeBp']),
   );
 }
 
@@ -295,6 +305,43 @@ class BookingSource {
     name: _str(j['name']) ?? '',
     channel: _str(j['channel']) ?? 'OTHER',
     commissionBp: _int(j['commissionBp']),
+    isActive: j['isActive'] == null ? true : _bool(j['isActive']),
+  );
+}
+
+class Coupon {
+  const Coupon({
+    required this.id,
+    required this.code,
+    required this.kind,
+    required this.value,
+    this.description,
+    this.minNights,
+    this.maxUses,
+    this.uses = 0,
+    this.isActive = true,
+  });
+  final String id;
+  final String code;
+  final String kind;
+  final int value;
+  final String? description;
+  final int? minNights;
+  final int? maxUses;
+  final int uses;
+  final bool isActive;
+  String get valueLabel => kind == 'PERCENT'
+      ? '${(value / 100).toStringAsFixed(0)}% off'
+      : '₹${(value / 100).toStringAsFixed(0)} off';
+  factory Coupon.fromJson(Map j) => Coupon(
+    id: '${j['id']}',
+    code: _str(j['code']) ?? '',
+    kind: _str(j['kind']) ?? 'PERCENT',
+    value: _int(j['value']),
+    description: _str(j['description']),
+    minNights: _intOrNull(j['minNights']),
+    maxUses: _intOrNull(j['maxUses']),
+    uses: _int(j['uses']),
     isActive: j['isActive'] == null ? true : _bool(j['isActive']),
   );
 }

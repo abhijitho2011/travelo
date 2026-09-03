@@ -883,9 +883,13 @@ class NewReservation {
     this.holdMinutes,
     this.companyName,
     this.companyGstin,
+    this.corporateAccountId,
   });
 
   final String roomTypeId;
+
+  /// Bill the stay to a company account; the folio settles by CORPORATE.
+  final String? corporateAccountId;
 
   /// The rate plan sold; null means the flat nightly rate.
   final String? ratePlanId;
@@ -1159,4 +1163,11 @@ class FolioPayment {
 
 /// The payment methods the desk can record — mirrors the server's
 /// folioPaymentMethodValues.
-const kFolioPaymentMethods = <String>['CASH', 'CARD', 'UPI', 'BANK', 'ONLINE'];
+const kFolioPaymentMethods = <String>[
+  'CASH',
+  'CARD',
+  'UPI',
+  'BANK',
+  'ONLINE',
+  'CORPORATE',
+];

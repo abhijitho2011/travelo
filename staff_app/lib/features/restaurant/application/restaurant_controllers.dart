@@ -202,15 +202,39 @@ class RestaurantActions {
     return o;
   }
 
+  Future<RestaurantOrder> discount(
+    String orderId, {
+    required int amountPaise,
+    required String reason,
+  }) async {
+    final result = await _repo.discount(
+      orderId,
+      amountPaise: amountPaise,
+      reason: reason,
+    );
+    _refreshOrder(orderId);
+    return result;
+  }
+
   Future<RestaurantOrder> settle(
     String orderId,
     PaymentMethod method, {
     String? reservationId,
+    String? corporateAccountId,
+    int? amountPaise,
+    String? remarks,
   }) async {
-    final o = await _repo.settle(orderId, method, reservationId: reservationId);
+    final result = await _repo.settle(
+      orderId,
+      method,
+      reservationId: reservationId,
+      corporateAccountId: corporateAccountId,
+      amountPaise: amountPaise,
+      remarks: remarks,
+    );
     _refreshOrder(orderId);
     _invalidateBoards();
-    return o;
+    return result;
   }
 
   Future<RestaurantOrder> cancelOrder(String orderId, String reason) async {

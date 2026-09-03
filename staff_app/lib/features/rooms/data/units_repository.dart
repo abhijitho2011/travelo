@@ -117,6 +117,18 @@ class UnitsRepository {
 
   // ----------------------------------------------------- dynamic pricing --
 
+  /// Run (or preview) the pricing rules for one room type against the grid.
+  Future<Map> runRules(
+    String roomTypeId, {
+    bool dryRun = false,
+    int days = 90,
+  }) async =>
+      await _api.post(
+            '/room-types/$roomTypeId/pricing-rules/run',
+            body: {'dryRun': dryRun, 'days': days},
+          )
+          as Map;
+
   Future<List<PricingRule>> pricingRules(String roomTypeId) async {
     final data = await _api.get('/room-types/$roomTypeId/pricing-rules');
     return _listOf(data, PricingRule.fromJson);

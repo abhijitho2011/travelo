@@ -16,6 +16,7 @@ import '../../rooms/data/room_models.dart' show formatPaise;
 import '../../rooms/presentation/room_widgets.dart'
     show FieldNote, FormErrorNote;
 import '../../property_settings/application/property_settings_controllers.dart';
+import '../../accounts/application/accounts_controllers.dart';
 import '../../rooms/application/units_controllers.dart';
 import '../application/reception_controllers.dart';
 import '../data/reception_models.dart';
@@ -76,6 +77,7 @@ class _ReservationFormScreenState extends ConsumerState<ReservationFormScreen> {
   ReservationSource _source = ReservationSource.walkIn;
   String? _ratePlanId;
   String? _bookingSourceId;
+  String? _corporateAccountId;
   final _segment = TextEditingController();
   final _holdMinutes = TextEditingController();
   final _companyName = TextEditingController();
@@ -209,6 +211,7 @@ class _ReservationFormScreenState extends ConsumerState<ReservationFormScreen> {
                   : int.tryParse(_holdMinutes.text.trim()),
               companyName: _companyName.text.trim(),
               companyGstin: _companyGstin.text.trim().toUpperCase(),
+              corporateAccountId: _corporateAccountId,
             ),
           );
       messenger.showSnackBar(
@@ -422,6 +425,12 @@ class _ReservationFormScreenState extends ConsumerState<ReservationFormScreen> {
                         labelText: 'Company (optional)',
                         hintText: 'Bills to a company — prints on the invoice',
                       ),
+                    ),
+                    gapMd,
+                    _CorporateAccountPicker(
+                      value: _corporateAccountId,
+                      onChanged: (id) =>
+                          setState(() => _corporateAccountId = id),
                     ),
                     gapMd,
                     TextFormField(
@@ -720,6 +729,34 @@ class _RatePlanPicker extends ConsumerWidget {
               '${p.name} · ${formatPaise(p.basePricePaise)} · ${p.mealPlan.label}',
             ),
           ),
+      ],
+      onChanged: onChanged,
+    );
+  }
+}
+
+/// Bill the stay to a company account (direct billing), when any exist.
+class _CorporateAccountPicker extends ConsumerWidget {
+  const _CorporateAccountPicker({required this.value, required this.onChanged});
+  final String? value;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final accounts =
+        ref.watch(corporateAccountsProvider).valueOrNull ?? const [];
+    final active = accounts.where((a) => a.isActive).toList();
+    if (active.isEmpty) return const SizedBox.shrink();
+    return DropdownButtonFormField<String?>(
+      initialValue: active.any((a) => a.id == value) ? value : null,
+      isExpanded: true,
+      decoration: const InputDecoration(
+        labelText: 'Bill to company account (optional)',
+      ),
+      items: [
+        const DropdownMenuItem(value: null, child: Text('Guest pays')),
+        for (final a in active)
+          DropdownMenuItem(value: a.id, child: Text(a.name)),
       ],
       onChanged: onChanged,
     );

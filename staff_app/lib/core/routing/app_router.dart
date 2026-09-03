@@ -60,6 +60,7 @@ import '../../features/property_settings/presentation/property_settings_screen.d
 import '../../features/property_settings/presentation/catalogue_screens.dart';
 import '../../features/rates/presentation/rates_grid_screen.dart';
 import '../../features/reports/presentation/reports_screen.dart';
+import '../../features/accounts/presentation/ledger_screens.dart';
 import '../../features/sales/presentation/sales_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/sales/presentation/lead_detail_screen.dart';
@@ -228,6 +229,24 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: Routes.propertySources,
             builder: (_, _) => const BookingSourcesScreen(),
+          ),
+          GoRoute(
+            path: Routes.propertyCoupons,
+            builder: (_, _) => const CouponsScreen(),
+          ),
+          GoRoute(
+            path: Routes.accountsCash,
+            builder: (_, _) => const CashTrackerScreen(),
+          ),
+          GoRoute(
+            path: Routes.accountsCorporate,
+            builder: (_, _) => const CorporateAccountsScreen(),
+          ),
+          GoRoute(
+            path: Routes.accountsCorporatePattern,
+            builder: (_, state) => CorporateStatementScreen(
+              accountId: state.pathParameters['id']!,
+            ),
           ),
           GoRoute(
             path: Routes.rates,

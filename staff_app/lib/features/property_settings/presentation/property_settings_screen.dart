@@ -40,6 +40,8 @@ class _PropertySettingsScreenState
   final _hold = TextEditingController();
   final _slug = TextEditingController();
   final _terms = TextEditingController();
+  final _floor = TextEditingController();
+  final _serviceCharge = TextEditingController();
   bool _pricesIncludeTax = false;
   bool _showGstin = true;
   bool _showHsn = true;
@@ -80,6 +82,12 @@ class _PropertySettingsScreenState
     _hold.text = s.holdExpiryMinutes?.toString() ?? '';
     _slug.text = s.bookingEngineSlug ?? '';
     _terms.text = s.bookingTerms ?? '';
+    _floor.text = s.minRoomPricePaise == null
+        ? ''
+        : (s.minRoomPricePaise! ~/ 100).toString();
+    _serviceCharge.text = s.restaurantServiceChargeBp == 0
+        ? ''
+        : (s.restaurantServiceChargeBp / 100).toString();
     _pricesIncludeTax = s.pricesIncludeTax;
     _showGstin = s.invoiceShowGstin;
     _showHsn = s.invoiceShowHsn;
@@ -118,6 +126,11 @@ class _PropertySettingsScreenState
         if (_slug.text.trim().isNotEmpty)
           'bookingEngineSlug': _slug.text.trim(),
         'bookingTerms': _terms.text.trim(),
+        'minRoomPricePaise': _floor.text.trim().isEmpty
+            ? null
+            : (int.tryParse(_floor.text.trim()) ?? 0) * 100,
+        'restaurantServiceChargeBp':
+            ((double.tryParse(_serviceCharge.text.trim()) ?? 0) * 100).round(),
       });
       messenger.showSnackBar(
         const SnackBar(content: Text('Property settings saved')),
