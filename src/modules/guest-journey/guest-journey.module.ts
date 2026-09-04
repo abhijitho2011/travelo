@@ -7,7 +7,11 @@ import { PropertyConfigModule } from '../property-config/property-config.module'
 import { ReservationsModule } from '../reservations/reservations.module';
 import { SharedAuthModule } from '../shared-auth/shared-auth.module';
 import { StorageModule } from '../storage/storage.module';
-import { PublicGuestController, StaffGuestLinkController } from './guest-journey.controllers';
+import {
+  PublicGuestController,
+  StaffGuestLinkController,
+  StaffGuestLinksController,
+} from './guest-journey.controllers';
 import { GuestJourneyService } from './guest-journey.service';
 
 @Module({
@@ -21,7 +25,7 @@ import { GuestJourneyService } from './guest-journey.service';
     StorageModule,
     NotificationsModule,
   ],
-  controllers: [PublicGuestController, StaffGuestLinkController],
+  controllers: [PublicGuestController, StaffGuestLinkController, StaffGuestLinksController],
   providers: [GuestJourneyService],
   exports: [GuestJourneyService],
 })

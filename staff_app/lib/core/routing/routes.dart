@@ -149,4 +149,10 @@ class Routes {
   static const conversationPattern = '/conversations/:id';
   static String conversation(String id) => '/conversations/$id';
   static const reviews = '/reviews';
+  static const guests = '/guests';
+  static const billing = '/billing';
+  static const channels = '/channels';
+  static const bookingEngine = '/booking-engine';
+  static const revenue = '/revenue';
+  static const magicLink = '/magic-link';
 }

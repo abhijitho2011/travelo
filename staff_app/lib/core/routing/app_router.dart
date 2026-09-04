@@ -64,6 +64,12 @@ import '../../features/accounts/presentation/ledger_screens.dart';
 import '../../features/guest_comms/presentation/conversations_screen.dart';
 import '../../features/guest_comms/presentation/reviews_screen.dart';
 import '../../features/guest_comms/presentation/report_builder_screen.dart';
+import '../../features/guests/presentation/guests_screen.dart';
+import '../../features/billing/presentation/billing_screen.dart';
+import '../../features/guest_journey/presentation/magic_link_screen.dart';
+import '../../features/channels/presentation/channels_screen.dart';
+import '../../features/booking_engine/presentation/booking_engine_screen.dart';
+import '../../features/revenue/presentation/revenue_screen.dart';
 import '../../features/sales/presentation/sales_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/sales/presentation/lead_detail_screen.dart';
@@ -276,6 +282,27 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: Routes.reviews,
             builder: (_, _) => const ReviewsScreen(),
+          ),
+          GoRoute(path: Routes.guests, builder: (_, _) => const GuestsScreen()),
+          GoRoute(
+            path: Routes.billing,
+            builder: (_, _) => const BillingScreen(),
+          ),
+          GoRoute(
+            path: Routes.magicLink,
+            builder: (_, _) => const MagicLinkScreen(),
+          ),
+          GoRoute(
+            path: Routes.channels,
+            builder: (_, _) => const ChannelsScreen(),
+          ),
+          GoRoute(
+            path: Routes.bookingEngine,
+            builder: (_, _) => const BookingEngineScreen(),
+          ),
+          GoRoute(
+            path: Routes.revenue,
+            builder: (_, _) => const RevenueScreen(),
           ),
           // Room-first: adding a room opens the full workspace, where the
           // room's own specifications, photos and rates live. There is no

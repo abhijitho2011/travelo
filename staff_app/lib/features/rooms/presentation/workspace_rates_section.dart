@@ -1660,7 +1660,7 @@ class DynamicPricingSection extends ConsumerWidget {
                 ),
               ),
               Text(
-                rule.trigger.label,
+                rule.displayName,
                 style: AppTypography.body(size: 11.5, color: c.mutedForeground),
               ),
             ],
@@ -1745,6 +1745,29 @@ class DynamicPricingSection extends ConsumerWidget {
   }
 }
 
+/// Opens the pricing-rule editor from outside this file — the revenue manager
+/// edits the same rules the workspace does, so it must open the same sheet.
+/// Resolves to the confirmation message when a rule was saved, null otherwise.
+Future<String?> showPricingRuleSheet(
+  BuildContext context, {
+  required String roomTypeId,
+  PricingRule? rule,
+}) => _openSheet<String>(
+  context,
+  (_) => _PricingRuleSheet(roomTypeId: roomTypeId, rule: rule),
+);
+
+/// Opens the channel-mapping editor from outside this file (the Channels
+/// screen). Resolves to the confirmation message when saved, null otherwise.
+Future<String?> showChannelMappingSheet(
+  BuildContext context, {
+  required String roomTypeId,
+  required ChannelMapping channel,
+}) => _openSheet<String>(
+  context,
+  (_) => _ChannelMappingSheet(roomTypeId: roomTypeId, channel: channel),
+);
+
 /// The rule editor. The condition half of the form follows the trigger: a
 /// season is a pair of dates, everything else is a comparator and a threshold.
 class _PricingRuleSheet extends ConsumerStatefulWidget {
@@ -1758,6 +1781,7 @@ class _PricingRuleSheet extends ConsumerStatefulWidget {
 }
 
 class _PricingRuleSheetState extends ConsumerState<_PricingRuleSheet> {
+  late final TextEditingController _name;
   late final TextEditingController _threshold;
   late final TextEditingController _amount;
 
@@ -1775,6 +1799,7 @@ class _PricingRuleSheetState extends ConsumerState<_PricingRuleSheet> {
   void initState() {
     super.initState();
     final rule = widget.rule;
+    _name = TextEditingController(text: rule?.name ?? '');
     _threshold = TextEditingController(text: rule?.threshold?.toString() ?? '');
     _amount = TextEditingController(
       text: rule == null ? '' : _decimalText(rule.adjustmentValue.abs()),
@@ -1789,6 +1814,7 @@ class _PricingRuleSheetState extends ConsumerState<_PricingRuleSheet> {
 
   @override
   void dispose() {
+    _name.dispose();
     _threshold.dispose();
     _amount.dispose();
     super.dispose();
@@ -1805,6 +1831,12 @@ class _PricingRuleSheetState extends ConsumerState<_PricingRuleSheet> {
       onSave: _save,
       saveLabel: widget.rule == null ? 'Add rule' : 'Save changes',
       fields: [
+        _SheetField(
+          label: 'Name (optional)',
+          controller: _name,
+          hint: 'Weekend uplift',
+          helper: 'Shown on the rules list and in run previews.',
+        ),
         _SheetDropdown<PricingTrigger>(
           label: 'Trigger',
           value: _trigger,
@@ -1958,6 +1990,8 @@ class _PricingRuleSheetState extends ConsumerState<_PricingRuleSheet> {
     final rule = PricingRule(
       id: existing?.id ?? '',
       roomTypeId: widget.roomTypeId,
+      name: _name.text.trim().isEmpty ? null : _name.text.trim(),
+      priority: existing?.priority ?? 0,
       trigger: _trigger,
       comparator: _comparator,
       threshold: threshold,

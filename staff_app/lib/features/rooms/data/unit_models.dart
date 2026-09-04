@@ -645,10 +645,19 @@ class PricingRule {
     this.adjustmentKind = AdjustmentKind.percent,
     this.enabled = true,
     this.priority = 0,
+    this.name,
+    this.lastRunAt,
   });
 
   final String id;
   final String roomTypeId;
+
+  /// The optional human name the server stores; the engine falls back to the
+  /// trigger when a rule has none, so the label here does the same.
+  final String? name;
+
+  /// When the engine last applied this rule to the grid (null: never run).
+  final DateTime? lastRunAt;
   final PricingTrigger trigger;
   final Comparator comparator;
   final int? threshold;
@@ -660,6 +669,9 @@ class PricingRule {
   final int priority;
 
   bool get isIncrease => adjustmentValue >= 0;
+
+  /// What to call the rule on a card: its name, else its trigger.
+  String get displayName => (name ?? '').trim().isEmpty ? trigger.label : name!;
 
   /// "Increase by 15%" / "Reduce by ₹200".
   String get adjustmentLabel {
@@ -698,9 +710,14 @@ class PricingRule {
     adjustmentValue: _int(_pick(json, ['adjustmentValue', 'adjustment_value'])),
     enabled: json['enabled'] == null ? true : _bool(json['enabled']),
     priority: _int(json['priority']),
+    name: _str(json['name']),
+    lastRunAt: DateTime.tryParse(
+      (_pick(json, ['lastRunAt', 'last_run_at']) ?? '').toString(),
+    ),
   );
 
   Map<String, dynamic> toJson() => {
+    if ((name ?? '').trim().isNotEmpty) 'name': name!.trim(),
     'trigger': trigger.wire,
     'comparator': comparator.wire,
     if (threshold != null) 'threshold': threshold,
@@ -709,6 +726,7 @@ class PricingRule {
     'adjustmentKind': adjustmentKind.wire,
     'adjustmentValue': adjustmentValue,
     'enabled': enabled,
+    'priority': priority,
   };
 }
 
@@ -758,6 +776,9 @@ class ChannelConnection {
     this.errorCount = 0,
     this.detail,
     this.channelPropertyId,
+    this.lastSyncAt,
+    this.lastSuccessAt,
+    this.lastFailureAt,
   });
 
   final String id;
@@ -766,6 +787,12 @@ class ChannelConnection {
   final bool connected;
   final int errorCount;
   final String? detail;
+
+  /// The sync health the server writes: the last attempt, the last one that
+  /// worked and the last one that did not. Any may be null on a fresh row.
+  final DateTime? lastSyncAt;
+  final DateTime? lastSuccessAt;
+  final DateTime? lastFailureAt;
 
   /// The property's id on the provider's side, when the admin has set one.
   final String? channelPropertyId;
@@ -797,8 +824,14 @@ class ChannelConnection {
     channelPropertyId: _str(
       _pick(json, ['channexPropertyId', 'channex_property_id']),
     ),
+    lastSyncAt: _date(_pick(json, ['lastSyncAt', 'last_sync_at'])),
+    lastSuccessAt: _date(_pick(json, ['lastSuccessAt', 'last_success_at'])),
+    lastFailureAt: _date(_pick(json, ['lastFailureAt', 'last_failure_at'])),
   );
 }
+
+DateTime? _date(Object? v) =>
+    v == null ? null : DateTime.tryParse(v.toString());
 
 /// One connection as seen from ONE room type: the same health, plus whether
 /// this room type has been pointed at its counterpart on the channel.

@@ -12,6 +12,8 @@ class SidebarEntry {
     required this.icon,
     required this.route,
     this.onTap,
+    this.badge,
+    this.badgeWarns = false,
   });
 
   final String label;
@@ -19,6 +21,12 @@ class SidebarEntry {
 
   /// The route this entry navigates to (also used to compute the active state).
   final String route;
+
+  /// A live count shown at the row's trailing edge; null hides it.
+  final int? badge;
+
+  /// Warning-toned badge (housekeeping backlog) instead of the neutral one.
+  final bool badgeWarns;
 
   /// Overrides the default `context.go(route)` — e.g. to open a sheet.
   final VoidCallback? onTap;
@@ -42,8 +50,12 @@ class TaveloSidebar extends StatelessWidget {
     required this.currentLocation,
     required this.isActive,
     this.width = 232,
+    this.header,
     this.footer,
   });
+
+  /// Sits under the wordmark — the property card.
+  final Widget? header;
 
   final List<SidebarSection> sections;
   final String currentLocation;
@@ -77,6 +89,7 @@ class TaveloSidebar extends StatelessWidget {
               child: TaveloLogo(height: 26),
             ),
           ),
+          if (header != null) header!,
           Expanded(
             child: SingleChildScrollView(
               child: Column(
@@ -167,6 +180,31 @@ class _SidebarRowState extends State<_SidebarRow> {
                     ),
                   ),
                 ),
+                if (widget.entry.badge != null && widget.entry.badge! > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: widget.entry.badgeWarns
+                          ? c.warning.withValues(alpha: 0.16)
+                          : (active
+                                ? c.primary.withValues(alpha: 0.14)
+                                : c.muted),
+                      borderRadius: R.rPill,
+                    ),
+                    child: Text(
+                      '${widget.entry.badge}',
+                      style: AppTypography.body(
+                        size: 11,
+                        weight: FontWeight.w600,
+                        color: widget.entry.badgeWarns
+                            ? c.warning
+                            : (active ? c.primary : c.mutedForeground),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),

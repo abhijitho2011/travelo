@@ -45,6 +45,7 @@ class P {
   static const checkOutPerform = 'checkout.perform';
   static const guestRead = 'guest.read';
   static const guestCreate = 'guest.create';
+  static const guestUpdate = 'guest.update';
   static const roomRead = 'room.read';
   static const roomStatusUpdate = 'room.status.update';
 
@@ -74,6 +75,7 @@ class P {
   static const reviewRead = 'review.read';
   static const reviewRespond = 'review.respond';
   static const corporateRead = 'corporate.read';
+  static const channelRead = 'channel.read';
 
   // ----------------------------------------------------------- operations --
   static const housekeepingRead = 'housekeeping.read';

@@ -6,7 +6,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
-import { and, desc, eq, gt, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, isNull, lt, or, type SQL } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
 import {
   guestLinks,
@@ -20,13 +20,16 @@ import { FolioService } from '../folio/folio.service';
 import { NotificationDeliveryService } from '../notifications/notification-delivery.service';
 import { PropertyConfigService } from '../property-config/property-config.service';
 import { RealtimeService } from '../realtime/realtime.service';
-import { nightsBetween } from '../reservations/reservation-rules';
+import { addDays, nightsBetween, today } from '../reservations/reservation-rules';
 import { ReservationsService } from '../reservations/reservations.service';
 import { StorageService } from '../storage/storage.service';
 
 /** A link lives until the day after checkout. */
 const LINK_TTL_AFTER_CHECKOUT_MS = 24 * 3600_000;
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+export type GuestLinkWindow = 'today' | 'week' | 'all';
+const GUEST_LINK_LIST_LIMIT = 500;
+
 const IMAGE_MIME: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -379,6 +382,19 @@ export class GuestJourneyService {
     return { ok: true };
   }
 
+  /** The desk-facing view of one link row — the same shape on the per-stay and list routes. */
+  static linkState(link: typeof guestLinks.$inferSelect | null | undefined) {
+    return link
+      ? {
+          sentAt: link.sentAt,
+          openedAt: link.openedAt,
+          checkinSubmittedAt: link.checkinSubmittedAt,
+          checkoutRequestedAt: link.checkoutRequestedAt,
+          expiresAt: link.expiresAt,
+        }
+      : null;
+  }
+
   /** For the desk: the link state per reservation, and presigned ID/photo URLs. */
   async status(propertyId: string, reservationId: string) {
     const r = await this.reservations.requireReservation(propertyId, reservationId);
@@ -389,21 +405,82 @@ export class GuestJourneyService {
       .orderBy(desc(guestLinks.createdAt))
       .limit(1);
     return {
-      link: link
-        ? {
-            sentAt: link.sentAt,
-            openedAt: link.openedAt,
-            checkinSubmittedAt: link.checkinSubmittedAt,
-            checkoutRequestedAt: link.checkoutRequestedAt,
-            expiresAt: link.expiresAt,
-          }
-        : null,
+      link: GuestJourneyService.linkState(link),
       idProofUrl: r.guestIdProofKey
         ? await this.storage.getSignedUrl(r.guestIdProofKey, 900).catch(() => null)
         : null,
       photoUrl: r.guestPhotoKey
         ? await this.storage.getSignedUrl(r.guestPhotoKey, 900).catch(() => null)
         : null,
+    };
+  }
+
+  /**
+   * The desk's link board: which guests have been sent a link, who opened it,
+   * who has checked in online, who wants out.
+   *
+   *   today — arriving today (CONFIRMED) plus everyone in-house
+   *   week  — arriving within the next 7 days plus everyone in-house
+   *   all   — every CONFIRMED stay still ahead, plus everyone in-house
+   *
+   * One query: a reservation holds at most one live link (issue() replaces),
+   * so the join is one-to-at-most-one.
+   */
+  async list(propertyId: string, window: GuestLinkWindow = 'today', now: Date = new Date()) {
+    const day = today(now);
+    const inHouse = eq(reservations.status, 'CHECKED_IN');
+    let arriving: SQL;
+    if (window === 'today') {
+      arriving = and(eq(reservations.status, 'CONFIRMED'), eq(reservations.checkIn, day)) as SQL;
+    } else if (window === 'week') {
+      arriving = and(
+        eq(reservations.status, 'CONFIRMED'),
+        gte(reservations.checkIn, day),
+        lt(reservations.checkIn, addDays(day, 7)),
+      ) as SQL;
+    } else {
+      arriving = and(eq(reservations.status, 'CONFIRMED'), gte(reservations.checkIn, day)) as SQL;
+    }
+
+    const rows = await this.db
+      .select({
+        id: reservations.id,
+        reservationNumber: reservations.reservationNumber,
+        guestName: reservations.guestName,
+        guestPhone: reservations.guestPhone,
+        guestEmail: reservations.guestEmail,
+        checkIn: reservations.checkIn,
+        checkOut: reservations.checkOut,
+        status: reservations.status,
+        roomNumber: rooms.number,
+        link: guestLinks,
+      })
+      .from(reservations)
+      .leftJoin(rooms, eq(reservations.roomId, rooms.id))
+      .leftJoin(guestLinks, eq(guestLinks.reservationId, reservations.id))
+      .where(
+        and(
+          eq(reservations.propertyId, propertyId),
+          isNull(reservations.deletedAt),
+          or(inHouse, arriving),
+        ),
+      )
+      .orderBy(asc(reservations.checkIn), asc(reservations.guestName))
+      .limit(GUEST_LINK_LIST_LIMIT);
+
+    return {
+      items: rows.map((r) => ({
+        reservationId: r.id,
+        code: r.reservationNumber,
+        guestName: r.guestName,
+        phone: r.guestPhone,
+        email: r.guestEmail,
+        roomNumber: r.roomNumber ?? null,
+        checkIn: r.checkIn,
+        checkOut: r.checkOut,
+        status: r.status,
+        link: GuestJourneyService.linkState(r.link),
+      })),
     };
   }
 }

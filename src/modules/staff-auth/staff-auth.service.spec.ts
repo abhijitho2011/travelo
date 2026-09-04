@@ -25,19 +25,24 @@ async function expectRejectionCode(p: Promise<unknown>, code: string): Promise<v
 }
 
 /**
- * Chainable Drizzle stand-in. `select()` returns the seeded rows; `insert()` is
- * a spy so a test can prove no row was ever created.
+ * Chainable Drizzle stand-in. The first `select()` returns the seeded rows,
+ * every later one the `rooms` count (what `me()` asks for second); `insert()`
+ * is a spy so a test can prove no row was ever created.
  */
-function makeDb(rows: Row[] = []) {
+function makeDb(rows: Row[] = [], roomCount = 0) {
   const insert = jest.fn(() => ({ values: () => ({ returning: async () => [] }) }));
+  let calls = 0;
   const chain = () => {
+    const result = calls++ === 0 ? rows : [{ count: roomCount }];
     const c: Record<string, unknown> = {};
     Object.assign(c, {
       from: () => c,
       leftJoin: () => c,
       where: () => c,
       orderBy: () => c,
-      limit: async () => rows,
+      limit: async () => result,
+      then: (res: (v: Row[]) => unknown, rej?: (e: unknown) => unknown) =>
+        Promise.resolve(result).then(res, rej),
     });
     return c;
   };
@@ -248,16 +253,19 @@ describe('StaffAuthService — Google sign-in', () => {
 
 describe('StaffAuthService.me — the app’s role-detection payload', () => {
   it('returns user, hotel, organization, role and resolved permissions', async () => {
-    const db = makeDb([
-      {
-        s: staffRow(),
-        propertyName: 'Sea Breeze Resort',
-        propertyCity: 'Kochi',
-        propertyState: 'Kerala',
-        ownerName: 'Ravi Owner',
-        ownerCompany: 'Acme Hospitality',
-      },
-    ]);
+    const db = makeDb(
+      [
+        {
+          s: staffRow(),
+          propertyName: 'Sea Breeze Resort',
+          propertyCity: 'Kochi',
+          propertyState: 'Kerala',
+          ownerName: 'Ravi Owner',
+          ownerCompany: 'Acme Hospitality',
+        },
+      ],
+      42,
+    );
     const svc = new StaffAuthService(
       db as never,
       { sendOtp: jest.fn() } as never,
@@ -284,6 +292,7 @@ describe('StaffAuthService.me — the app’s role-detection payload', () => {
       name: 'Sea Breeze Resort',
       city: 'Kochi',
       state: 'Kerala',
+      roomCount: 42,
     });
     expect(me.organization).toEqual({ id: 'own-1', name: 'Acme Hospitality' });
     expect(me.role).toBe('RECEPTIONIST');

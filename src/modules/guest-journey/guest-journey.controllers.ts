@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -34,7 +35,7 @@ import {
   RequireStaffPermissions,
   StaffPermissionsGuard,
 } from '../staff-auth/staff-permissions.guard';
-import { GuestJourneyService } from './guest-journey.service';
+import { GuestJourneyService, type GuestLinkWindow } from './guest-journey.service';
 
 class GuestCheckinDto {
   @IsOptional() @IsString() @Length(2, 160) guestName?: string;
@@ -58,6 +59,10 @@ class GuestRequestsDto {
 }
 class UploadKindDto {
   @IsOptional() @IsIn(['id', 'photo']) kind?: 'id' | 'photo';
+}
+class GuestLinkListQueryDto {
+  /** today (default): arrivals today + in-house; week: next 7 days + in-house; all: every future stay + in-house. */
+  @IsOptional() @IsIn(['today', 'week', 'all']) window?: GuestLinkWindow;
 }
 
 /** The guest side. No user, no guard: the token IS the credential, and it is throttled. */
@@ -135,5 +140,20 @@ export class StaffGuestLinkController {
       actorRole: me.role,
     });
     return res;
+  }
+}
+
+/** The desk's link board across the property: who was sent a link and what they did with it. */
+@ApiTags('Staff Guest Link')
+@ApiBearerAuth()
+@UseGuards(StaffJwtGuard, StaffPermissionsGuard)
+@Controller({ path: 'api/v1/staff/guest-links', version: VERSION_NEUTRAL })
+export class StaffGuestLinksController {
+  constructor(private readonly journey: GuestJourneyService) {}
+
+  @Get()
+  @RequireStaffPermissions('reservation.read')
+  list(@CurrentStaff() me: AuthenticatedStaff, @Query() query: GuestLinkListQueryDto) {
+    return this.journey.list(me.propertyId, query.window ?? 'today');
   }
 }

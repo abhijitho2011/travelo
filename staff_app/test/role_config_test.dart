@@ -234,9 +234,9 @@ void main() {
 
     test('a More item hides when its permission is missing', () {
       final gm = RoleConfig.of(StaffRole.generalManager);
-      const housekeepingOnly = PermissionSet({'housekeeping.read'});
-      final visible = gm.visibleMore(housekeepingOnly).map((i) => i.route);
-      expect(visible, contains(Routes.housekeeping));
+      const stockOnly = PermissionSet({'inventory.read'});
+      final visible = gm.visibleMore(stockOnly).map((i) => i.route);
+      expect(visible, contains(Routes.inventory));
       expect(visible, isNot(contains(Routes.accounts)));
       // The ungated common tail (Settings) survives any permission set.
       expect(visible, contains(Routes.settings));

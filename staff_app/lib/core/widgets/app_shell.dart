@@ -12,6 +12,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import '../theme/theme_controller.dart';
+import 'nav_live.dart';
 import 'offline_indicator.dart';
 import 'tavelo_logo.dart';
 import 'tavelo_sidebar.dart';
@@ -24,10 +25,17 @@ import 'tavelo_sidebar.dart';
 /// Group the sidebar by [NavItem.section], in first-seen order so the role
 /// config decides the sequence. Untitled items (the bottom-bar primaries)
 /// always lead.
-List<SidebarSection> _sections(BuildContext context, List<NavItem> items) {
+List<SidebarSection> _sections(
+  BuildContext context,
+  List<NavItem> items,
+  Map<NavBadge, int> badges,
+) {
   final order = <String?>[];
   final byTitle = <String?, List<SidebarEntry>>{};
   for (final item in items) {
+    // Configuration lives in the footer on a tablet; listing it twice would
+    // make the sidebar look unfinished.
+    if (item.route == Routes.propertySettings) continue;
     final key = item.section;
     if (!byTitle.containsKey(key)) {
       order.add(key);
@@ -38,6 +46,8 @@ List<SidebarSection> _sections(BuildContext context, List<NavItem> items) {
         label: item.label,
         icon: item.icon,
         route: item.route,
+        badge: item.badge == null ? null : badges[item.badge!],
+        badgeWarns: item.badge == NavBadge.dirtyRooms,
         onTap: () => context.go(item.route),
       ),
     );
@@ -142,7 +152,17 @@ class AppShell extends ConsumerWidget {
               TaveloSidebar(
                 currentLocation: location,
                 isActive: (route) => _routeActive(route, location),
-                sections: _sections(context, items),
+                sections: _sections(
+                  context,
+                  items,
+                  ref.watch(navBadgesProvider),
+                ),
+                header: const _PropertyCard(),
+                footer: _SidebarFooter(
+                  configuration: [...items, ...more]
+                      .where((i) => i.route == Routes.propertySettings)
+                      .firstOrNull,
+                ),
               ),
               // Keep line length readable rather than letting a list span the
               // full width of a landscape tablet.
@@ -502,4 +522,193 @@ class _RealtimeBinderState extends ConsumerState<_RealtimeBinder> {
 
   @override
   Widget build(BuildContext context) => widget.child;
+}
+
+/// The hotel this session belongs to: initials, name, city and room count.
+class _PropertyCard extends ConsumerWidget {
+  const _PropertyCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    final hotel = ref.watch(sessionProvider)?.hotel;
+    if (hotel == null) return const SizedBox.shrink();
+    final sub = [
+      if (hotel.city != null && hotel.city!.isNotEmpty) hotel.city!,
+      if (hotel.roomCount != null) '${hotel.roomCount} rooms',
+    ].join(' · ');
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        border: Border.all(color: c.border),
+        borderRadius: R.rMd,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: c.primary, borderRadius: R.rSm),
+            child: Text(
+              hotel.initials,
+              style: AppTypography.body(
+                size: 11,
+                weight: FontWeight.w700,
+                color: c.primaryForeground,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  hotel.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.body(
+                    size: 12.5,
+                    weight: FontWeight.w600,
+                    color: c.foreground,
+                  ),
+                ),
+                if (sub.isNotEmpty)
+                  Text(
+                    sub,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.body(
+                      size: 10.5,
+                      color: c.mutedForeground,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Configuration, then the channel-manager pill.
+class _SidebarFooter extends ConsumerWidget {
+  const _SidebarFooter({required this.configuration});
+  final NavItem? configuration;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    final location = GoRouterState.of(context).uri.path;
+    final sync = ref.watch(channelSyncProvider).valueOrNull;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          height: 1,
+          margin: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+          color: c.muted,
+        ),
+        if (configuration != null)
+          _FooterRow(
+            icon: configuration!.icon,
+            label: configuration!.label,
+            active: _routeActive(configuration!.route, location),
+            onTap: () => context.go(configuration!.route),
+          ),
+        if (sync != null && sync.state != ChannelSyncState.unknown)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 6, 10, 2),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: switch (sync.state) {
+                  ChannelSyncState.synced => c.primary.withValues(alpha: 0.12),
+                  ChannelSyncState.attention => c.warning.withValues(
+                    alpha: 0.14,
+                  ),
+                  _ => c.muted,
+                },
+                borderRadius: R.rPill,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.circle,
+                    size: 7,
+                    color: switch (sync.state) {
+                      ChannelSyncState.synced => c.primary,
+                      ChannelSyncState.attention => c.warning,
+                      _ => c.mutedForeground,
+                    },
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      sync.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.body(
+                        size: 11,
+                        weight: FontWeight.w600,
+                        color: c.foreground.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _FooterRow extends StatelessWidget {
+  const _FooterRow({
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: R.rSm,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        decoration: BoxDecoration(
+          color: active ? c.accent : Colors.transparent,
+          borderRadius: R.rSm,
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 19, color: active ? c.primary : c.mutedForeground),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: AppTypography.body(
+                size: 13.5,
+                weight: active ? FontWeight.w600 : FontWeight.w500,
+                color: active
+                    ? c.primary
+                    : c.foreground.withValues(alpha: 0.82),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

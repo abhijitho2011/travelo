@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { DRIZZLE, Database } from '../../database/database.module';
-import { hotelStaff, owners, properties, type HotelStaff } from '../../database/schema';
+import { hotelStaff, owners, properties, rooms, type HotelStaff } from '../../database/schema';
 import { FirebaseService } from '../shared-auth/firebase.service';
 import { SMS_PROVIDER, SmsProvider } from '../shared-auth/sms/sms-provider.interface';
 import { maskMobile } from '../shared-auth/mobile.util';
@@ -144,6 +144,13 @@ export class StaffAuthService {
     if (!row) throw StaffErrors.staffNotFound();
     const s = row.s;
 
+    // Live inventory size — the app sizes its room grid and onboarding
+    // prompts from this without a second call.
+    const [roomRow] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(rooms)
+      .where(and(eq(rooms.propertyId, s.propertyId), isNull(rooms.deletedAt)));
+
     return {
       user: {
         id: s.id,
@@ -161,6 +168,7 @@ export class StaffAuthService {
         name: row.propertyName,
         city: row.propertyCity,
         state: row.propertyState,
+        roomCount: roomRow?.count ?? 0,
       },
       organization: {
         id: s.ownerId,

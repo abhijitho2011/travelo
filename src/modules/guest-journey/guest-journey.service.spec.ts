@@ -1,5 +1,5 @@
 import { GuestJourneyService } from './guest-journey.service';
-import { mockDb } from '../owner-auth/testing/db.mock';
+import { mockDb, sqlText } from '../owner-auth/testing/db.mock';
 
 const IN = new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10);
 const OUT = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
@@ -153,5 +153,125 @@ describe('GuestJourneyService', () => {
     expect(db.updates.find((u) => u.table === 'reservations')?.values).toMatchObject({
       guestIdProofKey: expect.stringMatching(/^guests\//),
     });
+  });
+});
+
+describe('GuestJourneyService.list — the desk’s link board', () => {
+  const NOW = new Date('2026-09-04T06:00:00.000Z');
+  const linkRow = {
+    id: 'gl-1',
+    propertyId: 'p',
+    reservationId: 'res-1',
+    tokenHash: 'x'.repeat(64),
+    sentAt: new Date('2026-09-03T10:00:00.000Z'),
+    openedAt: new Date('2026-09-03T11:00:00.000Z'),
+    checkinSubmittedAt: null,
+    checkoutRequestedAt: null,
+    expiresAt: new Date('2026-09-08T00:00:00.000Z'),
+    createdAt: new Date('2026-09-03T10:00:00.000Z'),
+  };
+  const boardRow = (over: Record<string, unknown> = {}) => ({
+    id: 'res-1',
+    reservationNumber: 'RSV-000001',
+    guestName: 'Asha',
+    guestPhone: '9876543210',
+    guestEmail: 'asha@example.test',
+    checkIn: '2026-09-04',
+    checkOut: '2026-09-07',
+    status: 'CONFIRMED',
+    roomNumber: '204',
+    link: linkRow,
+    ...over,
+  });
+
+  it('lists arrivals and in-house stays with their link state (or null), scoped to the property', async () => {
+    const db = mockDb({
+      select: {
+        reservations: [
+          [
+            boardRow(),
+            boardRow({
+              id: 'res-2',
+              reservationNumber: 'RSV-000002',
+              guestName: 'Ravi',
+              guestEmail: null,
+              status: 'CHECKED_IN',
+              roomNumber: null,
+              link: null,
+            }),
+          ],
+        ],
+      },
+    });
+    const { s } = svc(db);
+    const res = await s.list('p', 'today', NOW);
+
+    expect(res).toEqual({
+      items: [
+        {
+          reservationId: 'res-1',
+          code: 'RSV-000001',
+          guestName: 'Asha',
+          phone: '9876543210',
+          email: 'asha@example.test',
+          roomNumber: '204',
+          checkIn: '2026-09-04',
+          checkOut: '2026-09-07',
+          status: 'CONFIRMED',
+          link: {
+            sentAt: linkRow.sentAt,
+            openedAt: linkRow.openedAt,
+            checkinSubmittedAt: null,
+            checkoutRequestedAt: null,
+            expiresAt: linkRow.expiresAt,
+          },
+        },
+        {
+          reservationId: 'res-2',
+          code: 'RSV-000002',
+          guestName: 'Ravi',
+          phone: '9876543210',
+          email: null,
+          roomNumber: null,
+          checkIn: '2026-09-04',
+          checkOut: '2026-09-07',
+          status: 'CHECKED_IN',
+          link: null,
+        },
+      ],
+    });
+    // The list route never leaks the token hash to the desk.
+    expect(JSON.stringify(res)).not.toContain(linkRow.tokenHash);
+
+    const where = sqlText(db.wheresFor('reservations')[0]);
+    expect(where).toContain('property_id');
+    expect(where).toContain('p');
+    expect(where).toContain('deleted_at is null');
+    expect(where).toContain('CHECKED_IN');
+    expect(where).toContain('CONFIRMED');
+    expect(where).toContain('2026-09-04');
+  });
+
+  it('the week window spans the next 7 days; all takes every future confirmed stay', async () => {
+    const db = mockDb({ select: { reservations: [[], []] } });
+    const { s } = svc(db);
+
+    await s.list('p', 'week', NOW);
+    const week = sqlText(db.wheresFor('reservations')[0]);
+    expect(week).toContain('2026-09-04');
+    expect(week).toContain('2026-09-11');
+
+    await s.list('p', 'all', NOW);
+    const all = sqlText(db.wheresFor('reservations')[1]);
+    expect(all).toContain('2026-09-04');
+    expect(all).not.toContain('2026-09-11');
+  });
+
+  it('returns the same link shape as the per-reservation status route', async () => {
+    const db = mockDb({ select: { guest_links: [[linkRow]] } });
+    const { s } = svc(db);
+    const status = await s.status('p', 'res-1');
+    expect(status.link).toEqual(GuestJourneyService.linkState(linkRow));
+    expect(status.link).not.toHaveProperty('tokenHash');
   });
 });

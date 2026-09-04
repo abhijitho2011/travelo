@@ -97,12 +97,29 @@ class StaffUser {
 
 @immutable
 class Hotel {
-  const Hotel({required this.id, required this.name, this.city, this.state});
+  const Hotel({
+    required this.id,
+    required this.name,
+    this.city,
+    this.state,
+    this.roomCount,
+  });
 
   final String id;
   final String name;
   final String? city;
   final String? state;
+  final int? roomCount;
+
+  /// "HVH" for Harbour View Hotel — the sidebar avatar.
+  String get initials {
+    final words = name
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .toList();
+    if (words.isEmpty) return '?';
+    return words.take(3).map((w) => w[0].toUpperCase()).join();
+  }
 
   String get location =>
       [city, state].where((s) => s != null && s.isNotEmpty).join(', ');
@@ -112,6 +129,9 @@ class Hotel {
     name: (json['name'] as String?) ?? 'Your hotel',
     city: json['city'] as String?,
     state: json['state'] as String?,
+    roomCount: json['roomCount'] is num
+        ? (json['roomCount'] as num).toInt()
+        : null,
   );
 }
 
